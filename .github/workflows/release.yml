@@ -1,0 +1,89 @@
+name: Build release
+
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Build-only version (vX.Y.Z); pushing a tag publishes a release'
+        required: true
+        default: v0.1.0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: ctype, curl, dom, fileinfo, filter, hash, mbstring, openssl, pdo_mysql, session, tokenizer, xml, zip
+          tools: composer:v2
+          coverage: none
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+      - run: composer check-platform-reqs --no-dev
+      - run: npm ci
+      - run: npm run build
+      - name: Package ready-to-install assets
+        env:
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: php scripts/build-release.php --version "$RELEASE_VERSION" --repository "$RELEASE_REPOSITORY"
+      - name: Smoke-test the actual production ZIP
+        run: |
+          php dist/install.php --archive dist/perysee.zip --checksums dist/SHA256SUMS --target "$RUNNER_TEMP/perysee-smoke" --url https://stats.example.com --yes
+          cd "$RUNNER_TEMP/perysee-smoke"
+          php artisan --version
+          test ! -f .env
+      - uses: actions/upload-artifact@v7
+        with:
+          name: perysee-release
+          path: |
+            dist/perysee.zip
+            dist/install.php
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: perysee-release
+          path: dist
+      - name: Publish all release assets together
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_VERSION" --verify-tag --draft --title "Perysee $RELEASE_VERSION" --generate-notes dist/perysee.zip dist/install.php dist/SHA256SUMS
+          if [[ "$RELEASE_VERSION" == *-* ]]; then
+            gh release edit "$RELEASE_VERSION" --prerelease --draft=false
+          else
+            gh release edit "$RELEASE_VERSION" --draft=false --latest
+          fi
