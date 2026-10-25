@@ -67,3 +67,4 @@ jobs:
       - run: composer test:mariadb
       - run: npm run test:tracker
       - run: npm run test:distribution
+      - run: bash -n scripts/install.sh

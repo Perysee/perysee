@@ -1,0 +1,13 @@
+name = "perysee-downloads"
+main = "worker.mjs"
+compatibility_date = "2026-10-25"
+workers_dev = false
+
+[[routes]]
+pattern = "get.perysee.eu"
+custom_domain = true
+
+[vars]
+GITHUB_REPOSITORY = "mattrbdr/perysee"
+
+# Set GITHUB_TOKEN with `wrangler secret put`; never store it in this file.

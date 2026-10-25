@@ -60,6 +60,7 @@ jobs:
           path: |
             dist/perysee.zip
             dist/install.php
+            dist/install.sh
             dist/SHA256SUMS
           if-no-files-found: error
 
@@ -81,7 +82,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_VERSION" --verify-tag --draft --title "Perysee $RELEASE_VERSION" --generate-notes dist/perysee.zip dist/install.php dist/SHA256SUMS
+          gh release create "$RELEASE_VERSION" --verify-tag --draft --title "Perysee $RELEASE_VERSION" --generate-notes dist/perysee.zip dist/install.php dist/install.sh dist/SHA256SUMS
           if [[ "$RELEASE_VERSION" == *-* ]]; then
             gh release edit "$RELEASE_VERSION" --prerelease --draft=false
           else

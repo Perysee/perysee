@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, chmodSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -28,7 +28,7 @@ function fixture(t) {
     writeFileSync(join(source, 'public/build/assets/app.js'), 'console.log("production")');
     for (const path of ['.env', '.env.testing', 'bootstrap/cache/config.php', 'storage/app/private/installation/installed',
         'storage/app/private/installation/secret', 'storage/logs/laravel.log', 'storage/framework/sessions/private',
-        'public/hot', 'node_modules/private', 'tests/private', 'infra/private']) {
+        'public/hot', 'node_modules/private', 'tests/private', 'infra/private', 'DEVELOPMENT.md']) {
         mkdirSync(join(source, path, '..'), { recursive: true });
         writeFileSync(join(source, path), 'DO_NOT_SHIP');
     }
@@ -57,7 +57,7 @@ test('production ZIP installs offline without exposing local secrets or generate
         assert.ok(existsSync(join(target, path)), path);
     }
     for (const path of ['.env', '.env.testing', 'bootstrap/cache/config.php', 'storage/app/private/installation/installed',
-        'storage/app/private/installation/secret', 'storage/logs/laravel.log', 'public/hot', 'node_modules', 'tests', 'infra']) {
+        'storage/app/private/installation/secret', 'storage/logs/laravel.log', 'public/hot', 'node_modules', 'tests', 'infra', 'DEVELOPMENT.md']) {
         assert.equal(existsSync(join(target, path)), false, path);
     }
     assert.deepEqual(JSON.parse(readFileSync(join(target, 'release.json'))), { version: 'v1.2.3', repository: 'example/perysee' });
@@ -122,4 +122,87 @@ test('archive traversal and symlinks are rejected without writing outside stagin
         assert.equal(existsSync(target), false);
         assert.equal(existsSync(join(f.root, 'escape')), false);
     }
+});
+
+function bootstrapEnvironment(f) {
+    const bin = join(f.root, 'bin');
+    mkdirSync(bin);
+    const curl = join(bin, 'curl');
+    writeFileSync(curl, `#!/usr/bin/env node
+import { copyFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+const args = process.argv.slice(2);
+const url = args.find(arg => arg.startsWith('https://'));
+if (!url || process.env.PERYSEE_TEST_DOWNLOAD_FAIL) process.exit(22);
+const output = args[args.indexOf('--output') + 1];
+copyFileSync(join(process.env.PERYSEE_TEST_RELEASE, basename(new URL(url).pathname)), output);
+`);
+    chmodSync(curl, 0o755);
+    return { ...process.env, PATH: `${bin}:${process.env.PATH}`, TMPDIR: f.root,
+        PERYSEE_TEST_RELEASE: f.output, PERYSEE_DOWNLOAD_URL: 'https://downloads.example.com/latest' };
+}
+test('one-line shell bootstrap downloads, verifies and installs the release without build tools', (t) => {
+    const f = fixture(t);
+    build(f);
+    const target = join(f.root, 'from bootstrap');
+    const result = spawnSync('bash', [join(scripts, 'install.sh'), '--target', target, '--url', 'https://stats.example.com', '--yes'],
+        { encoding: 'utf8', env: bootstrapEnvironment(f) });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.ok(existsSync(join(target, 'public/build/manifest.json')));
+    assert.match(result.stdout, /https:\/\/stats.example.com\/install/);
+    assert.equal(readdirSync(f.root).some(name => name.startsWith('perysee-bootstrap.')), false);
+    assert.ok(existsSync(join(f.output, 'install.sh')));
+    assert.match(readFileSync(join(f.output, 'SHA256SUMS'), 'utf8'), /  install\.sh\n/);
+});
+test('shell bootstrap never executes an installer that fails checksum verification', (t) => {
+    const f = fixture(t);
+    build(f);
+    const marker = join(f.root, 'executed');
+    writeFileSync(join(f.output, 'install.php'), `<?php file_put_contents(${JSON.stringify(marker)}, 'bad');`);
+    const result = spawnSync('bash', [join(scripts, 'install.sh'), '--target', join(f.root, 'target'), '--url', 'https://stats.example.com', '--yes'],
+        { encoding: 'utf8', env: bootstrapEnvironment(f) });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /checksum/i);
+    assert.equal(existsSync(marker), false);
+    assert.equal(existsSync(join(f.root, 'target')), false);
+    assert.equal(readdirSync(f.root).some(name => name.startsWith('perysee-bootstrap.')), false);
+});
+test('failed bootstrap download leaves the destination untouched and removes temporary files', (t) => {
+    const f = fixture(t);
+    build(f);
+    const result = spawnSync('bash', [join(scripts, 'install.sh'), '--target', join(f.root, 'target'), '--url', 'https://stats.example.com', '--yes'],
+        { encoding: 'utf8', env: { ...bootstrapEnvironment(f), PERYSEE_TEST_DOWNLOAD_FAIL: '1' } });
+    assert.notEqual(result.status, 0);
+    assert.equal(result.status, 22);
+    assert.equal(existsSync(join(f.root, 'target')), false);
+    assert.equal(readdirSync(f.root).some(name => name.startsWith('perysee-bootstrap.')), false);
+});
+
+test('curl-piped shell bootstrap keeps interactive questions on the controlling terminal', (t) => {
+    const f = fixture(t);
+    build(f);
+    const target = join(f.root, 'interactive pipeline');
+    const python = `import os, pty, signal, sys
+signal.alarm(20)
+pid, master = pty.fork()
+if pid == 0:
+    os.execv('/bin/bash', ['bash', '-c', 'cat "$PERYSEE_TEST_BOOTSTRAP" | bash'])
+os.write(master, (os.environ['PERYSEE_TEST_TARGET'] + '\\nhttps://stats.example.com\\nyes\\n').encode())
+while True:
+    try:
+        data = os.read(master, 65536)
+        if not data: break
+        sys.stdout.buffer.write(data)
+        sys.stdout.buffer.flush()
+    except OSError:
+        break
+_, status = os.waitpid(pid, 0)
+sys.exit(os.waitstatus_to_exitcode(status))
+`;
+    const result = spawnSync('python3', ['-c', python], { encoding: 'utf8', timeout: 25000,
+        env: { ...bootstrapEnvironment(f), PERYSEE_TEST_BOOTSTRAP: join(scripts, 'install.sh'), PERYSEE_TEST_TARGET: target } });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.ok(existsSync(join(target, 'artisan')));
+    assert.match(result.stdout, /Application directory/);
+    assert.match(result.stdout, /https:\/\/stats.example.com\/install/);
 });

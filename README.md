@@ -4,29 +4,19 @@ Application autonome **PHP 8.3+ / Laravel 13 / Blade / MariaDB 11.4.x**. Ce doss
 
 Ce dossier est la racine du dépôt privé [mattrbdr/perysee](https://github.com/mattrbdr/perysee) : `app/`, `artisan` et `.github/` sont directement à sa racine sur GitHub. Les sites de présentation ne font pas partie de ce dépôt.
 
-## Installer une release
+## Installer Perysee
 
-Les [releases GitHub](https://github.com/mattrbdr/perysee/releases) fournissent **`perysee.zip`**, prêt à déployer : dépendances PHP de production, assets compilés, polices et tracker inclus. **Ni npm, ni Node, ni Composer ne sont nécessaires sur l’hébergement.** Ne pas utiliser le ZIP « Source code » généré automatiquement par GitHub.
-
-Le dépôt étant privé, utiliser un compte autorisé et un jeton GitHub avec **Contents: read** sur ce dépôt. Depuis Bash, dans un dossier hors de la racine web :
+Sur un hébergement compatible, la commande publique d’installation est :
 
 ```sh
-read -r -s -p "GitHub token: " GH_TOKEN
-echo
-export GH_TOKEN
-curl --fail --location --proto '=https' --proto-redir '=https' \
-  --header "Authorization: Bearer $GH_TOKEN" \
-  --header 'Accept: application/vnd.github.raw+json' \
-  'https://api.github.com/repos/mattrbdr/perysee/contents/scripts/install.php?ref=main' \
-  --output perysee-install.php && php perysee-install.php
-unset GH_TOKEN
+curl -fsSL https://get.perysee.eu | bash
 ```
 
-L’installateur nécessite PHP 8.3+, les extensions de l’application et PHP Zip. Il demande le dossier de destination et l’URL HTTPS, télécharge la dernière release stable, vérifie son SHA-256 et extrait les fichiers sans écraser un dossier existant non vide. Il affiche ensuite le document root exact (`DOSSIER/public`) et le lien `/install`. Le parent du dossier choisi doit exister et être accessible en écriture. Le jeton n’est pas enregistré dans l’application. Supprimer le script téléchargé après utilisation.
+L’installateur vérifie PHP, télécharge les fichiers prêts à utiliser, demande le dossier de destination et l’URL HTTPS, puis affiche le document root (`DOSSIER/public`) et le lien `/install`. Ni npm, ni Node, ni Composer ne sont nécessaires sur l’hébergement. PHP CLI 8.3+, les extensions de l’application et PHP Zip sont nécessaires pour cette commande.
 
-Configurer le domaine, HTTPS et une base **MariaDB 11.4.x**, puis terminer l’assistant web décrit ci-dessous. Sans terminal, télécharger `perysee.zip` depuis les assets d’une release avec son compte GitHub, vérifier `SHA256SUMS` sur son ordinateur et extraire le ZIP avec le gestionnaire de fichiers. Il contient un dossier `perysee/` : le document root doit viser son sous-dossier `public/`.
+Sans terminal, le ZIP est proposé à `https://get.perysee.eu/perysee.zip`. Extraire son dossier `perysee/` hors de la racine web, puis faire pointer le domaine sur `perysee/public/`. Terminer avec l’assistant web décrit ci-dessous.
 
-Aucune release n’est disponible avant la première publication d’un tag de version. Voir la section « Fabrication et publication » pour préparer les trois fichiers automatiquement.
+Les instructions de fabrication, les tests privés et l’activation du relais de téléchargement sont dans [DEVELOPMENT.md](DEVELOPMENT.md), réservé aux mainteneurs et exclu du ZIP et de la documentation web.
 
 ## Fonctionnalités disponibles
 
@@ -82,41 +72,6 @@ La release `perysee.zip` contient `vendor/` de production, les assets compilés 
 L’assistant refuse une base contenant déjà des comptes. Une panne de connexion ne remplace pas la configuration existante. Après un échec de migration, corriger les droits et reprendre avec les mêmes paramètres : les migrations terminées sont conservées. Si la session expire, utiliser de nouveau le secret puis reprendre l’étape SQL.
 
 Une instance installée fonctionne sans Node, Redis, Apple container, SMTP ni worker permanent. Les sessions et le cache utilisent des fichiers, et les dates SQL sont en UTC. La queue configurée en base est réservée aux futurs traitements ponctuels ; aucune tâche d’agrégation n’est planifiée. Une purge bornée des événements expirés est planifiée toutes les cinq minutes et nécessite le scheduler.
-
-## Fabrication et publication
-
-Réservé aux mainteneurs : utiliser un checkout neuf pour ne pas remplacer les dépendances de développement d’une instance locale.
-
-```sh
-composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
-composer check-platform-reqs --no-dev
-npm ci
-npm run build
-php scripts/build-release.php --version v0.1.0 --repository mattrbdr/perysee
-```
-
-`dist/` reçoit `perysee.zip`, `install.php` et `SHA256SUMS`. Le packager sélectionne explicitement les fichiers nécessaires et exclut `.env`, les secrets/verrous d’installation locaux, les sessions, les logs, les caches générés, les tests et `node_modules/`. Les guides Markdown nécessaires à l’interface restent inclus.
-
-Les workflows dans `.github/workflows/` fonctionnent depuis la racine de ce dépôt :
-
-- **Application checks** : tests PHP 8.3 et 8.5, SQLite et MariaDB 11.4.8 dédiée, build des assets, tests du tracker et de la distribution.
-- **Build release** : lors du push d’un tag `vX.Y.Z`, exécute les contrôles, fabrique les fichiers, installe le vrai ZIP dans un dossier temporaire et démarre Artisan, puis publie les trois assets ensemble dans une release GitHub. Un tag avec suffixe (`v0.1.0-beta.1`) devient une préversion. L’exécution manuelle fabrique uniquement un artifact, sans publication.
-
-Après validation du commit à publier :
-
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-Pour tester un ZIP sans GitHub :
-
-```sh
-php dist/install.php --archive dist/perysee.zip --checksums dist/SHA256SUMS \
-  --target /CHEMIN/VIDE/perysee --url https://stats.example.com --yes
-```
-
-Cette commande installe uniquement les fichiers. Elle ne configure pas le domaine ni la base et ne remplace pas une instance existante. Les mises à jour nécessitent une sauvegarde, le remplacement contrôlé des fichiers en conservant `.env` et `storage/`, puis `php artisan optimize:clear` et `php artisan migrate --force` via un terminal de confiance. Ne pas utiliser l’assistant de première installation comme outil de mise à jour.
 
 ## Récupération
 

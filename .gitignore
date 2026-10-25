@@ -29,4 +29,6 @@ Thumbs.db
 
 .env.testing
 /infra/mariadb/.env.testing
+/infra/downloads/.wrangler/
+/infra/downloads/.dev.vars*
 /storage/app/private/installation/
