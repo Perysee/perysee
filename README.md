@@ -1,6 +1,6 @@
 # Application Perysee
 
-Application autonome **PHP 8.3+ / Laravel 13 / Blade / MariaDB 11.4.x**. Ce dossier contient l’application du produit ; `../presentation/` contient sa landing et son site documentaire et n’est pas une dépendance de l’application.
+Application autonome **PHP 8.3+ / Laravel 13 / Vue 3 + Nuxt UI / MariaDB 11.4.x**. Ce dossier contient l’application du produit ; `../presentation/` contient sa landing et son site documentaire et n’est pas une dépendance de l’application.
 
 Ce dossier est la racine du dépôt privé [mattrbdr/perysee](https://github.com/mattrbdr/perysee) : `app/`, `artisan` et `.github/` sont directement à sa racine sur GitHub. Les sites de présentation ne font pas partie de ce dépôt.
 
@@ -22,11 +22,11 @@ Les instructions de fabrication, les tests privés et l’activation du relais d
 
 - Installation depuis le navigateur : diagnostic, configuration MariaDB, migrations, premier administrateur et verrouillage définitif.
 - Connexion, déconnexion, changement de mot de passe et récupération administrateur par commande.
-- Création, liste, consultation et modification de sites, domaines autorisés et fuseau de reporting.
+- Création, liste, consultation et modification de sites, domaines autorisés, exclusions et fuseau de reporting (fixé après le premier événement). Suppression permanente différée par la maintenance.
 - Isolation des sites par membre : `owner` en écriture, `viewer` en lecture. Aucun accès implicite aux sites pour l’administrateur d’instance.
-- Interface Blade en anglais, responsive, avec assets et police Geist locaux.
+- Interface Vue 3 / Inertia / Nuxt UI en anglais, responsive, accordée à la landing et à la documentation : Geist, palette commune et icônes Tabler locales. Aucun SSR ni serveur Node sur l’hébergement.
 
-**Lueur et le collecteur de pages vues sont disponibles**, avec modes sans identifiant ou sessions et consentement configurable. La fiche affiche un contrôle de réception sur quinze minutes ; les rapports agrégés et exports restent à développer. Aucune statistique fictive n’est affichée. La collecte ne confirme un événement qu’après son insertion SQL. Les invitations, inscriptions publiques et suppressions de sites ne sont pas disponibles.
+**Lueur et le collecteur sont disponibles**, avec pages vues sans identifiant ou sessions, consentement configurable et événements nommés. Les rapports consolidés couvrent pages, sessions commencées, sources, campagnes et appareils, avec exports CSV. Le contrôle de réception sur quinze minutes reste distinct des rapports. Le scheduler consolide les données et effectue la maintenance toutes les cinq minutes. Les administrateurs disposent d’une page de santé et de réglages de rétention. Aucune statistique fictive n’est affichée ; la collecte confirme un événement après son insertion SQL. Les pays sont déterminés approximativement à partir d’une base MMDB locale, avec couverture explicite ; l’attribution distingue les sources IA reconnues. Les pixels, invitations et inscriptions publiques ne sont pas implémentés.
 
 ## Développement local
 
@@ -59,7 +59,7 @@ Le script local conserve les secrets déjà configurés. Ne pas lancer `key:gene
 
 ## Installation cible sans SSH
 
-La release `perysee.zip` contient `vendor/` de production, les assets compilés dans `public/build/`, `public/fonts/`, `public/tracker/` et les guides intégrés à l’interface. La qualification sur de vrais hébergements cPanel reste à réaliser.
+La release `perysee.zip` contient `vendor/` de production, les assets compilés dans `public/build/`, `public/fonts/`, `public/tracker/`. La qualification sur de vrais hébergements cPanel reste à réaliser.
 
 1. Déployer les fichiers sur un hébergement PHP compatible et créer une base MariaDB **11.4.x** dédiée avec les droits nécessaires aux migrations.
 2. Activer HTTPS et diriger la racine du domaine **vers `public/`**. Ne jamais exposer la racine de l’application. Vérifier également les alias et accès alternatifs du serveur.
@@ -106,10 +106,17 @@ Cette commande crée une base et un compte **`perysee_test`** distincts. L’uti
 
 **Les tests MariaDB réinitialisent uniquement cette base dédiée.** Ils couvrent installation à partir d’une base vide, reprise, verrouillage, erreurs SQL, authentification, CSRF, récupération et isolation entre sites. Les tests n’installent pas l’instance locale et ne créent pas son administrateur.
 
+## Documentation du produit
+
+Les guides sont maintenus dans le site documentaire `presentation/apps/docs/`, séparé du dépôt et de la distribution Laravel. En local, lancer `npm run dev:docs` depuis `presentation/` pour ouvrir [la documentation](http://localhost:3001). Les liens ci-dessous utilisent cette adresse locale ; en production, définir `PERYSEE_DOCS_URL` avec l’origine réelle du site documentaire pour les liens de l’application.
+
+- [Développement local et tests — documentation interne](DEVELOPMENT.md).
+- [Installation sur un hébergement](http://localhost:3001/getting-started/shared-hosting).
+
 ## Suivi et données de démonstration
 
-- [Installer Lueur, intégrer le consentement et tester en local](docs/INSTALLATION-SUIVI.md).
-- [Choisir entre pages vues, sessions et politique de consentement](docs/CONFIDENTIALITE.md), avec les sources CNIL et CEPD.
+- [Installer Lueur, intégrer le consentement et tester en local](http://localhost:3001/tracking/installation).
+- [Choisir entre pages vues, sessions et politique de consentement](http://localhost:3001/tracking/privacy), avec les sources CNIL et CEPD.
 
 ```sh
 php artisan migrate

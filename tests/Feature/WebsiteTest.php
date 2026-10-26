@@ -6,6 +6,7 @@ use App\Installation\InstallationState;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class WebsiteTest extends TestCase
@@ -32,7 +33,7 @@ class WebsiteTest extends TestCase
         $this->assertSame('example.com', $website->domain);
         $this->assertContains('example.com', $website->allowed_domains);
         $this->assertSame('owner', $website->members()->first()->pivot->role);
-        $this->get('/sites/'.$website->id)->assertOk()->assertSee('Install Lueur');
+        $this->get('/sites/'.$website->id)->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.show')->where('canUpdate', true)->where('siteLinks.tracking', url('/sites/'.$website->id.'/tracking')));
         $this->put('/sites/'.$website->id, array_merge($this->payload(), ['name' => 'Updated', 'public_id' => 'forged']))->assertSessionHasNoErrors();
         $this->assertSame($publicId, $website->fresh()->public_id);
         $this->assertSame('Updated', $website->fresh()->name);
@@ -58,7 +59,7 @@ class WebsiteTest extends TestCase
         $this->actingAs($viewer)->get('/sites/'.$site->id)->assertOk()->assertDontSee('Edit site');
         $this->get('/sites/'.$site->id.'/edit')->assertForbidden();
         $this->put('/sites/'.$site->id, $this->payload())->assertForbidden();
-        $this->delete('/sites/'.$site->id)->assertMethodNotAllowed();
+        $this->delete('/sites/'.$site->id)->assertForbidden();
     }
 
     public function test_invalid_domains_and_timezones_are_rejected(): void
@@ -73,7 +74,7 @@ class WebsiteTest extends TestCase
         $name = '<script>alert("xss")</script>';
         $this->actingAs($user)->post('/sites', array_merge($this->payload(), ['name' => $name, 'is_admin' => true, 'members' => [999]]))->assertSessionHasNoErrors();
         $site = Website::firstOrFail();
-        $this->get('/sites/'.$site->id)->assertOk()->assertSee($name)->assertDontSee($name, false);
+        $this->get('/sites/'.$site->id)->assertOk()->assertInertia(fn (Assert $page) => $page->where('website.name', $name))->assertDontSee($name, false);
         $this->assertFalse($user->fresh()->is_admin);
         $this->assertSame(1, $site->members()->count());
     }
@@ -85,7 +86,7 @@ class WebsiteTest extends TestCase
         $site = Website::firstOrFail();
         $this->assertSame('sessions', $site->tracking_mode);
         $this->assertFalse($site->consent_required);
-        $this->get('/sites/'.$site->id.'/edit')->assertOk()->assertSee('Consent not required');
+        $this->get('/sites/'.$site->id.'/edit')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.form')->where('website.consent_required', false)->where('website.tracking_mode', 'sessions'));
         $this->put('/sites/'.$site->id, array_merge($this->payload(), ['tracking_mode' => 'invalid', 'consent_required' => 'invalid']))->assertSessionHasErrors(['tracking_mode', 'consent_required']);
     }
 }

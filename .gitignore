@@ -32,3 +32,5 @@ Thumbs.db
 /infra/downloads/.wrangler/
 /infra/downloads/.dev.vars*
 /storage/app/private/installation/
+
+/.nuxt-ui/

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Analytics\InstanceHealth;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -14,13 +15,13 @@ class PruneTracking extends Command
     public function handle(): int
     {
         $limit = filter_var($this->option('limit'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 10000]]);
-        $days = (int) config('perysee.raw_retention_days');
+        $days = (int) app(InstanceHealth::class)->get('raw_retention_days', config('perysee.raw_retention_days', 90));
         if ($limit === false || $days < 1) {
             $this->error('Use a limit between 1 and 10000 and a retention of at least one day.');
 
             return self::FAILURE;
         }
-        $ids = DB::table('events')->where('received_at', '<', now('UTC')->subDays($days))->orderBy('received_at')->orderBy('id')->limit($limit)->pluck('id');
+        $ids = DB::table('events')->whereNotNull('processed_at')->where('received_at', '<', now('UTC')->subDays($days))->orderBy('received_at')->orderBy('id')->limit($limit)->pluck('id');
         $deleted = $ids->isEmpty() ? 0 : DB::table('events')->whereIn('id', $ids)->delete();
         $this->info("Deleted {$deleted} expired tracking events.");
 

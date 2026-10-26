@@ -23,6 +23,10 @@ class SaveWebsiteRequest extends FormRequest
         if (is_string($domains)) {
             $domains = array_values(array_filter(array_map(fn (string $domain) => strtolower(trim($domain)), preg_split('/\r\n|\r|\n/', $domains))));
         }
+        $excluded = $this->input('excluded_paths');
+        if (is_string($excluded)) {
+            $this->merge(['excluded_paths' => array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $excluded))))]);
+        }
         $this->merge(['domain' => is_string($this->domain) ? strtolower(trim($this->domain)) : $this->domain, 'allowed_domains' => $domains]);
     }
 
@@ -33,6 +37,8 @@ class SaveWebsiteRequest extends FormRequest
         return [
             'tracking_mode' => ['sometimes', 'required', 'in:pageviews,sessions'],
             'consent_required' => ['sometimes', 'required', 'boolean'],
+            'excluded_paths' => ['sometimes', 'nullable', 'array', 'max:50'],
+            'excluded_paths.*' => ['required', 'string', 'max:512', 'regex:/^\\/(?!\\/)[^?#]*$/D'],
             'name' => ['required', 'string', 'max:150'],
             'domain' => $domain,
             'allowed_domains' => ['present', 'array', 'max:20'],

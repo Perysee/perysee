@@ -1,0 +1,14 @@
+{
+  "source": "https://github.com/lobehub/lobe-icons",
+  "license": "MIT",
+  "retrieved": "2026-10-25",
+  "chatgpt_asset": "packages/static-svg/icons/openai.svg",
+  "logos": [
+    "chatgpt",
+    "claude",
+    "perplexity",
+    "gemini",
+    "copilot",
+    "grok"
+  ]
+}

@@ -1,0 +1,10 @@
+[
+  {"input":"/", "expected":"/"},
+  {"input":"/about/", "expected":"/about/"},
+  {"input":"/caf%C3%A9", "expected":"/café"},
+  {"input":"/users/123/a%40example.com?secret=yes#fragment", "expected":"/users/:redacted/:redacted"},
+  {"input":"/nested%252Fsecret", "expected":"/:redacted"},
+  {"input":"/x%3Fsecret", "expected":"/:redacted"},
+  {"input":"/bad%FF", "expected":"/:redacted"},
+  {"input":"/a%2Fb", "expected":"/a/b"}
+]

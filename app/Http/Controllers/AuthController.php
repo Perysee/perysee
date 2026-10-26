@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Rules\BcryptPassword;
+use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10,13 +11,13 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Response;
 
 class AuthController extends Controller
 {
-    public function create(): View
+    public function create(): Response
     {
-        return view('auth.login');
+        return Ui::render('auth.login');
     }
 
     public function store(Request $request): RedirectResponse
@@ -44,9 +45,9 @@ class AuthController extends Controller
         return redirect()->route('login');
     }
 
-    public function editPassword(): View
+    public function editPassword(): Response
     {
-        return view('auth.password');
+        return Ui::render('auth.password');
     }
 
     public function updatePassword(Request $request): RedirectResponse

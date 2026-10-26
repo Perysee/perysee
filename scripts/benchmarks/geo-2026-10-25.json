@@ -1,0 +1,66 @@
+{
+  "environment": {
+    "site": "19fb4e7a-2883-4866-bafc-405bfa455503",
+    "php": "8.5.7",
+    "database": "11.4.8-MariaDB-ubu2404",
+    "os": "Darwin MacBookAir.lan 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:05:27 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T8103 arm64",
+    "cpu": "Record physical CPU separately",
+    "server_workers": 4
+  },
+  "duration_per_profile_seconds": 30,
+  "recorded_at": "2026-10-25T14:32:03.888Z",
+  "limitations": [
+    "Loopback PHP development server, four workers, not Apache or LiteSpeed",
+    "Minimal and PDO prototypes deliberately omit production validation, consent, quota, locking and privacy rules",
+    "Full collector uses process-local array cache to avoid a single simulated IP exhausting its quota; distributed quota performance is excluded",
+    "P95 excludes HTTP failures; failures and dispatch lag are reported separately",
+    "Memory is PHP allocated peak per request, not process RSS",
+    "Storage is a table-wide InnoDB estimate, not physical per-event disk usage"
+  ],
+  "profiles": [
+    {
+      "mode": "full",
+      "events_per_minute": 1000,
+      "dispatched": 500,
+      "successful": 500,
+      "duration_ms": 29972.7985,
+      "p50_ms": 19.79633300000023,
+      "p95_ms": 52.77079100000083,
+      "p99_ms": 153.56941700000243,
+      "dispatch_lag_p95_ms": 1.5346250000002328,
+      "peak_php_bytes": 10485760,
+      "statuses": {
+        "204": 500
+      },
+      "errors": {}
+    },
+    {
+      "mode": "full-no-geo",
+      "events_per_minute": 1000,
+      "dispatched": 500,
+      "successful": 500,
+      "duration_ms": 29960.812958000002,
+      "p50_ms": 21.660209000001487,
+      "p95_ms": 45.22620800000004,
+      "p99_ms": 245.92104200000176,
+      "dispatch_lag_p95_ms": 1.7353749999965657,
+      "peak_php_bytes": 2097152,
+      "statuses": {
+        "204": 500
+      },
+      "errors": {}
+    }
+  ],
+  "consolidation": {
+    "confirmed_events": 1000,
+    "aggregated_events": 1000,
+    "pageviews": 1000,
+    "aggregation_ms": 151.767833,
+    "report_samples": 100,
+    "report_p95_ms": 5.030459,
+    "events_table_estimated_bytes": "229376",
+    "peak_cli_bytes": 33554432
+  },
+  "expected_confirmed": 1000,
+  "integrity": true
+}

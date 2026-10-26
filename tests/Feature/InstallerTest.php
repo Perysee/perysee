@@ -10,6 +10,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class InstallerTest extends TestCase
@@ -45,7 +46,7 @@ class InstallerTest extends TestCase
     public function test_first_opening_displays_diagnostics_without_disclosing_secret(): void
     {
         $this->get('/')->assertRedirect('/install');
-        $response = $this->get('/install')->assertOk()->assertSee('Install Perysee')->assertSee('installation/secret');
+        $response = $this->get('/install')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'install')->where('authorized', false)->has('checks')->missing('databaseDefaults'));
         $response->assertDontSee(trim(file_get_contents(app(InstallationState::class)->secretPath())));
     }
 
@@ -61,7 +62,7 @@ class InstallerTest extends TestCase
     {
         $this->unlock();
         $this->post('/install/database', $this->databasePayload())->assertSessionHasNoErrors()->assertRedirect('/install');
-        $this->get('/install')->assertSee('Create your administrator');
+        $this->get('/install')->assertInertia(fn (Assert $page) => $page->where('authorized', true)->where('migrated', true)->missing('databaseDefaults'));
         $this->post('/install/administrator', ['name' => 'Owner', 'email' => 'OWNER@example.com', 'password' => 'Strong-password-123!', 'password_confirmation' => 'Strong-password-123!'])->assertSessionHasNoErrors()->assertRedirect('/login');
         $user = User::firstOrFail();
         $this->assertSame('owner@example.com', $user->email);
@@ -119,6 +120,6 @@ class InstallerTest extends TestCase
         $this->post('/install/administrator', [])->assertForbidden();
         Artisan::swap($console);
         $this->post('/install/database', $this->databasePayload())->assertSessionHasNoErrors();
-        $this->get('/install')->assertSee('Create your administrator');
+        $this->get('/install')->assertInertia(fn (Assert $page) => $page->where('authorized', true)->where('migrated', true)->missing('databaseDefaults'));
     }
 }

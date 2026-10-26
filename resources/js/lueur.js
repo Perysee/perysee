@@ -19,7 +19,7 @@
     const normalize = value => {
         let path = String(value).split(/[?#]/)[0];
         try { path = decodeURIComponent(path); } catch (_) { /* Keep invalid escapes as literal text. */ }
-        return ('/' + path.replace(/^\/+/, '').split('/').map(segment => /[\x00-\x1f\x7f@]/.test(segment) || /^\d+$/.test(segment) || /^[a-f0-9-]{32,}$/i.test(segment) || segment.length > 80 ? ':redacted' : segment).join('/')).slice(0, 512);
+        return Array.from('/' + path.replace(/^\/+/, '').split('/').map(segment => /[\x00-\x1f\x7f@?#]/.test(segment) || /%[a-f0-9]{2}/i.test(segment) || /^\d+$/.test(segment) || /^[a-f0-9-]{32,}$/i.test(segment) || Array.from(segment).length > 80 ? ':redacted' : segment).join('/')).slice(0, 512).join('');
     };
     function readCookie() {
         const value = document.cookie.split('; ').find(part => part.startsWith(cookieName + '='));
@@ -41,19 +41,36 @@
             return readCookie()?.id === record.id ? record.id : null;
         } catch (_) { return null; }
     }
-    function pageview(path) {
+    const campaignValue = value => !value || /[\x00-\x1f\x7f@\\/?#=&]/.test(value) || /[a-f0-9]{32,}/i.test(value) ? null : value.trim().slice(0, 100);
+    function send(type, path, name) {
         if (!allowed || blocked()) return;
         const cleaned = normalize(path || script.dataset.path || location.pathname);
-        if (cleaned === lastPath) return;
-        const payload = { v: 1, site, type: 'pageview', mode, host: location.hostname, path: cleaned, consent: given };
+        if (type === 'pageview' && cleaned === lastPath) return;
+        const rules = (script.dataset.excludePaths || '').split(',').filter(Boolean);
+        if (rules.some(rule => rule.endsWith('*') ? cleaned.startsWith(rule.slice(0, -1)) : cleaned === rule)) return;
+        const payload = { v: 1, site, type, mode, host: location.hostname, path: cleaned, consent: given, ref: null };
+        if (/Macintosh/i.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1) payload.device_hint = 'tablet';
+        if (type === 'event') payload.event_name = name;
+        try {
+            const ref = new URL(document.referrer);
+            if (['http:', 'https:'].includes(ref.protocol) && ref.hostname !== location.hostname) payload.ref = ref.protocol + '//' + ref.hostname;
+        } catch (_) { /* No referrer or an unsupported address. */ }
+        try {
+            const params = new URL(location.href).searchParams;
+            ['utm_source', 'utm_medium', 'utm_campaign'].forEach(key => { payload[key] = campaignValue(params.get(key)); });
+        } catch (_) { /* Invalid location cannot prevent collection. */ }
         if (mode === 'sessions') {
             payload.session = session();
             if (!payload.session) return;
         }
-        lastPath = cleaned;
+        if (type === 'pageview') lastPath = cleaned;
         try {
             window.fetch(endpoint, { method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', keepalive: true, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(payload) }).catch(() => {});
         } catch (_) { /* Analytics must never break the host page. */ }
+    }
+    function pageview(path) { send('pageview', path); }
+    function track(name) {
+        if (typeof name === 'string' && /^[a-zA-Z][a-zA-Z0-9_.:-]{0,63}$/.test(name)) send('event', null, name);
     }
     const api = {
         version: 1,
@@ -68,8 +85,9 @@
             } else pageview();
         },
         pageview,
+        track,
         push(command) {
-            if (Array.isArray(command) && ['consent', 'pageview'].includes(command[0])) api[command[0]](...command.slice(1));
+            if (Array.isArray(command) && ['consent', 'pageview', 'track'].includes(command[0])) api[command[0]](...command.slice(1));
         }
     };
     window.lueur = api;

@@ -1,0 +1,7 @@
+@props(['recent', 'standalone' => false, 'totals' => null])
+<section class="report-panel reception-panel">
+    <header class="panel-heading"><div><h2><span class="status-dot"></span>Reception check</h2><p>Last 15 minutes · confirmed events, separate from consolidated reports</p></div><span class="neutral-badge">{{ count($recent) }} in view</span></header>
+    @if($standalone && $totals)<div class="reception-summary">@foreach(['events' => 'Events received', 'pageviews' => 'Pageviews', 'custom_events' => 'Custom events'] as $key => $label)<div><span>{{ $label }}</span><strong>{{ number_format($totals[$key]) }}</strong></div>@endforeach</div>@endif
+    <div class="table-wrap"><table class="activity-table"><thead><tr><th>Event</th><th>Page</th><th>Received (UTC)</th></tr></thead><tbody>@forelse($recent as $event)<tr><td><span class="event-kind"><x-icon :name="$event['event_type'] === 2 ? 'bolt' : 'eye'" />{{ $event['event_name'] ?? 'Pageview' }}</span></td><td>{{ $event['path'] }}</td><td class="tabular">{{ \Illuminate\Support\Carbon::parse($event['received_at'], 'UTC')->format('H:i:s') }}</td></tr>@empty<tr><td colspan="3"><div class="panel-empty"><x-icon name="activity" /><strong>No events received in the last fifteen minutes.</strong><p>Visit your website after permitting measurement to check reception.</p></div></td></tr>@endforelse</tbody></table></div>
+    <footer class="panel-footer"><span>Up to 100 events · updates when you refresh</span><span class="subtle">No visitor identifiers displayed</span></footer>
+</section>

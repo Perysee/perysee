@@ -1,0 +1,74 @@
+name: Internal performance laboratory
+
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: 'Seconds per profile (60 recommended, maximum 300)'
+        required: true
+        default: '60'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    services:
+      mariadb:
+        image: mariadb:11.4.8
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-only
+          MARIADB_DATABASE: perysee_test
+          MARIADB_USER: perysee_test
+          MARIADB_PASSWORD: ci-test-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, pdo_sqlite, xml, dom, curl
+          tools: composer:v2
+          coverage: none
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - run: composer install --prefer-dist --no-interaction
+      - name: Configure dedicated laboratory database
+        run: |
+          cat > .env.testing <<'ENV'
+          APP_ENV=testing
+          APP_KEY=base64:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+          APP_DEBUG=false
+          DB_CONNECTION=mariadb
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_DATABASE=perysee_test
+          DB_USERNAME=perysee_test
+          DB_PASSWORD=ci-test-only
+          DB_URL=
+          CACHE_STORE=array
+          SESSION_DRIVER=array
+          QUEUE_CONNECTION=sync
+          ENV
+          chmod 600 .env.testing
+      - name: Compare collectors and verify consolidation
+        env:
+          PROFILE_SECONDS: ${{ inputs.seconds }}
+        run: node scripts/benchmarks/run.mjs "$PROFILE_SECONDS" benchmark.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: internal-benchmark-results
+          path: benchmark.json
+          if-no-files-found: warn

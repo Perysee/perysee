@@ -6,22 +6,23 @@ use App\Installation\Diagnostics;
 use App\Installation\InstallationState;
 use App\Installation\Installer;
 use App\Rules\BcryptPassword;
+use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Response;
 
 class InstallationController extends Controller
 {
     public function __construct(private Installer $installer, private InstallationState $state, private Diagnostics $diagnostics) {}
 
-    public function show(Request $request): View
+    public function show(Request $request): Response
     {
         $this->installer->assertAvailable();
 
-        return view('install', [
+        return Ui::render('install', [
             'checks' => $this->diagnostics->checks($request),
             'authorized' => $this->authorized($request),
             'migrated' => $this->migrated($request),

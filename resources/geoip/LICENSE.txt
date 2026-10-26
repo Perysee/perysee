@@ -1,0 +1,6 @@
+DB-IP Country Lite, October 2026
+Source: https://db-ip.com/db/lite.php
+License: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+IP Geolocation by DB-IP: https://db-ip.com
+Database redistributed unmodified. Reduced coverage and accuracy.

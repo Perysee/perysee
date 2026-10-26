@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, chmodSync, readdirSync } from 'node:fs';
@@ -16,19 +17,23 @@ function fixture(t) {
     const source = join(root, 'source');
     const output = join(root, 'output');
     for (const path of ['app/Example.php', 'bootstrap/app.php', 'config/app.php', 'database/migrations/example.php',
-        'resources/views/example.blade.php', 'routes/web.php', 'artisan', 'composer.json', 'composer.lock', 'README.md', 'docs/INSTALLATION-SUIVI.md', 'docs/CONFIDENTIALITE.md',
-        'public/index.php', 'public/.htaccess', 'public/fonts/geist.woff2', 'public/tracker/lueur.v1.js',
-        'public/tracker/lueur.v1.js.gz', 'vendor/autoload.php', 'vendor/composer/platform_check.php']) {
+        'resources/views/example.blade.php', 'routes/web.php', 'artisan', 'composer.json', 'composer.lock', 'README.md',
+        'public/index.php', 'public/.htaccess', 'public/site-icon.svg', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/fonts/geist.woff2', 'public/tracker/lueur.v1.js',
+        'public/brands/chatgpt.svg', 'public/brands/LICENSE', 'public/maps/world.json', 'public/tracker/lueur.v1.js.gz', 'vendor/autoload.php', 'vendor/composer/platform_check.php']) {
         mkdirSync(join(source, path, '..'), { recursive: true });
         writeFileSync(join(source, path), '<?php // fixture');
     }
+    mkdirSync(join(source, 'resources/geoip'), {recursive:true});
+    const db = Buffer.from('MMDB fixture');
+    writeFileSync(join(source, 'resources/geoip/country.mmdb'), db);
+    writeFileSync(join(source, 'resources/geoip/manifest.json'), JSON.stringify({edition:'test',sha256:createHash('sha256').update(db).digest('hex')}));
     writeFileSync(join(source, 'vendor/composer/installed.json'), JSON.stringify({ dev: false, packages: [] }));
     mkdirSync(join(source, 'public/build/assets'), { recursive: true });
     writeFileSync(join(source, 'public/build/manifest.json'), JSON.stringify({ 'resources/js/app.js': { file: 'assets/app.js' } }));
     writeFileSync(join(source, 'public/build/assets/app.js'), 'console.log("production")');
     for (const path of ['.env', '.env.testing', 'bootstrap/cache/config.php', 'storage/app/private/installation/installed',
         'storage/app/private/installation/secret', 'storage/logs/laravel.log', 'storage/framework/sessions/private',
-        'public/hot', 'node_modules/private', 'tests/private', 'infra/private', 'DEVELOPMENT.md']) {
+        'public/hot', 'node_modules/private', 'tests/private', 'infra/private', 'DEVELOPMENT.md', 'docs/SUIVI-FONCTIONNALITES.md']) {
         mkdirSync(join(source, path, '..'), { recursive: true });
         writeFileSync(join(source, path), 'DO_NOT_SHIP');
     }
@@ -52,12 +57,12 @@ test('production ZIP installs offline without exposing local secrets or generate
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /chosen folder\/public/);
     assert.match(result.stdout, /https:\/\/stats.example.com\/install/);
-    for (const path of ['README.md', 'docs/INSTALLATION-SUIVI.md', 'docs/CONFIDENTIALITE.md', 'vendor/autoload.php', 'public/build/manifest.json', 'public/.htaccess', 'public/tracker/lueur.v1.js.gz',
+    for (const path of ['resources/geoip/country.mmdb', 'resources/geoip/manifest.json', 'public/brands/chatgpt.svg', 'public/maps/world.json', 'README.md', 'vendor/autoload.php', 'public/build/manifest.json', 'public/.htaccess', 'public/site-icon.svg', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/tracker/lueur.v1.js.gz',
         'storage/framework/sessions', 'storage/framework/cache/data', 'storage/framework/cache/locks', 'storage/framework/views', 'bootstrap/cache']) {
         assert.ok(existsSync(join(target, path)), path);
     }
     for (const path of ['.env', '.env.testing', 'bootstrap/cache/config.php', 'storage/app/private/installation/installed',
-        'storage/app/private/installation/secret', 'storage/logs/laravel.log', 'public/hot', 'node_modules', 'tests', 'infra', 'DEVELOPMENT.md']) {
+        'storage/app/private/installation/secret', 'storage/logs/laravel.log', 'public/hot', 'node_modules', 'tests', 'infra', 'DEVELOPMENT.md', 'docs/SUIVI-FONCTIONNALITES.md']) {
         assert.equal(existsSync(join(target, path)), false, path);
     }
     assert.deepEqual(JSON.parse(readFileSync(join(target, 'release.json'))), { version: 'v1.2.3', repository: 'example/perysee' });
@@ -205,4 +210,11 @@ sys.exit(os.waitstatus_to_exitcode(status))
     assert.ok(existsSync(join(target, 'artisan')));
     assert.match(result.stdout, /Application directory/);
     assert.match(result.stdout, /https:\/\/stats.example.com\/install/);
+});
+test('bundled country database must match its pinned checksum', t => {
+    const f = fixture(t);
+    writeFileSync(join(f.source, 'resources/geoip/country.mmdb'), 'tampered database');
+    const result = run(join(scripts, 'build-release.php'), ['--source', f.source, '--output', f.output, '--version', 'v1.2.3', '--repository', 'example/perysee']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /country database checksum mismatch/);
 });

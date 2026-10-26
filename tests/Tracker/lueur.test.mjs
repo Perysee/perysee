@@ -8,17 +8,18 @@ const site = 'c5d09ee1-e154-4625-b97c-6c8f8b27f103';
 function browser(source, { mode = 'pageviews', required = true, jar = new Map(), signal = false, now = 100000000, fail = false, queue = undefined, cookiesBlocked = false } = {}) {
     let reads = 0, writes = 0, time = now;
     const requests = [];
+    const listeners = {};
     const document = { currentScript: { dataset: { site, mode, consentRequired: String(required) }, src: 'https://stats.example.com/lueur.js' } };
     Object.defineProperty(document, 'cookie', {
         get() { reads++; if(cookiesBlocked) return ''; return [...jar].map(([key, value]) => key + '=' + value).join('; '); },
         set(value) { writes++; if(cookiesBlocked) return; const [pair] = value.split(';'); const index = pair.indexOf('='); if (value.includes('Max-Age=0')) jar.delete(pair.slice(0,index)); else jar.set(pair.slice(0,index),pair.slice(index+1)); },
     });
-    const location = { protocol: 'https:', hostname: 'example.com', pathname: '/' };
-    const history = { pushState(_state, _title, path) { location.pathname = path.split(/[?#]/)[0]; }, replaceState(_state, _title, path) { location.pathname = path.split(/[?#]/)[0]; } };
+    const location = { protocol: 'https:', hostname: 'example.com', pathname: '/', href: 'https://example.com/' };
+    const history = { pushState(_state, _title, path) { const url = new URL(path, location.href); location.pathname = url.pathname; location.href = url.href; }, replaceState(_state, _title, path) { const url = new URL(path, location.href); location.pathname = url.pathname; location.href = url.href; } };
     const context = { document, location, history, navigator: { globalPrivacyControl: signal }, URL, Uint8Array, Date: class extends Date { static now() { return time; } } };
-    context.window = { lueur: queue, crypto: { getRandomValues(bytes) { for(let i=0;i<bytes.length;i++) bytes[i] = (entropy++ % 256); } }, fetch(url, options) { requests.push({ url, options, data: JSON.parse(options.body) }); return fail ? Promise.reject(new Error('offline')) : Promise.resolve({status:204}); }, addEventListener() {} };
+    context.window = { lueur: queue, crypto: { getRandomValues(bytes) { for(let i=0;i<bytes.length;i++) bytes[i] = (entropy++ % 256); } }, fetch(url, options) { requests.push({ url, options, data: JSON.parse(options.body) }); return fail ? Promise.reject(new Error('offline')) : Promise.resolve({status:204}); }, addEventListener(name, callback) { listeners[name] = callback; } };
     runInNewContext(source, context);
-    return { context, jar, requests, reads: () => reads, writes: () => writes, advance: milliseconds => time += milliseconds, api: context.window.lueur };
+    return { context, jar, requests, dispatch: name => listeners[name]?.(), reads: () => reads, writes: () => writes, advance: milliseconds => time += milliseconds, api: context.window.lueur };
 }
 for (const file of sources) {
     const source = readFileSync(file, 'utf8');
@@ -73,5 +74,66 @@ for (const file of sources) {
     test(`${file}: network failures never cause unhandled page errors`, async () => {
         const page = browser(source,{required:false,fail:true});
         await new Promise(resolve => setImmediate(resolve)); assert.equal(page.requests.length,1);
+    });
+}
+
+for (const file of sources) {
+    const source = readFileSync(file, 'utf8');
+    test(`${file}: custom events use consent, bounded names and queue commands`, () => {
+        const page = browser(source);
+        page.api.track('signup'); assert.equal(page.requests.length, 0);
+        page.api.consent(true); page.api.track('signup');
+        assert.equal(page.requests[1].data.type, 'event');
+        assert.equal(page.requests[1].data.event_name, 'signup');
+        page.api.push(['track', 'checkout']); assert.equal(page.requests[2].data.event_name, 'checkout');
+        page.api.track('email@example.com'); page.api.track('a'.repeat(65));
+        assert.equal(page.requests.length, 3);
+        page.api.consent(false); page.api.track('blocked'); assert.equal(page.requests.length, 3);
+    });
+    test(`${file}: only referrer hostname and authorized campaign fields leave the page`, () => {
+        const page = browser(source);
+        page.context.document.referrer = 'https://search.example.org/private?email=a@example.com';
+        page.context.location.href = 'https://example.com/?utm_source=news&utm_medium=email&utm_campaign=launch&email=private';
+        page.api.consent(true);
+        assert.equal(page.requests[0].data.ref, 'https://search.example.org');
+        assert.equal(page.requests[0].data.utm_source, 'news');
+        assert.equal(page.requests[0].data.utm_campaign, 'launch');
+        assert.equal(JSON.stringify(page.requests[0].data).includes('private'), false);
+    });
+}
+
+for (const file of sources) {
+    const source = readFileSync(file, 'utf8');
+    test(`${file}: shared canonical paths never decode private data twice`, () => {
+        const page = browser(source, { required: false });
+        for (const fixture of JSON.parse(readFileSync('tests/Fixtures/paths.json', 'utf8'))) {
+            page.api.pageview('/separator');
+            page.api.pageview(fixture.input);
+            assert.equal(page.requests.at(-1).data.path, fixture.expected);
+        }
+    });
+    test(`${file}: only the iPad desktop-mode hint is sent and no raw agent leaves the page`, () => {
+        const page = browser(source);
+        page.context.navigator.userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X) Safari/605';
+        page.context.navigator.maxTouchPoints = 5;
+        page.api.consent(true);
+        assert.equal(page.requests.at(-1).data.device_hint, 'tablet');
+        assert.equal(JSON.stringify(page.requests.at(-1).data).includes('Macintosh'), false);
+    });
+}
+
+for (const file of sources) {
+    const source = readFileSync(file, 'utf8');
+    test(`${file}: SPA route hooks and popstate count one view per useful navigation`, () => {
+        const page = browser(source, {required:false, queue:[['pageview','/']]});
+        assert.equal(page.requests.length,1);
+        page.context.history.pushState(null,'','/pricing?utm_source=chatgpt.com');
+        page.api.pageview('/pricing');
+        page.context.history.replaceState(null,'','/pricing?different=query');
+        assert.equal(page.requests.length,2);
+        assert.equal(page.requests[1].data.utm_source,'chatgpt.com');
+        page.context.location.pathname='/'; page.context.location.href='https://example.com/';
+        page.dispatch('popstate'); page.dispatch('popstate');
+        assert.equal(page.requests.length,3);
     });
 }

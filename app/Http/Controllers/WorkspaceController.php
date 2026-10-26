@@ -2,47 +2,63 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\InstanceHealth;
+use App\Analytics\Reporting\Reports;
 use App\Models\Website;
+use App\Support\Ui;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\View\View;
+use Inertia\Response;
 
 class WorkspaceController extends Controller
 {
-    public function dashboard(): View
+    public function dashboard(Request $request, Reports $reports): Response
     {
-        return view('placeholder', ['title' => 'Dashboard', 'description' => 'A home for the sites and reports that matter to you.', 'message' => 'Your workspace dashboard is coming. All your websites are already available in Sites.', 'icon' => 'layout-dashboard', 'website' => null]);
+        $sites = $request->user()->websites()->whereNull('deleting_at')->orderBy('name')->paginate(20);
+        $summaries = [];
+        $charts = [];
+        foreach ($sites as $site) {
+            $period = $reports->period($request, $site);
+            $summaries[$site->id] = $reports->overview($site, $period);
+            $charts[$site->id] = $reports->series($site, $period);
+        }
+
+        return Ui::render('dashboard', compact('sites', 'summaries', 'charts'));
     }
 
-    public function pixels(): View
+    public function pixels(): Response
     {
-        return view('placeholder', ['title' => 'Pixels', 'description' => 'Manage lightweight tracking pixels from one place.', 'message' => 'Pixel tracking will be available in a future release. You can already measure pageviews with Lueur.', 'icon' => 'grid-dots', 'website' => null]);
+        return Ui::render('placeholder', ['title' => 'Pixels', 'description' => 'Manage lightweight tracking pixels from one place.', 'message' => 'Pixel tracking will be available in a future release. You can already measure pageviews with Lueur.', 'icon' => 'grid-dots', 'website' => null]);
     }
 
-    public function settings(Request $request): View
+    public function settings(Request $request): Response
     {
         abort_unless($request->user()->is_admin, 403);
 
-        return view('settings', ['settings' => [
+        return Ui::render('settings', ['settings' => [
             'Application name' => config('app.name'),
             'Application address' => config('app.url'),
             'Instance timezone' => config('app.timezone'),
-            'Raw event retention' => config('perysee.raw_retention_days').' days',
+            'Raw event retention' => app(InstanceHealth::class)->get('raw_retention_days', config('perysee.raw_retention_days')).' days',
         ]]);
     }
 
-    public function sitePage(Website $website, string $section): View
+    public function sitePage(Request $request, Website $website, string $section, Reports $reports): Response
     {
         Gate::authorize('view', $website);
-        $sections = [
-            'events' => ['Events', 'Understand the actions people take on your site.', 'Custom event reports are coming. Lueur currently collects pageviews.', 'bolt'],
-            'sessions' => ['Sessions', 'Explore visits without confusing sessions with people.', 'Session reports are coming. You can already check observed sessions in Overview when session measurement is enabled.', 'users'],
-            'realtime' => ['Realtime', 'See activity as it reaches your instance.', 'The live activity feed is coming. Overview already shows confirmed events received in the last fifteen minutes.', 'clock'],
-            'pixels' => ['Pixels', 'A simple tracking pixel for this website.', 'Pixel tracking is not implemented yet. Use Tracking setup to install Lueur in the meantime.', 'grid-dots'],
-        ];
-        abort_unless(isset($sections[$section]), 404);
-        [$title, $description, $message, $icon] = $sections[$section];
+        abort_if($website->deleting_at, 404);
+        if ($section === 'pixels') {
+            return Ui::render('placeholder', ['title' => 'Pixels', 'description' => 'Tracking pixels', 'message' => 'Available in a future release.', 'icon' => 'grid-dots', 'website' => $website]);
+        }
+        $dimension = ['sources' => 'source', 'campaigns' => 'campaign', 'devices' => 'device', 'events' => 'event', 'pages' => 'path', 'countries' => 'country'][$section] ?? 'path';
+        $period = $reports->period($request, $website);
+        $technologyCoverage = [];
+        if ($section === 'devices') {
+            $request->validate(['dimension' => ['sometimes', 'in:device,device_brand,browser']]);
+            $dimension = $request->input('dimension', 'device');
+            $technologyCoverage = $reports->clientCoverage($website, $period);
+        }
 
-        return view('placeholder', compact('title', 'description', 'message', 'icon', 'website'));
+        return Ui::render('sites.show', ['website' => $website, 'period' => $period, 'report' => $reports->overview($website, $period), 'series' => $section === 'sessions' ? $reports->series($website, $period) : [], 'dimensions' => [], 'dimension' => $dimension, 'technologyCoverage' => $technologyCoverage, 'countryContext' => $section === 'countries' ? $reports->dimensionReport($website, $period, 'country')['map'] : [], 'recent' => $section === 'realtime' ? $reports->recent($website) : [], 'section' => $section, 'dimensionReport' => in_array($section, ['sessions', 'realtime'], true) ? null : $reports->dimensionReport($website, $period, $dimension, $request->input('value')), 'receptionTotals' => $section === 'realtime' ? $reports->receptionTotals($website) : null]);
     }
 }

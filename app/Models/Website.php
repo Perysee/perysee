@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
 
-#[Fillable(['name', 'domain', 'allowed_domains', 'timezone', 'tracking_mode', 'consent_required'])]
+#[Fillable(['name', 'domain', 'allowed_domains', 'timezone', 'tracking_mode', 'consent_required', 'excluded_paths'])]
 class Website extends Model
 {
     /** @use HasFactory<WebsiteFactory> */
@@ -24,7 +24,7 @@ class Website extends Model
 
     protected function casts(): array
     {
-        return ['allowed_domains' => 'array', 'consent_required' => 'boolean', 'is_demo' => 'boolean'];
+        return ['allowed_domains' => 'array', 'consent_required' => 'boolean', 'is_demo' => 'boolean', 'excluded_paths' => 'array', 'first_collected_at' => 'datetime', 'deleting_at' => 'datetime'];
     }
 
     public function members(): BelongsToMany

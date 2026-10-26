@@ -6,6 +6,7 @@ use App\Installation\Diagnostics;
 use App\Installation\EnvironmentFile;
 use App\Installation\InstallationState;
 use Illuminate\Http\Request;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class InstallationSecurityTest extends TestCase
@@ -14,7 +15,7 @@ class InstallationSecurityTest extends TestCase
     {
         config(['app.key' => null, 'database.default' => 'mariadb', 'database.connections.mariadb.host' => '127.0.0.1', 'database.connections.mariadb.port' => 1]);
         $this->app->forgetInstance('encrypter');
-        $this->get('/install')->assertOk()->assertSee('Install Perysee');
+        $this->get('/install')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'install')->where('authorized', false)->missing('databaseDefaults')->where('auth', null));
         $key = app(EnvironmentFile::class)->values()['APP_KEY'];
         $this->assertSame(32, strlen(base64_decode(substr($key, 7))));
         $this->get('/install')->assertOk();

@@ -6,6 +6,7 @@ use App\Installation\InstallationState;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class WorkspaceNavigationTest extends TestCase
@@ -21,16 +22,16 @@ class WorkspaceNavigationTest extends TestCase
     public function test_global_pages_have_workspace_navigation_and_pixels_placeholder(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
-        $this->actingAs($admin)->get('/sites')->assertOk()->assertSee('data-navigation="global"', false)->assertSee('Instance settings')->assertSee('Password');
-        $this->get('/pixels')->assertOk()->assertSee('Pixels')->assertSee('Coming soon');
-        $this->get('/dashboard')->assertOk()->assertSee('Coming soon');
-        $this->get('/settings')->assertOk()->assertSee('Instance settings')->assertSee('Current configuration');
+        $this->actingAs($admin)->get('/sites')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.index')->where('auth.is_admin', true)->where('links.settings', url('/settings'))->where('links', fn ($links) => $links['password.edit'] === route('password.edit')));
+        $this->get('/pixels')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'placeholder')->where('title', 'Pixels'));
+        $this->get('/dashboard')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'dashboard'));
+        $this->get('/settings')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'settings')->has('settings'));
     }
 
     public function test_instance_settings_are_restricted_to_administrators(): void
     {
         $this->actingAs(User::factory()->create())->get('/settings')->assertForbidden();
-        $this->get('/sites')->assertOk()->assertDontSee('Instance settings');
+        $this->get('/sites')->assertOk()->assertInertia(fn (Assert $page) => $page->where('auth.is_admin', false));
     }
 
     public function test_site_context_separates_overview_tracking_and_future_pages(): void
@@ -38,10 +39,10 @@ class WorkspaceNavigationTest extends TestCase
         $user = User::factory()->create();
         $site = Website::factory()->create();
         $site->members()->attach($user, ['role' => 'owner']);
-        $this->actingAs($user)->get('/sites/'.$site->id)->assertOk()->assertSee('data-navigation="site"', false)->assertSee('Overview')->assertSee('Tracking setup')->assertDontSee('data-navigation="global"', false)->assertDontSee('<pre class="snippet">', false);
-        $this->get('/sites/'.$site->id.'/tracking')->assertOk()->assertSee('Install Lueur')->assertSee('data-site=');
+        $this->actingAs($user)->get('/sites/'.$site->id)->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.show')->where('website.id', $site->id)->missing('snippet'));
+        $this->get('/sites/'.$site->id.'/tracking')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.tracking')->where('snippet', fn (string $snippet) => str_contains($snippet, 'data-site="'.$site->public_id.'"')));
         foreach (['events', 'sessions', 'realtime', 'pixels'] as $section) {
-            $this->get('/sites/'.$site->id.'/'.$section)->assertOk()->assertSee('Coming soon')->assertSee($site->name);
+            $this->get('/sites/'.$site->id.'/'.$section)->assertOk()->assertInertia(fn (Assert $page) => $page->where('website.id', $site->id)->where('screen', $section === 'pixels' ? 'placeholder' : 'sites.show'));
         }
     }
 
@@ -50,7 +51,7 @@ class WorkspaceNavigationTest extends TestCase
         $site = Website::factory()->create();
         $viewer = User::factory()->create();
         $site->members()->attach($viewer, ['role' => 'viewer']);
-        $this->actingAs($viewer)->get('/sites/'.$site->id.'/tracking')->assertOk()->assertDontSee('Site settings');
+        $this->actingAs($viewer)->get('/sites/'.$site->id.'/tracking')->assertOk()->assertInertia(fn (Assert $page) => $page->where('canUpdate', false));
         $this->actingAs(User::factory()->create(['is_admin' => true]));
         foreach (['tracking', 'events', 'sessions', 'realtime', 'pixels'] as $section) {
             $this->get('/sites/'.$site->id.'/'.$section)->assertForbidden();
@@ -65,7 +66,7 @@ class WorkspaceNavigationTest extends TestCase
         $hidden = Website::factory()->create(['name' => 'Private client']);
         $alpha->members()->attach($owner, ['role' => 'owner']);
         $beta->members()->attach($owner, ['role' => 'owner']);
-        $this->actingAs($owner)->get('/sites?q=Alpha')->assertOk()->assertSee('Alpha journal')->assertDontSee('Beta journal')->assertDontSee($hidden->name);
+        $this->actingAs($owner)->get('/sites?q=Alpha')->assertOk()->assertInertia(fn (Assert $page) => $page->has('websites.data', 1)->where('websites.data.0.id', $alpha->id)->has('navigation', 2))->assertDontSee($hidden->name);
         $this->get('/sites/'.$alpha->id)->assertOk()->assertSee('Beta journal')->assertDontSee($hidden->name);
     }
 }

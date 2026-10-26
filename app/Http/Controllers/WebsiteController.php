@@ -2,39 +2,44 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Reporting\Reports;
 use App\Http\Requests\SaveWebsiteRequest;
 use App\Models\Website;
+use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\View\View;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Inertia\Response;
 
 class WebsiteController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:150']]);
         $search = trim($filters['q'] ?? '');
-        $query = $request->user()->websites();
+        $query = $request->user()->websites()->whereNull('deleting_at');
         if ($search !== '') {
             $query->where(function ($query) use ($search): void {
                 $query->where('websites.name', 'like', '%'.$search.'%')->orWhere('domain', 'like', '%'.$search.'%');
             });
         }
 
-        return view('sites.index', ['websites' => $query->orderBy('name')->paginate(20)->withQueryString(), 'search' => $search]);
+        return Ui::render('sites.index', ['websites' => $query->orderBy('name')->paginate(20)->withQueryString(), 'search' => $search]);
     }
 
-    public function create(): View
+    public function create(): Response
     {
-        return view('sites.form', ['website' => new Website(['timezone' => 'UTC', 'allowed_domains' => [], 'tracking_mode' => 'pageviews', 'consent_required' => true])]);
+        return Ui::render('sites.form', ['website' => new Website(['timezone' => 'UTC', 'allowed_domains' => [], 'tracking_mode' => 'pageviews', 'consent_required' => true])]);
     }
 
     public function store(SaveWebsiteRequest $request): RedirectResponse
     {
         $website = DB::transaction(function () use ($request): Website {
-            $website = Website::create($request->siteAttributes());
+            $website = Website::create($request->siteAttributes())->refresh();
+            DB::table('site_measurement_periods')->insert(['website_id' => $website->id, 'started_at' => now('UTC'), 'mode' => $website->tracking_mode]);
             $website->members()->attach($request->user(), ['role' => 'owner']);
 
             return $website;
@@ -43,37 +48,60 @@ class WebsiteController extends Controller
         return redirect()->route('sites.show', $website)->with('status', __('Site created.'));
     }
 
-    public function show(Website $website): View
+    public function show(Request $request, Website $website, Reports $reports): Response|RedirectResponse
+    {
+        Gate::authorize('view', $website);
+        abort_if($website->deleting_at, 404);
+        $period = $reports->period($request, $website);
+        if ($request->input('view') === 'pages' || $request->filled('value')) {
+            return redirect()->route('sites.section', ['website' => $website, 'section' => 'pages'] + $request->only(['from', 'to', 'period', 'value']));
+        }
+
+        return Ui::render('sites.show', ['website' => $website, 'period' => $period, 'report' => $reports->overview($website, $period), 'series' => $reports->series($website, $period), 'dimensions' => $reports->dimensions($website, $period, 'path', $request->input('value')), 'dimension' => 'path', 'breakdowns' => ['source' => $reports->dimensions($website, $period, 'source')]]);
+    }
+
+    public function destroy(Request $request, Website $website): RedirectResponse
+    {
+        Gate::authorize('update', $website);
+        $request->validate(['confirmation' => ['required', 'string', Rule::in([$website->domain])]]);
+        DB::transaction(function () use ($website): void {
+            $locked = Website::whereKey($website->id)->lockForUpdate()->firstOrFail();
+            $locked->forceFill(['deleting_at' => $locked->deleting_at ?? now('UTC')])->save();
+        });
+
+        return redirect()->route('sites.index')->with('status', 'Collection stopped. Site data will be deleted in bounded batches by the scheduled maintenance.');
+    }
+
+    public function tracking(Website $website): Response
     {
         Gate::authorize('view', $website);
 
-        $recent = DB::table('events')->where('website_id', $website->id)->where('received_at', '>=', now('UTC')->subMinutes(15));
-        $tracking = [
-            'pageviews' => (clone $recent)->count(),
-            'sessions' => (clone $recent)->whereNotNull('session_key')->distinct()->count('session_key'),
-            'latest' => DB::table('events')->where('website_id', $website->id)->max('received_at'),
-        ];
-
-        return view('sites.show', compact('website', 'tracking'));
+        return Ui::render('sites.tracking', compact('website'));
     }
 
-    public function tracking(Website $website): View
-    {
-        Gate::authorize('view', $website);
-
-        return view('sites.tracking', compact('website'));
-    }
-
-    public function edit(Website $website): View
+    public function edit(Website $website): Response
     {
         Gate::authorize('update', $website);
 
-        return view('sites.form', compact('website'));
+        return Ui::render('sites.form', compact('website'));
     }
 
     public function update(SaveWebsiteRequest $request, Website $website): RedirectResponse
     {
-        $website->update($request->siteAttributes());
+        DB::transaction(function () use ($request, $website): void {
+            $locked = Website::whereKey($website->id)->lockForUpdate()->firstOrFail();
+            $data = $request->siteAttributes();
+            if (($locked->first_collected_at || DB::table('events')->where('website_id', $locked->id)->exists()) && $data['timezone'] !== $locked->timezone) {
+                throw ValidationException::withMessages(['timezone' => 'The reporting timezone is fixed after the first collected event.']);
+            }
+            abort_if($locked->deleting_at, 409);
+            if (isset($data['tracking_mode']) && $data['tracking_mode'] !== $locked->tracking_mode) {
+                $changed = now('UTC')->format('Y-m-d H:i:s.v');
+                DB::table('site_measurement_periods')->where('website_id', $locked->id)->whereNull('ended_at')->update(['ended_at' => $changed]);
+                DB::table('site_measurement_periods')->insert(['website_id' => $locked->id, 'started_at' => $changed, 'mode' => $data['tracking_mode']]);
+            }
+            $locked->update($data);
+        }, 3);
 
         return redirect()->route('sites.show', $website)->with('status', __('Site updated.'));
     }

@@ -101,6 +101,21 @@
         @case('search')
             <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0-14 0m18 11l-6-6"/>
             @break
+        @case('calendar')
+            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8 3v4m8-4v4M4 10h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1"/>
+            @break
+        @case('download')
+            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 3v12m-4-4l4 4l4-4M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/>
+            @break
+        @case('file-text')
+            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5v5h5M9 12h6m-6 4h6"/>
+            @break
+        @case('device-desktop')
+            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1m4 17h8m-4-4v4"/>
+            @break
+        @case('info-circle')
+            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></g>
+            @break
         @default
             @php(throw new InvalidArgumentException('Unknown icon: '.$name))
     @endswitch

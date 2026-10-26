@@ -41,12 +41,16 @@ function buildRelease(array $options): void
     if (! is_dir($output) && ! mkdir($output, 0755, true)) {
         throw new RuntimeException('Cannot create output directory.');
     }
+    $geoManifest = json_decode(file_get_contents($source.'/resources/geoip/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+    if (! hash_equals($geoManifest['sha256'], hash_file('sha256', $source.'/resources/geoip/country.mmdb'))) {
+        throw new RuntimeException('Bundled country database checksum mismatch.');
+    }
     $zip = new ZipArchive;
     if ($zip->open($output.'/perysee.zip', ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
         throw new RuntimeException('Cannot create release ZIP.');
     }
     try {
-        foreach (['app', 'bootstrap', 'config', 'database/migrations', 'docs', 'resources', 'routes', 'vendor', 'public/build', 'public/fonts', 'public/tracker'] as $directory) {
+        foreach (['app', 'bootstrap', 'config', 'database/migrations', 'resources', 'routes', 'vendor', 'public/build', 'public/fonts', 'public/tracker', 'public/brands', 'public/maps'] as $directory) {
             $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source.'/'.$directory, FilesystemIterator::SKIP_DOTS));
             foreach ($iterator as $entry) {
                 $relative = substr($entry->getPathname(), strlen($source) + 1);
@@ -61,7 +65,7 @@ function buildRelease(array $options): void
                 }
             }
         }
-        foreach (['artisan', 'composer.json', 'composer.lock', 'README.md', 'public/index.php', 'public/.htaccess', 'public/favicon.ico', 'public/robots.txt', 'public/logo.svg'] as $file) {
+        foreach (['artisan', 'composer.json', 'composer.lock', 'README.md', 'public/index.php', 'public/.htaccess', 'public/favicon.ico', 'public/robots.txt', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/site-icon.svg'] as $file) {
             if (is_file($source.'/'.$file) && ! is_link($source.'/'.$file)) {
                 $zip->addFile($source.'/'.$file, 'perysee/'.$file);
             }

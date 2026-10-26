@@ -2,4 +2,5 @@
 
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::command('perysee:prune-tracking --limit=1000')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('perysee:aggregate --batch=500 --budget-seconds=15')->everyFiveMinutes();
+Schedule::command('perysee:maintenance --limit=1000')->everyFiveMinutes();

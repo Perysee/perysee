@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class FreshInstallationTest extends TestCase
@@ -32,7 +33,7 @@ class FreshInstallationTest extends TestCase
             ])->assertSessionHasNoErrors()->assertRedirect('/install');
             $this->post('/install/administrator', ['name' => 'Test owner', 'email' => 'owner@example.test', 'password' => 'Test-password-123!', 'password_confirmation' => 'Test-password-123!'])->assertSessionHasNoErrors()->assertRedirect('/login');
             $this->post('/login', ['email' => 'owner@example.test', 'password' => 'Test-password-123!'])->assertRedirect('/sites');
-            $this->get('/sites')->assertOk()->assertSee('Start with your first site');
+            $this->get('/sites')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.index')->has('websites.data', 0));
             $this->post('/sites', ['name' => 'First site', 'domain' => 'example.com', 'allowed_domains' => '', 'timezone' => 'Europe/Paris'])->assertSessionHasNoErrors()->assertRedirect();
             $website = Website::firstOrFail();
             $this->get('/sites/'.$website->id)->assertOk()->assertSee('First site');

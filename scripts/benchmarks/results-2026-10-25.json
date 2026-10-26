@@ -1,0 +1,401 @@
+{
+  "date": "2026-10-25",
+  "scope": "Local development laboratory, no hosting qualification or commercial capacity promise",
+  "profiles": [
+    {
+      "mode": "full",
+      "events_per_minute": 100,
+      "dispatched": 100,
+      "successful": 100,
+      "duration_ms": 59427.651333,
+      "p50_ms": 22.35174999999981,
+      "p95_ms": 60.858999999999924,
+      "p99_ms": 365.57570800000394,
+      "dispatch_lag_p95_ms": 2.8503749999999854,
+      "peak_php_bytes": 10485760,
+      "statuses": {
+        "204": 100
+      },
+      "errors": {}
+    },
+    {
+      "mode": "full",
+      "events_per_minute": 1000,
+      "dispatched": 1000,
+      "successful": 1000,
+      "duration_ms": 59967.314917,
+      "p50_ms": 18.51370899999165,
+      "p95_ms": 24.144375000003492,
+      "p99_ms": 40.69174999999814,
+      "dispatch_lag_p95_ms": 1.6330000000016298,
+      "peak_php_bytes": 2097152,
+      "statuses": {
+        "204": 1000
+      },
+      "errors": {}
+    },
+    {
+      "mode": "full",
+      "events_per_minute": 10000,
+      "dispatched": 10000,
+      "successful": 10000,
+      "duration_ms": 60028.665666999994,
+      "p50_ms": 30.1840830000001,
+      "p95_ms": 236.33941699998104,
+      "p99_ms": 305.75466700000106,
+      "dispatch_lag_p95_ms": 1.0088329999998678,
+      "peak_php_bytes": 2097152,
+      "statuses": {
+        "204": 10000
+      },
+      "errors": {}
+    },
+    {
+      "mode": "minimal",
+      "events_per_minute": 100,
+      "dispatched": 100,
+      "successful": 100,
+      "duration_ms": 59416.626709000004,
+      "p50_ms": 16.196082999987993,
+      "p95_ms": 20.73754200001713,
+      "p99_ms": 22.999833000008948,
+      "dispatch_lag_p95_ms": 1.4969169999822043,
+      "peak_php_bytes": 2097152,
+      "statuses": {
+        "204": 100
+      },
+      "errors": {}
+    },
+    {
+      "mode": "minimal",
+      "events_per_minute": 1000,
+      "dispatched": 1000,
+      "successful": 1000,
+      "duration_ms": 59963.031749999966,
+      "p50_ms": 16.046415999997407,
+      "p95_ms": 23.046249999984866,
+      "p99_ms": 291.9620419999992,
+      "dispatch_lag_p95_ms": 1.3669999999983702,
+      "peak_php_bytes": 2097152,
+      "statuses": {
+        "204": 1000
+      },
+      "errors": {}
+    },
+    {
+      "mode": "minimal",
+      "events_per_minute": 10000,
+      "dispatched": 10000,
+      "successful": 10000,
+      "duration_ms": 60015.548958,
+      "p50_ms": 8.777291000000332,
+      "p95_ms": 15.829125000000204,
+      "p99_ms": 44.329124999996566,
+      "dispatch_lag_p95_ms": 1.4121250000007421,
+      "peak_php_bytes": 10485760,
+      "statuses": {
+        "204": 10000
+      },
+      "errors": {}
+    },
+    {
+      "mode": "pdo",
+      "events_per_minute": 100,
+      "dispatched": 100,
+      "successful": 100,
+      "duration_ms": 59416.922084,
+      "p50_ms": 8.432207999998354,
+      "p95_ms": 10.737166000006255,
+      "p99_ms": 13.309792000000016,
+      "dispatch_lag_p95_ms": 2.554999999993015,
+      "peak_php_bytes": 2097152,
+      "statuses": {
+        "204": 100
+      },
+      "errors": {}
+    },
+    {
+      "mode": "pdo",
+      "events_per_minute": 1000,
+      "dispatched": 1000,
+      "successful": 1000,
+      "duration_ms": 59951.144375,
+      "p50_ms": 8.1569170000148,
+      "p95_ms": 10.671457999997074,
+      "p99_ms": 19.768875000008848,
+      "dispatch_lag_p95_ms": 2.405417000001762,
+      "peak_php_bytes": 2097152,
+      "statuses": {
+        "204": 1000
+      },
+      "errors": {}
+    },
+    {
+      "mode": "pdo",
+      "events_per_minute": 10000,
+      "dispatched": 10000,
+      "successful": 10000,
+      "duration_ms": 60021.403667000006,
+      "p50_ms": 5.579583999991883,
+      "p95_ms": 7.329874999995809,
+      "p99_ms": 13.003624999983003,
+      "dispatch_lag_p95_ms": 1.155417000001762,
+      "peak_php_bytes": 2097152,
+      "statuses": {
+        "204": 10000
+      },
+      "errors": {}
+    }
+  ],
+  "runs": [
+    {
+      "environment": {
+        "site": "ea3b6427-7163-4d15-a20a-1065d7a98585",
+        "php": "8.5.7",
+        "database": "11.4.8-MariaDB-ubu2404",
+        "os": "Darwin [hostname omitted] 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:05:27 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T8103 arm64",
+        "cpu": "Apple M1",
+        "server_workers": 4,
+        "database_container": {
+          "vcpus": 2,
+          "memory_mib": 1024,
+          "image": "mariadb:11.4.8"
+        }
+      },
+      "duration_per_profile_seconds": 60,
+      "recorded_at": "2026-10-25T10:26:44.419Z",
+      "limitations": [
+        "Loopback PHP development server, four workers, not Apache or LiteSpeed",
+        "Minimal and PDO prototypes deliberately omit production validation, consent, quota, locking and privacy rules",
+        "Full collector uses process-local array cache to avoid a single simulated IP exhausting its quota; distributed quota performance is excluded",
+        "P95 excludes HTTP failures; failures and dispatch lag are reported separately",
+        "Memory is PHP allocated peak per request, not process RSS",
+        "Storage is a table-wide InnoDB estimate, not physical per-event disk usage"
+      ],
+      "profiles": [
+        {
+          "mode": "full",
+          "events_per_minute": 100,
+          "dispatched": 100,
+          "successful": 100,
+          "duration_ms": 59427.651333,
+          "p50_ms": 22.35174999999981,
+          "p95_ms": 60.858999999999924,
+          "p99_ms": 365.57570800000394,
+          "dispatch_lag_p95_ms": 2.8503749999999854,
+          "peak_php_bytes": 10485760,
+          "statuses": {
+            "204": 100
+          },
+          "errors": {}
+        },
+        {
+          "mode": "full",
+          "events_per_minute": 1000,
+          "dispatched": 1000,
+          "successful": 1000,
+          "duration_ms": 59967.314917,
+          "p50_ms": 18.51370899999165,
+          "p95_ms": 24.144375000003492,
+          "p99_ms": 40.69174999999814,
+          "dispatch_lag_p95_ms": 1.6330000000016298,
+          "peak_php_bytes": 2097152,
+          "statuses": {
+            "204": 1000
+          },
+          "errors": {}
+        },
+        {
+          "mode": "full",
+          "events_per_minute": 10000,
+          "dispatched": 10000,
+          "successful": 10000,
+          "duration_ms": 60028.665666999994,
+          "p50_ms": 30.1840830000001,
+          "p95_ms": 236.33941699998104,
+          "p99_ms": 305.75466700000106,
+          "dispatch_lag_p95_ms": 1.0088329999998678,
+          "peak_php_bytes": 2097152,
+          "statuses": {
+            "204": 10000
+          },
+          "errors": {}
+        },
+        {
+          "mode": "minimal",
+          "events_per_minute": 100,
+          "dispatched": 100,
+          "successful": 100,
+          "duration_ms": 59416.626709000004,
+          "p50_ms": 16.196082999987993,
+          "p95_ms": 20.73754200001713,
+          "p99_ms": 22.999833000008948,
+          "dispatch_lag_p95_ms": 1.4969169999822043,
+          "peak_php_bytes": 2097152,
+          "statuses": {
+            "204": 100
+          },
+          "errors": {}
+        },
+        {
+          "mode": "minimal",
+          "events_per_minute": 1000,
+          "dispatched": 1000,
+          "successful": 1000,
+          "duration_ms": 59963.031749999966,
+          "p50_ms": 16.046415999997407,
+          "p95_ms": 23.046249999984866,
+          "p99_ms": 291.9620419999992,
+          "dispatch_lag_p95_ms": 1.3669999999983702,
+          "peak_php_bytes": 2097152,
+          "statuses": {
+            "204": 1000
+          },
+          "errors": {}
+        }
+      ],
+      "consolidation": {
+        "confirmed_events": 12200,
+        "aggregated_events": 12200,
+        "pageviews": 12200,
+        "aggregation_ms": 1826.628542,
+        "report_samples": 100,
+        "report_p95_ms": 5.906667,
+        "events_table_estimated_bytes": "2457600",
+        "peak_cli_bytes": 31457280
+      },
+      "expected_confirmed": 12200,
+      "integrity": true,
+      "http_client": "node:http",
+      "dataset": "v1 pageview, 50 paths, no session token, no referrer/UTM payload; legacy tracker compatibility path"
+    },
+    {
+      "environment": {
+        "site": "d5eeb963-73de-42d9-a34c-1cd5e0fd0fbf",
+        "php": "8.5.7",
+        "database": "11.4.8-MariaDB-ubu2404",
+        "os": "Darwin [hostname omitted] 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:05:27 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T8103 arm64",
+        "cpu": "Apple M1",
+        "server_workers": 4,
+        "database_container": {
+          "vcpus": 2,
+          "memory_mib": 1024,
+          "image": "mariadb:11.4.8"
+        }
+      },
+      "duration_per_profile_seconds": 60,
+      "recorded_at": "2026-10-25T10:20:25.892Z",
+      "limitations": [
+        "Loopback PHP development server, four workers, not Apache or LiteSpeed",
+        "Minimal and PDO prototypes deliberately omit production validation, consent, quota, locking and privacy rules",
+        "Full collector uses process-local array cache to avoid a single simulated IP exhausting its quota; distributed quota performance is excluded",
+        "P95 excludes HTTP failures; failures and dispatch lag are reported separately",
+        "Memory is PHP allocated peak per request, not process RSS",
+        "Storage is a table-wide InnoDB estimate, not physical per-event disk usage"
+      ],
+      "profiles": [
+        {
+          "mode": "minimal",
+          "events_per_minute": 10000,
+          "dispatched": 10000,
+          "successful": 10000,
+          "duration_ms": 60015.548958,
+          "p50_ms": 8.777291000000332,
+          "p95_ms": 15.829125000000204,
+          "p99_ms": 44.329124999996566,
+          "dispatch_lag_p95_ms": 1.4121250000007421,
+          "peak_php_bytes": 10485760,
+          "statuses": {
+            "204": 10000
+          },
+          "errors": {}
+        },
+        {
+          "mode": "pdo",
+          "events_per_minute": 100,
+          "dispatched": 100,
+          "successful": 100,
+          "duration_ms": 59416.922084,
+          "p50_ms": 8.432207999998354,
+          "p95_ms": 10.737166000006255,
+          "p99_ms": 13.309792000000016,
+          "dispatch_lag_p95_ms": 2.554999999993015,
+          "peak_php_bytes": 2097152,
+          "statuses": {
+            "204": 100
+          },
+          "errors": {}
+        },
+        {
+          "mode": "pdo",
+          "events_per_minute": 1000,
+          "dispatched": 1000,
+          "successful": 1000,
+          "duration_ms": 59951.144375,
+          "p50_ms": 8.1569170000148,
+          "p95_ms": 10.671457999997074,
+          "p99_ms": 19.768875000008848,
+          "dispatch_lag_p95_ms": 2.405417000001762,
+          "peak_php_bytes": 2097152,
+          "statuses": {
+            "204": 1000
+          },
+          "errors": {}
+        },
+        {
+          "mode": "pdo",
+          "events_per_minute": 10000,
+          "dispatched": 10000,
+          "successful": 10000,
+          "duration_ms": 60021.403667000006,
+          "p50_ms": 5.579583999991883,
+          "p95_ms": 7.329874999995809,
+          "p99_ms": 13.003624999983003,
+          "dispatch_lag_p95_ms": 1.155417000001762,
+          "peak_php_bytes": 2097152,
+          "statuses": {
+            "204": 10000
+          },
+          "errors": {}
+        }
+      ],
+      "consolidation": {
+        "confirmed_events": 21100,
+        "aggregated_events": 21100,
+        "pageviews": 21100,
+        "aggregation_ms": 3324.281166,
+        "report_samples": 100,
+        "report_p95_ms": 5.828792,
+        "events_table_estimated_bytes": "3981312",
+        "peak_cli_bytes": 31457280
+      },
+      "expected_confirmed": 21100,
+      "integrity": true,
+      "http_client": "node:http",
+      "dataset": "v1 pageview, 50 paths, no session token, no referrer/UTM payload; legacy tracker compatibility path"
+    }
+  ],
+  "confirmed_events_in_complete_profiles": 33300,
+  "consolidated_events_in_complete_profiles": 33300,
+  "integrity": true,
+  "discarded_attempt": {
+    "reason": "Node 24 fetch/undici native setTypeOfService EINVAL during minimal 10000 profile. All initial profiles were repeated with node:http; excluded from canonical comparisons.",
+    "durable_events_consolidated_and_removed_from_synthetic_site": 19330,
+    "consolidation": {
+      "confirmed_events": 19330,
+      "aggregated_events": 19330,
+      "pageviews": 19330,
+      "aggregation_ms": 2792.65175,
+      "report_samples": 100,
+      "report_p95_ms": 5.667,
+      "events_table_estimated_bytes": "3915776",
+      "peak_cli_bytes": 33554432
+    }
+  },
+  "source_sha256": {
+    "scripts/benchmarks/run.mjs": "1696649966cf16d1a67b9615c3993d685227fa5aa3dfa69314e65b09255b870d",
+    "scripts/benchmarks/router.php": "5ce905e74b0f90eab6858d90177c9ebd90a8e53ae230bc1bb99752aa74baf4c6",
+    "app/Http/Controllers/TrackingController.php": "c584c3c057fa0f6751edc4ba751c373dea4d35fc071d511afcc57dd506680761",
+    "app/Analytics/Aggregation/Aggregator.php": "7fbc4060229b773862b6aceee71a6bca835edcaac4051e594bb8d26367389ecf"
+  }
+}

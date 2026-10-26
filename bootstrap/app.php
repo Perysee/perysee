@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Middleware\BootstrapInstallation;
+use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\TrustConfiguredProxies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -14,9 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
         then: fn () => require base_path('routes/tracking.php'),
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->replace(TrustProxies::class, TrustConfiguredProxies::class);
         $middleware->prepend(BootstrapInstallation::class);
         $middleware->trimStrings(except: ['db_password']);
         $middleware->authenticateSessions();
+        $middleware->web(append: [HandleInertiaRequests::class]);
         $middleware->redirectUsersTo('/sites');
     })
     ->withExceptions(function (Exceptions $exceptions): void {

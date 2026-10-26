@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'geoip_path' => env('PERYSEE_GEOIP_PATH'),
+    'trusted_proxies' => array_values(array_filter(array_map('trim', explode(',', env('PERYSEE_TRUSTED_PROXIES', ''))))),
     'installation_path' => storage_path('app/private/installation'),
     'environment_path' => app()->environmentFilePath(),
     'aggregate' => [
