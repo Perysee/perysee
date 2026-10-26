@@ -71,7 +71,7 @@ La release `perysee.zip` contient `vendor/` de production, les assets compilés 
 
 L’assistant refuse une base contenant déjà des comptes. Une panne de connexion ne remplace pas la configuration existante. Après un échec de migration, corriger les droits et reprendre avec les mêmes paramètres : les migrations terminées sont conservées. Si la session expire, utiliser de nouveau le secret puis reprendre l’étape SQL.
 
-Une instance installée fonctionne sans Node, Redis, Apple container, SMTP ni worker permanent. Les sessions et le cache utilisent des fichiers, et les dates SQL sont en UTC. La queue configurée en base est réservée aux futurs traitements ponctuels ; aucune tâche d’agrégation n’est planifiée. Une purge bornée des événements expirés est planifiée toutes les cinq minutes et nécessite le scheduler.
+Une instance installée fonctionne sans Node, Redis, Apple container, SMTP ni worker permanent. Les sessions et le cache utilisent des fichiers, et les dates SQL sont en UTC. L’agrégation et la maintenance bornées sont planifiées toutes les cinq minutes et nécessitent le scheduler. Aucun worker permanent n’est requis.
 
 ## Récupération
 
