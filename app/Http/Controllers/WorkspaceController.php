@@ -17,13 +17,15 @@ class WorkspaceController extends Controller
         $sites = $request->user()->websites()->whereNull('deleting_at')->orderBy('name')->paginate(20);
         $summaries = [];
         $charts = [];
+        $sitePeriods = [];
         foreach ($sites as $site) {
             $period = $reports->period($request, $site);
+            $sitePeriods[$site->id] = ['from' => $period['from'], 'to' => $period['to'], 'timezone' => $site->timezone];
             $summaries[$site->id] = $reports->overview($site, $period);
             $charts[$site->id] = $reports->series($site, $period);
         }
 
-        return Ui::render('dashboard', compact('sites', 'summaries', 'charts'));
+        return Ui::render('dashboard', compact('sites', 'summaries', 'charts', 'sitePeriods'));
     }
 
     public function pixels(): Response

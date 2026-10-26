@@ -3,13 +3,15 @@ import { ref } from "vue";
 import { usePage } from "@inertiajs/vue3";
 const props = defineProps(["website", "siteLinks", "canUpdate", "snippet"]);
 const page = usePage(),
-    copied = ref(false);
+    copied = ref(false), copyFailed = ref(false);
 async function copy() {
     try {
         await navigator.clipboard.writeText(props.snippet);
         copied.value = true;
+        copyFailed.value = false;
     } catch {
         copied.value = false;
+        copyFailed.value = true;
     }
 }
 </script>
@@ -45,7 +47,7 @@ async function copy() {
         <p class="text-sm text-muted mb-5">
             Add this script to the pages you want to measure.
         </p>
-        <pre class="code-block"><code>{{snippet}}</code></pre>
+        <p v-if="copyFailed" role="alert" class="text-sm text-warning mb-3">Copy unavailable. Select the snippet below and copy it manually.</p><pre class="code-block select-all" tabindex="0" aria-label="Tracking snippet"><code>{{snippet}}</code></pre>
         <UAlert
             class="mt-5"
             color="neutral"

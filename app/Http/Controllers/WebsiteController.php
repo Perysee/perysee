@@ -75,6 +75,7 @@ class WebsiteController extends Controller
     public function tracking(Website $website): Response
     {
         Gate::authorize('view', $website);
+        abort_if($website->deleting_at, 404);
 
         return Ui::render('sites.tracking', compact('website'));
     }
@@ -82,6 +83,7 @@ class WebsiteController extends Controller
     public function edit(Website $website): Response
     {
         Gate::authorize('update', $website);
+        abort_if($website->deleting_at, 404);
 
         return Ui::render('sites.form', compact('website'));
     }

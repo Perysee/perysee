@@ -3,7 +3,7 @@ import { usePage, router } from "@inertiajs/vue3";
 import TrafficChart from "./TrafficChart.vue";
 import DateRange from "./DateRange.vue";
 import { queryUrl } from "../interface-query.mjs";
-defineProps(["sites", "summaries", "charts", "period", "today"]);
+defineProps(["sites", "summaries", "charts", "period", "today", "sitePeriods"]);
 const page = usePage();
 const number = (value) =>
     value === null ? "—" : new Intl.NumberFormat("en").format(value);
@@ -37,8 +37,8 @@ const number = (value) =>
                     <UButton
                         :to="
                             queryUrl(site.url, {
-                                from: period.from,
-                                to: period.to,
+                                from: sitePeriods[site.id].from,
+                                to: sitePeriods[site.id].to,
                             })
                         "
                         :label="site.name"
@@ -46,7 +46,7 @@ const number = (value) =>
                         variant="link"
                         class="p-0 font-medium"
                     />
-                    <p class="text-xs text-muted mt-1">{{ site.domain }}</p>
+                    <p class="text-xs text-muted mt-1">{{ site.domain }}</p><p class="text-xs text-muted mt-1">{{ sitePeriods[site.id].from }} – {{ sitePeriods[site.id].to }} · {{ site.timezone }}</p>
                     <UBadge
                         v-if="site.is_demo"
                         color="warning"
@@ -96,7 +96,7 @@ const number = (value) =>
                     {{ summaries[site.id].availability.sessions }}</span
                 ><UButton
                     :to="
-                        queryUrl(site.url, { from: period.from, to: period.to })
+                        queryUrl(site.url, { from: sitePeriods[site.id].from, to: sitePeriods[site.id].to })
                     "
                     label="Open report"
                     trailing-icon="i-tabler-arrow-up-right"
