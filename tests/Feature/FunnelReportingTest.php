@@ -60,6 +60,19 @@ class FunnelReportingTest extends TestCase
         $this->assertSame(1, $status['data']['conversions']);
         $this->assertStringNotContainsString('private-session-key', json_encode($status));
         $this->assertDatabaseCount('journey_report_sessions', 0);
+
+        $owner = User::factory()->create();
+        $site->members()->attach($owner, ['role' => 'owner']);
+        $csv = $this->actingAs($owner)->get('/sites/'.$site->id.'/journey-reports/'.$job->id.'/export')->assertOk()->streamedContent();
+        $rows = array_map(fn ($line) => str_getcsv($line, escape: ''), explode("\n", trim($csv)));
+        $this->assertSame(['step', 'sessions', 'step_rate_percent', 'abandoned', 'pending'], $rows[0]);
+        $this->assertSame(['/', '1', '100', '0', '0'], $rows[1]);
+        $this->assertSame(['Event: signup', '1', '100', '0', '0'], $rows[2]);
+        $this->assertStringNotContainsString('private-session-key', $csv);
+        $other = Website::factory()->create();
+        $other->members()->attach($owner, ['role' => 'owner']);
+        $this->get('/sites/'.$other->id.'/journey-reports/'.$job->id.'/export')->assertNotFound();
+        $this->get('/api/sites/'.$other->id.'/journey-reports/'.$job->id)->assertNotFound();
     }
 
     public function test_identifier_free_events_and_truncated_sessions_cannot_manufacture_conversions(): void
