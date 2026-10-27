@@ -26,7 +26,7 @@ Les instructions de fabrication, les tests privés et l’activation du relais d
 - Isolation des sites par membre : `owner` en écriture, `viewer` en lecture. Aucun accès implicite aux sites pour l’administrateur d’instance.
 - Interface Vue 3 / Inertia / Nuxt UI en anglais, responsive, accordée à la landing et à la documentation : Geist, palette commune et icônes Tabler locales. Aucun SSR ni serveur Node sur l’hébergement.
 
-**Lueur et le collecteur sont disponibles**, avec pages vues sans identifiant ou sessions, consentement configurable et événements nommés. Les rapports consolidés couvrent pages, sessions commencées, sources, campagnes et appareils, avec exports CSV. Le contrôle de réception sur quinze minutes reste distinct des rapports. Le scheduler consolide les données et effectue la maintenance toutes les cinq minutes. Les administrateurs disposent d’une page de santé et de réglages de rétention. Aucune statistique fictive n’est affichée ; la collecte confirme un événement après son insertion SQL. Les pays sont déterminés approximativement à partir d’une base MMDB locale, avec couverture explicite ; l’attribution distingue les sources IA reconnues. Les pixels, invitations et inscriptions publiques ne sont pas implémentés.
+**Lueur et le collecteur sont disponibles**, avec pages vues sans identifiant ou sessions, consentement configurable et événements nommés. Les rapports consolidés couvrent pages, sessions commencées, sources, campagnes et appareils, avec exports CSV. Le contrôle de réception sur quinze minutes reste distinct des rapports. Le scheduler consolide les données et effectue la maintenance toutes les cinq minutes. Les administrateurs disposent d’une page de santé et de réglages de rétention. Hors sites de démonstration explicitement signalés, aucune statistique fictive n’est affichée ; la collecte confirme un événement après son insertion SQL. Les pays sont déterminés approximativement à partir d’une base MMDB locale, avec couverture explicite ; l’attribution distingue les sources IA reconnues. Les filtres croisés sont reconstruits depuis les événements conservés. Les funnels versionnés et parcours automatiques sont mesurés dans une même session, avec Sankey ECharts, calcul par lots et couverture historique explicite. Les pixels, invitations et inscriptions publiques ne sont pas implémentés.
 
 ## Développement local
 
@@ -131,3 +131,15 @@ npm run test:tracker
 ```
 
 Le build complet inclut le script minifié et son gzip. En production, activer le cron décrit dans le guide de suivi pour appliquer la rétention des événements.
+
+Les commandes `perysee:rebuild-segments --batch=500` et `perysee:journey-reports --batch=500 --budget=10` sont intégrées au scheduler. Les rapports de parcours sont des snapshots temporaires privés, purgés après un jour. Les définitions de funnels restent versionnées ; aucune donnée purgée n’est reconstruite artificiellement.
+
+Pour remplir les **deux sites de démonstration connus uniquement**, en local :
+
+```sh
+php artisan perysee:demo-reset
+# Reproduire exactement le même jeu à date identique :
+php artisan perysee:demo-reset --seed=73421
+```
+
+Le reset génère 30 jours de trafic synthétique avec horaires, volumes, sources et chemins variés. La démo avec sessions reçoit trois funnels préconfigurés (inscription, téléchargement, contact), leurs résultats sur sept jours et un parcours automatique déjà calculé. Les comptes, sites réels et définitions de funnels existantes sont conservés. Le mode sans identifiant conserve ses limites : aucun parcours ne peut y être reconstruit. La commande est atomique et refusée en production.
