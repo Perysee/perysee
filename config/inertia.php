@@ -2,5 +2,6 @@
 
 return [
     'ssr' => ['enabled' => false],
-    'testing' => ['ensure_pages_exist' => true, 'page_paths' => [resource_path('js/Pages')], 'page_extensions' => ['vue']],
+    'pages' => ['ensure_pages_exist' => false, 'paths' => [resource_path('js/Pages')], 'extensions' => ['vue']],
+    'testing' => ['ensure_pages_exist' => true],
 ];

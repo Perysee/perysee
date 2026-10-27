@@ -28,6 +28,12 @@ class InertiaInterfaceTest extends TestCase
         $this->get('/health')->assertInertia(fn (Assert $page) => $page->where('screen', 'health'));
     }
 
+    public function test_component_lookup_uses_the_exact_page_directory(): void
+    {
+        $this->assertSame([resource_path('js/Pages')], config('inertia.pages.paths'));
+        $this->assertSame(['vue'], config('inertia.pages.extensions'));
+    }
+
     public function test_login_renders_without_server_side_rendering(): void
     {
         app(InstallationState::class)->exclusive(fn () => app(InstallationState::class)->complete());

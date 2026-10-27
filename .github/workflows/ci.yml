@@ -47,6 +47,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - name: Create safe environment for test bootstrapping
+        run: cp .env.example .env
       - run: composer install --prefer-dist --no-interaction
       - run: npm ci
       - run: npm run build
