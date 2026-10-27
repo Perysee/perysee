@@ -25,10 +25,17 @@ class DemoAnalyticsTest extends TestCase
         $real = Website::factory()->create();
         DB::table('events')->insert(['website_id' => $real->id, 'received_at' => now('UTC'), 'path' => '/real', 'consent_given' => true]);
         $this->seed(LocalDemoSeeder::class);
-        $this->artisan('perysee:demo-reset')->assertSuccessful();
+        $this->artisan('perysee:demo-reset', ['--seed' => 73421])->assertSuccessful();
         $sites = Website::where('is_demo', true)->orderBy('id')->get();
         $manifest = app(InstanceHealth::class)->get('demo_manifest:'.$sites[0]->id);
         $this->assertGreaterThan(1000, $manifest['pageviews']);
+        $this->assertSame(4, $manifest['version']);
+        $sessionSite = $sites->firstWhere('tracking_mode', 'sessions');
+        $this->assertSame(3, DB::table('funnels')->where('website_id', $sessionSite->id)->count());
+        $this->assertSame(4, DB::table('journey_reports')->where('website_id', $sessionSite->id)->where('status', 'ready')->count());
+        $daily = DB::table('stats_daily')->where('website_id', $sites[0]->id)->pluck('pageviews')->all();
+        $this->assertGreaterThan(20, count(array_unique($daily)));
+        $this->assertSame($manifest['pageviews'], (int) DB::table('stats_segment_daily')->where('website_id', $sites[0]->id)->sum('pageviews'));
         foreach (['browser' => 'browsers', 'device_brand' => 'brands'] as $dimension => $key) {
             $this->assertSame($manifest['pageviews'], array_sum($manifest[$key]));
             $this->assertSame($manifest['pageviews'], (int) DB::table('stats_dimension_daily')->where('website_id', $sites[0]->id)->where('dimension_type', $dimension)->sum('metric_count'));
@@ -36,7 +43,7 @@ class DemoAnalyticsTest extends TestCase
         $this->assertSame($manifest['pageviews'], (int) DB::table('stats_daily')->where('website_id', $sites[0]->id)->sum('pageviews'));
         $this->assertSame($manifest['custom_events'], (int) DB::table('stats_daily')->where('website_id', $sites[0]->id)->sum('custom_events'));
         $this->assertNull(DB::table('events')->where('website_id', $real->id)->value('processed_at'));
-        $this->artisan('perysee:demo-reset')->assertSuccessful();
+        $this->artisan('perysee:demo-reset', ['--seed' => 73421])->assertSuccessful();
         $this->assertSame($manifest, app(InstanceHealth::class)->get('demo_manifest:'.$sites[0]->id));
         $this->assertSame($manifest['pageviews'], (int) DB::table('stats_daily')->where('website_id', $sites[0]->id)->sum('pageviews'));
         app(InstallationState::class)->exclusive(fn () => app(InstallationState::class)->complete());

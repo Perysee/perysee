@@ -3,26 +3,33 @@
 namespace App\Console\Commands;
 
 use App\Analytics\Aggregation\Aggregator;
-use App\Analytics\Ingestion\Device;
-use App\Analytics\Ingestion\Sources;
+use App\Analytics\DemoTraffic;
 use App\Analytics\InstanceHealth;
+use App\Analytics\Reporting\JourneyReports;
+use App\Analytics\Reporting\Reports;
 use App\Models\Website;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Throwable;
 
 class ResetDemoAnalytics extends Command
 {
-    protected $signature = 'perysee:demo-reset';
+    protected $signature = 'perysee:demo-reset {--seed= : Optional seed for reproducible random traffic}';
 
-    protected $description = 'Reset only the two known local demo sites with 30 days of deterministic analytics';
+    protected $description = 'Reset only the two known local demo sites with 30 days of varied analytics and sample funnels';
 
     public function handle(Aggregator $aggregator, InstanceHealth $health): int
     {
         if (! app()->environment('local', 'testing')) {
             $this->error('Demo reset is restricted to local development and tests.');
+
+            return self::FAILURE;
+        }
+        $seed = $this->option('seed') === null ? random_int(1, 2147483647) : filter_var($this->option('seed'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 2147483647]]);
+        if ($seed === false) {
+            $this->error('Use an integer seed between 0 and 2147483647.');
 
             return self::FAILURE;
         }
@@ -35,75 +42,23 @@ class ResetDemoAnalytics extends Command
             return self::FAILURE;
         }
         try {
-            $manifests = DB::transaction(function () use ($publicIds, $aggregator, $health): array {
+            $manifests = DB::transaction(function () use ($publicIds, $aggregator, $health, $seed): array {
                 $sites = Website::whereIn('public_id', $publicIds)->orderBy('id')->lockForUpdate()->get();
                 if ($sites->count() !== 2 || $sites->contains(fn (Website $site): bool => ! $site->is_demo || $site->deleting_at !== null)) {
                     throw new RuntimeException('The two known demo sites must exist, be marked demo, and not be pending deletion. Run LocalDemoSeeder first.');
                 }
                 $manifests = [];
                 foreach ($sites as $site) {
-                    foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions'] as $table) {
+                    foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions', 'journey_report_sessions', 'journey_reports'] as $table) {
                         DB::table($table)->where('website_id', $site->id)->delete();
                     }
+                    $generated = app(DemoTraffic::class)->generate($site, $seed);
+                    $rows = $generated['rows'];
+                    $expected = $generated['manifest'];
                     $start = now($site->timezone)->startOfDay()->subDays(29);
-                    $rows = [];
-                    $expected = ['version' => 3, 'from' => $start->toDateString(), 'to' => now($site->timezone)->toDateString(), 'pageviews' => 0, 'custom_events' => 0, 'sessions' => $site->tracking_mode === 'sessions' ? 0 : null, 'countries' => [], 'sources' => [], 'devices' => [], 'brands' => [], 'browsers' => [], 'pages' => [], 'events' => []];
-                    $sessions = [];
-                    $sourceValues = ['Direct', 'Direct', 'Direct', 'google.com', 'google.com', 'google.com', 'bing.com', 'newsletter', 'github.com', 'chatgpt.com', 'chatgpt.com', 'chatgpt.com', 'claude.ai', 'claude.ai', 'perplexity.ai', 'perplexity.ai', 'gemini.google.com', 'copilot.microsoft.com', 'grok.com', 'linkedin.com'];
-                    $paths = ['/', '/pricing', '/features', '/docs', '/blog', '/contact', '/about'];
-                    $devices = ['desktop', 'mobile', 'mobile', 'desktop', 'tablet', 'unknown'];
-                    $countries = ['FR', 'FR', 'FR', 'FR', 'FR', 'FR', 'FR', 'FR', 'FR', 'FR', 'FR', 'FR', 'US', 'US', 'US', 'US', 'US', 'US', 'DE', 'DE', 'DE', 'GB', 'GB', 'CA', 'CA', 'BE', 'CH', 'ES', 'JP', null, null];
-                    $add = function (Carbon $received, int $index, ?string $forcedSession = null) use (&$rows, &$expected, &$sessions, $site, $sourceValues, $paths, $devices, $countries): void {
-                        $source = $sourceValues[$index % count($sourceValues)];
-                        $device = $devices[$index % count($devices)];
-                        $profiles = [
-                            'desktop' => ['Mozilla/5.0 (Windows NT 10.0) Chrome/140.0 Safari/537.36', 'Mozilla/5.0 (Macintosh) Version/18.0 Safari/605.1', 'Mozilla/5.0 (Windows NT 10.0) Chrome/140.0 Safari/537.36 Edg/140.0', 'Mozilla/5.0 (X11) Firefox/140.0'],
-                            'mobile' => ['Mozilla/5.0 (iPhone) Version/18.0 Mobile Safari/605.1', 'Mozilla/5.0 (Linux; Android 14; SM-S921B) Chrome/140.0 Mobile Safari/537.36 SamsungBrowser/28.0', 'Mozilla/5.0 (Linux; Android 10; K) Chrome/140.0 Mobile Safari/537.36', 'Mozilla/5.0 (Linux; Android 14; Pixel 9) Chrome/140.0 Mobile Safari/537.36', 'Mozilla/5.0 (Linux; Android 14; Redmi Note) Firefox/140.0 Mobile'],
-                            'tablet' => ['Mozilla/5.0 (iPad) Version/18.0 Mobile Safari/605.1', 'Mozilla/5.0 (Linux; Android 14; SM-T870) SamsungBrowser/28.0 Chrome/140.0 Safari/537.36'],
-                            'unknown' => [''],
-                        ];
-                        $profile = $profiles[$device][(int) floor($index / 6) % count($profiles[$device])];
-                        $client = app(Device::class)->details($profile);
-                        $country = $countries[$index % count($countries)];
-                        $path = $index % 11 === 0 ? '/articles/story-'.chr(97 + $index % 26).chr(97 + (int) floor($index / 26) % 26) : $paths[$index % count($paths)];
-                        $session = $site->tracking_mode === 'sessions' ? hash('sha256', $site->public_id.':'.($forcedSession ?? $received->toDateString().':'.(int) floor($index / 4))) : null;
-                        if ($session !== null) {
-                            $sessions[$session] = true;
-                        }
-                        $row = ['website_id' => $site->id, 'received_at' => $received->copy()->utc()->format('Y-m-d H:i:s.v'), 'event_type' => 1, 'path' => $path, 'consent_given' => true, 'tracking_mode' => $site->tracking_mode, 'session_key' => $session, 'dimensions_available' => true, 'source_value' => $source, 'referrer_status' => $source === 'Direct' ? 'absent' : 'valid', 'referrer_host' => str_contains($source, '.') ? $source : null, ...$client, 'country_code' => $country, 'geo_available' => true, 'utm_source' => $index % 5 === 0 ? 'newsletter' : null, 'utm_medium' => $index % 5 === 0 ? 'email' : null, 'utm_campaign' => $index % 5 === 0 ? 'autumn-launch' : null, 'event_name' => null];
-                        // Use the same UTM-first resolver as real collection.
-                        $row['source_value'] = app(Sources::class)->resolve($row['utm_source'], $row['referrer_host'], $row['referrer_status']);
-                        if ($source === 'Direct' && ! $row['utm_source']) {
-                            $row['source_value'] = 'Direct';
-                        }
-                        $source = $row['source_value'];
-                        $rows[] = $row;
-                        $expected['pageviews']++;
-                        foreach (['countries' => $country ?? 'Unknown', 'sources' => $source, 'devices' => $device, 'brands' => $client['device_brand'], 'browsers' => $client['browser_name'], 'pages' => $path] as $type => $key) {
-                            $expected[$type][$key] = ($expected[$type][$key] ?? 0) + 1;
-                        }
-                        if ($index % 9 === 0) {
-                            $name = ['signup', 'download', 'contact_click'][$index % 3 === 0 ? (int) ($index / 9) % 3 : 0];
-                            $rows[] = array_merge($row, ['event_type' => 2, 'event_name' => $name]);
-                            $expected['custom_events']++;
-                            $expected['events'][$name] = ($expected['events'][$name] ?? 0) + 1;
-                        }
-                    };
-                    for ($day = 0; $day < 30; $day++) {
-                        $date = $start->copy()->addDays($day);
-                        $count = 48 + ($day * 13 % 80);
-                        $seconds = $day === 29 ? max(1, $date->diffInSeconds(now($site->timezone))) : 86300;
-                        for ($index = 0; $index < $count; $index++) {
-                            $received = $date->copy()->addSeconds((int) ($seconds * ($index + 1) / ($count + 1)));
-                            $add($received, $day * 100 + $index);
-                        }
-                    }
-                    $add(now($site->timezone)->startOfDay()->subMinute(), 3301, 'cross-midnight');
-                    $add(now($site->timezone)->startOfDay(), 3302, 'cross-midnight');
                     foreach (array_chunk($rows, 200) as $chunk) {
                         DB::table('events')->insert($chunk);
                     }
-                    $expected['sessions'] = $site->tracking_mode === 'sessions' ? count($sessions) : null;
                     DB::table('site_measurement_periods')->insert(['website_id' => $site->id, 'started_at' => $start->copy()->utc(), 'mode' => $site->tracking_mode]);
                     $site->forceFill(['first_collected_at' => $start->copy()->utc()])->save();
                     $health->put('demo_manifest:'.$site->id, $expected);
@@ -114,8 +69,22 @@ class ResetDemoAnalytics extends Command
                     throw new RuntimeException('Demo aggregation did not finish. The reset was rolled back.');
                 }
 
+                foreach ($sites as $site) {
+                    if ($site->tracking_mode === 'sessions') {
+                        $this->prepareReports($site, $health);
+                    }
+                }
+                $jobs = app(JourneyReports::class);
+                $deadline = microtime(true) + 120;
+                while (microtime(true) < $deadline && $jobs->tick(500, $sites->modelKeys())) {
+                }
+                if (DB::table('journey_reports')->whereIn('website_id', $sites->modelKeys())->where('status', '!=', 'ready')->exists()) {
+                    throw new RuntimeException('Demo session-flow calculations did not finish. The reset was rolled back.');
+                }
+
                 return $manifests;
             });
+            $this->info('Demo seed: '.$seed);
             foreach ($manifests as $id => $manifest) {
                 $this->info('Demo '.$id.': '.$manifest['pageviews'].' pageviews, '.$manifest['custom_events'].' custom events.');
             }
@@ -130,5 +99,30 @@ class ResetDemoAnalytics extends Command
                 DB::selectOne('SELECT RELEASE_LOCK(?) AS released', [$lock]);
             }
         }
+    }
+
+    private function prepareReports(Website $site, InstanceHealth $health): void
+    {
+        $presets = [
+            'Product signup' => [['type' => 'path', 'value' => '/', 'label' => 'Landing page'], ['type' => 'path', 'value' => '/pricing', 'label' => 'Pricing'], ['type' => 'event', 'value' => 'signup', 'label' => 'Account created']],
+            'Guide download' => [['type' => 'path', 'value' => '/articles/analytics-basics', 'label' => 'Read article'], ['type' => 'path', 'value' => '/resources/analytics-guide', 'label' => 'Guide page'], ['type' => 'event', 'value' => 'download', 'label' => 'Download']],
+            'Contact request' => [['type' => 'path', 'value' => '/', 'label' => 'Landing page'], ['type' => 'path', 'value' => '/contact', 'label' => 'Contact page'], ['type' => 'event', 'value' => 'contact_submit', 'label' => 'Message sent']],
+        ];
+        $ids = $health->get('demo_funnels:'.$site->id, []);
+        $period = app(Reports::class)->period(Request::create('/', 'GET', ['period' => '7d']), $site);
+        $payload = ['from' => $period['start']->toDateTimeString(), 'to' => $period['end']->toDateTimeString(), 'filters' => []];
+        foreach ($presets as $name => $steps) {
+            $funnel = isset($ids[$name]) ? DB::table('funnels')->where('website_id', $site->id)->where('id', $ids[$name])->first() : null;
+            if (! $funnel) {
+                $id = DB::table('funnels')->insertGetId(['website_id' => $site->id, 'name' => $name, 'current_version' => 1, 'created_at' => now('UTC'), 'updated_at' => now('UTC')]);
+                DB::table('funnel_versions')->insert(['website_id' => $site->id, 'funnel_id' => $id, 'version' => 1, 'steps' => json_encode($steps, JSON_THROW_ON_ERROR), 'created_at' => now('UTC')]);
+                $ids[$name] = $id;
+                $funnel = DB::table('funnels')->find($id);
+            }
+            $version = DB::table('funnel_versions')->where('funnel_id', $funnel->id)->where('version', $funnel->current_version)->firstOrFail();
+            app(JourneyReports::class)->request($site, ['kind' => 'funnel', 'funnel_id' => $funnel->id, 'version' => $version->version, 'steps' => json_decode($version->steps, true, flags: JSON_THROW_ON_ERROR), ...$payload]);
+        }
+        $health->put('demo_funnels:'.$site->id, $ids);
+        app(JourneyReports::class)->request($site, ['kind' => 'journey', 'start' => ['type' => 'path', 'value' => '/'], ...$payload]);
     }
 }
