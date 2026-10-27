@@ -2,7 +2,7 @@
 import ShareValue from "./ShareValue.vue";
 import { computed } from "vue";
 import { usePage, router } from "@inertiajs/vue3";
-import { queryUrl } from "../interface-query.mjs";
+import { queryUrl, selectFilter } from "../interface-query.mjs";
 const props = defineProps({
     rows: { type: Array, default: () => [] },
     total: { type: Number, default: 0 },
@@ -86,7 +86,7 @@ const share = (row) =>
         <template #value-cell="{ row }"
             ><a
                 :href="
-                    queryUrl(reportUrl, { ...query, value: row.original.value })
+                    queryUrl(reportUrl, { ...query, ...selectFilter(page.url, type, row.original.value) })
                 "
                 class="breakdown-label"
                 :style="{
@@ -98,7 +98,7 @@ const share = (row) =>
                     router.visit(
                         queryUrl(reportUrl, {
                             ...query,
-                            value: row.original.value,
+                            ...selectFilter(page.url, type, row.original.value),
                         }),
                         { preserveState: true, preserveScroll: true },
                     )

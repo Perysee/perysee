@@ -16,7 +16,7 @@ class AnalyticsUpgradeTest extends TestCase
 
     public function test_upgrade_preserves_accounts_sites_key_and_previously_confirmed_events(): void
     {
-        $this->artisan('migrate:rollback', ['--step' => 4, '--force' => true])->assertSuccessful();
+        $this->artisan('migrate:rollback', ['--step' => DB::table('migrations')->where('migration', '>=', '2026_10_25_095650_add_analytics_mvp_tables')->count(), '--force' => true])->assertSuccessful();
         $key = config('app.key');
         $user = User::factory()->create();
         $password = $user->password;

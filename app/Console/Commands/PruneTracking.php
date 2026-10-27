@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Analytics\Aggregation\Segments;
 use App\Analytics\InstanceHealth;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -21,10 +22,31 @@ class PruneTracking extends Command
 
             return self::FAILURE;
         }
-        $ids = DB::table('events')->whereNotNull('processed_at')->where('received_at', '<', now('UTC')->subDays($days))->orderBy('received_at')->orderBy('id')->limit($limit)->pluck('id');
-        $deleted = $ids->isEmpty() ? 0 : DB::table('events')->whereIn('id', $ids)->delete();
-        $this->info("Deleted {$deleted} expired tracking events.");
+        $maria = in_array(DB::getDriverName(), ['mariadb', 'mysql'], true);
+        $name = 'perysee:aggregate:'.substr(hash('sha256', DB::connection()->getDatabaseName()), 0, 32);
+        if ($maria && (int) DB::selectOne('SELECT GET_LOCK(?, 0) AS acquired', [$name])->acquired !== 1) {
+            return self::SUCCESS;
+        }
+        try {
+            $ids = DB::table('events')->whereNotNull('processed_at')->where('received_at', '<', now('UTC')->subDays($days))->orderBy('received_at')->orderBy('id')->limit($limit)->pluck('id');
+            $deleted = DB::transaction(function () use ($ids): int {
+                foreach (DB::table('events')->whereIn('id', $ids)->lockForUpdate()->get() as $event) {
+                    $site = DB::table('websites')->where('id', $event->website_id)->first();
+                    if ($site && ! $site->deleting_at) {
+                        app(Segments::class)->ingest($event, $site);
+                    }
+                }
+                DB::table('segment_events')->whereIn('event_id', $ids)->delete();
 
-        return self::SUCCESS;
+                return DB::table('events')->whereIn('id', $ids)->delete();
+            });
+            $this->info("Deleted {$deleted} expired tracking events.");
+
+            return self::SUCCESS;
+        } finally {
+            if ($maria) {
+                DB::selectOne('SELECT RELEASE_LOCK(?) AS released', [$name]);
+            }
+        }
     }
 }

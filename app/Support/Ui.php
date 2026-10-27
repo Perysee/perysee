@@ -44,7 +44,7 @@ class Ui
     private static function siteLinks(Website $site): array
     {
         $links = [];
-        foreach (['show', 'edit', 'tracking', 'export', 'favicon', 'update', 'destroy'] as $action) {
+        foreach (['filter-options', 'show', 'edit', 'tracking', 'export', 'favicon', 'update', 'destroy'] as $action) {
             $links[$action] = route('sites.'.$action, $site);
         }
         foreach (['pages', 'sources', 'campaigns', 'devices', 'countries', 'events', 'sessions', 'realtime'] as $section) {

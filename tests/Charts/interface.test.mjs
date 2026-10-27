@@ -36,3 +36,11 @@ test("calendar changes keep the active device or browser report", () => {
     assert.equal(url.searchParams.get("value"), "safari");
     assert.equal(url.searchParams.has("page"), false);
 });
+
+test('crossed filters survive date changes and serialize as Laravel arrays', () => {
+    const filters = reportFilters('/sites/3/pages?filters[country][]=FR&filters[country][]=BE&filters[device][]=mobile&page=2');
+    const url = new URL(queryUrl('https://stats.test/sites/3/pages', {...filters, from:'2026-10-01'}));
+    assert.deepEqual(url.searchParams.getAll('filters[country][]'), ['FR', 'BE']);
+    assert.deepEqual(url.searchParams.getAll('filters[device][]'), ['mobile']);
+    assert.equal(url.searchParams.has('page'), false);
+});

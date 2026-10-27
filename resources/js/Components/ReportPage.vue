@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
+import FilterBar from "./FilterBar.vue";
 import TrafficChart from "./TrafficChart.vue";
 import DateRange from "./DateRange.vue";
 import BreakdownTable from "./BreakdownTable.vue";
@@ -66,29 +67,14 @@ const exportUrl = computed(() =>
         ...(isDimension.value ? { dimension: props.dimension } : {}),
     }),
 );
-const group = ref(reportFilters(page.url).source_group || "all"),
-    provider = ref(reportFilters(page.url).provider || ""),
-    value = ref(reportFilters(page.url).value || "");
-watch(
-    () => page.url,
-    () => {
-        const filters = reportFilters(page.url);
-        group.value = filters.source_group || "all";
-        provider.value = filters.provider || "";
-        value.value = filters.value || "";
-    },
-);
-const filter = () =>
-    router.get(
-        queryUrl(page.props.currentUrl, {
-            ...query.value,
-            value: value.value,
-            source_group: group.value,
-            provider: provider.value,
-        }),
-        {},
-        { preserveScroll: true, preserveState: true },
-    );
+const value = ref(reportFilters(page.url).filters?.[props.dimension]?.[0] || reportFilters(page.url).value || '');
+watch(() => page.url, () => {value.value = reportFilters(page.url).filters?.[props.dimension]?.[0] || reportFilters(page.url).value || '';});
+const filter = () => {
+    const filters = {...(reportFilters(page.url).filters || {})};
+    if (value.value) filters[props.dimension] = [value.value];
+    else delete filters[props.dimension];
+    router.get(queryUrl(page.props.currentUrl, {...query.value,filters,value:null}),{}, {preserveScroll:true,preserveState:true});
+};
 const headings = {
     path: "Popular pages",
     source: "Sources",
@@ -214,6 +200,8 @@ const lastConsolidation = computed(() =>
             :timezone="website.timezone"
         />
     </div>
+    <FilterBar v-if="!isRecent" :period="period" :site-links="siteLinks" :active-dimension="dimension" />
+    <UAlert v-if="report.segment_coverage && report.segment_coverage.status !== 'available'" color="warning" :description="report.segment_coverage.message" class="mb-5" />
     <UAlert
         v-if="!isRecent && report.freshness.pending"
         icon="i-tabler-clock"
@@ -288,9 +276,10 @@ const lastConsolidation = computed(() =>
                     <TrafficChart
                         map
                         :countries="countryContext"
-                        :selected-country="value"
+                        :selected-country="query.filters?.country || value"
                         :filter-url="
                             queryUrl(siteLinks.countries, {
+                                ...reportFilters(page.url),
                                 from: period.from,
                                 to: period.to,
                             })
@@ -467,80 +456,6 @@ const lastConsolidation = computed(() =>
                             />{{ headings[dimension] }}
                         </h2>
                     </header>
-                    <form
-                        v-if="dimension === 'source' && !overview"
-                        class="flex flex-wrap items-end gap-3 p-5 border-b border-default"
-                        @submit.prevent="filter"
-                    >
-                        <UFormField label="Sources"
-                            ><USelect
-                                v-model="group"
-                                :items="[
-                                    { label: 'All sources', value: 'all' },
-                                    { label: 'AI sources', value: 'ai' },
-                                ]"
-                                aria-label="Source group"
-                                class="w-40" /></UFormField
-                        ><UFormField label="Provider"
-                            ><USelect
-                                v-model="provider"
-                                :items="[
-                                    { label: 'All providers', value: '' },
-                                    ...[
-                                        'chatgpt',
-                                        'claude',
-                                        'perplexity',
-                                        'gemini',
-                                        'copilot',
-                                        'grok',
-                                    ].map((value) => ({
-                                        label: {
-                                            chatgpt: 'ChatGPT',
-                                            claude: 'Claude',
-                                            perplexity: 'Perplexity',
-                                            gemini: 'Gemini',
-                                            copilot: 'Copilot',
-                                            grok: 'Grok',
-                                        }[value],
-                                        value,
-                                    })),
-                                ]"
-                                aria-label="Provider"
-                                class="w-40" /></UFormField
-                        ><UButton
-                            type="submit"
-                            color="neutral"
-                            variant="outline"
-                            label="Apply"
-                        />
-                    </form>
-                    <form
-                        v-if="!overview"
-                        class="flex gap-2 p-5 border-b border-default"
-                        @submit.prevent="filter"
-                    >
-                        <UInput
-                            v-model="value"
-                            icon="i-tabler-search"
-                            placeholder="Filter by exact value"
-                            aria-label="Exact value"
-                            class="flex-1 min-w-0"
-                        /><UButton
-                            type="submit"
-                            color="neutral"
-                            variant="outline"
-                            label="Filter"
-                        /><UButton
-                            v-if="value"
-                            label="Clear"
-                            color="neutral"
-                            variant="ghost"
-                            @click="
-                                value = '';
-                                filter();
-                            "
-                        />
-                    </form>
                     <CampaignTable
                         v-if="dimension === 'campaign' && !overview"
                         :rows="rows"

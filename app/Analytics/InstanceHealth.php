@@ -39,6 +39,7 @@ class InstanceHealth
         }
 
         return [
+            'segments_rebuild' => $this->get('segments_rebuild'),
             'geolocation' => app(Geolocation::class)->status(),
             'heartbeat' => $this->get('heartbeat'), 'aggregate_success' => $this->get('aggregate_success'),
             'aggregate_error' => $this->get('aggregate_error'), 'backlog' => (clone $pending)->count(),

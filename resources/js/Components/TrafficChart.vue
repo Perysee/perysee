@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue";
+import {queryUrl, selectFilter} from "../interface-query.mjs";
 import { usePage, router } from "@inertiajs/vue3";
 import { zoomMap } from "../map-navigation.mjs";
 const props = defineProps({
@@ -9,7 +10,7 @@ const props = defineProps({
     countries: Array,
     map: Boolean,
     filterUrl: String,
-    selectedCountry: String,
+    selectedCountry: [String, Array],
 });
 const page = usePage(),
     element = ref(),
@@ -92,7 +93,8 @@ onMounted(async () => {
             chart.on("click", (event) => {
                 if (/^[A-Z]{2}$/.test(event.name)) {
                     const url = new URL(props.filterUrl);
-                    url.searchParams.set("value", event.name);
+                    const selection = selectFilter(page.url, "country", event.name);
+                    url.href = queryUrl(url.href, {from: url.searchParams.get("from"), to: url.searchParams.get("to"), ...selection});
                     router.get(
                         url.href,
                         {},

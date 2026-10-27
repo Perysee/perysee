@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Reporting\Filters;
 use App\Analytics\Reporting\Reports;
+use App\Analytics\Reporting\SegmentReports;
 use App\Models\Website;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,6 +31,14 @@ class AnalyticsController extends Controller
         };
 
         return response()->json($data)->header('Cache-Control', 'no-store, private');
+    }
+
+    public function filterOptions(Request $request, Website $website, Reports $reports): JsonResponse
+    {
+        $this->authorizeSite($website);
+        $data = $request->validate(['filter_dimension' => ['required', 'in:'.implode(',', Filters::DIMENSIONS)], 'q' => ['nullable', 'string', 'max:150']]);
+
+        return response()->json(['data' => app(SegmentReports::class)->options($website, $reports->period($request, $website), $data['filter_dimension'], $data['q'] ?? '')])->header('Cache-Control', 'no-store, private');
     }
 
     public function export(Request $request, Website $website, Reports $reports): StreamedResponse

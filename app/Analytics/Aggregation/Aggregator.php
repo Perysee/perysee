@@ -71,6 +71,7 @@ class Aggregator
             if ($site->deleting_at) {
                 continue;
             }
+            app(Segments::class)->ingest($event, $site);
             [$date, $hour] = $this->buckets($event->received_at, $site->timezone);
             $mode = $event->tracking_mode ?? ($event->session_key ? 'sessions' : 'unknown');
             $metrics = ['pageviews' => $event->event_type === 1 ? 1 : 0, 'custom_events' => $event->event_type === 2 ? 1 : 0,

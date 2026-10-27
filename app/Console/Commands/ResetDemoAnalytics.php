@@ -42,7 +42,7 @@ class ResetDemoAnalytics extends Command
                 }
                 $manifests = [];
                 foreach ($sites as $site) {
-                    foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods'] as $table) {
+                    foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions'] as $table) {
                         DB::table($table)->where('website_id', $site->id)->delete();
                     }
                     $start = now($site->timezone)->startOfDay()->subDays(29);

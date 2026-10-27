@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, onBeforeUnmount } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
+import { queryUrl, reportFilters } from "../interface-query.mjs";
 import BrandLogo from "./BrandLogo.vue";
 import ColorModeButton from "./ColorModeButton.vue";
 const page = usePage(),
@@ -80,6 +81,9 @@ const sections = [
 ];
 const nav = computed(() => {
     if (hasSite.value) {
+        const values = {...reportFilters(page.url)};
+        delete values.value;
+        delete values.dimension;
         const dates = new URLSearchParams();
         const params = new URL(page.url, location.origin).searchParams;
         for (const key of ["from", "to", "period"])
@@ -88,11 +92,7 @@ const nav = computed(() => {
             label,
             icon,
             to:
-                p.value.siteLinks[key === "overview" ? "show" : key] +
-                (dates.size && key !== "realtime" ? "?" + dates : ""),
-            active:
-                p.value.screen === "sites.show" &&
-                (p.value.section || "overview") === key,
+                queryUrl(p.value.siteLinks[key === "overview" ? "show" : key], key === "realtime" ? {} : {...values, ...Object.fromEntries(dates)}),
         }));
     }
     return workspaceNav.value;

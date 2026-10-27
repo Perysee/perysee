@@ -1,7 +1,9 @@
 <script setup>
 import ShareValue from "./ShareValue.vue";
 import { computed } from "vue";
-import { queryUrl } from "../interface-query.mjs";
+import { queryUrl, selectFilter } from "../interface-query.mjs";
+import {usePage} from "@inertiajs/vue3";
+const page=usePage();
 const props = defineProps(["rows", "total", "reportUrl", "query"]);
 const campaigns = computed(() =>
     props.rows.map((row) => {
@@ -48,7 +50,7 @@ const columns = [
         ><template #name-cell="{ row }"
             ><UButton
                 :to="
-                    queryUrl(reportUrl, { ...query, value: row.original.value })
+                    queryUrl(reportUrl, { ...query, ...selectFilter(page.url, 'campaign', row.original.value) })
                 "
                 :label="row.original.name"
                 icon="i-tabler-speakerphone"

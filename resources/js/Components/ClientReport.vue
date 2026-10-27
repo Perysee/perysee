@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { usePage, router } from "@inertiajs/vue3";
-import { queryUrl } from "../interface-query.mjs";
+import { queryUrl, reportFilters, selectFilter } from "../interface-query.mjs";
 import { describeClient } from "../client-labels.mjs";
 import BreakdownTable from "./BreakdownTable.vue";
 import TrafficChart from "./TrafficChart.vue";
@@ -26,11 +26,10 @@ const title = computed(
 const query = computed(() => ({
     from: props.period.from,
     to: props.period.to,
+    ...reportFilters(page.url),
     dimension: props.dimension,
 }));
-const selected = computed(() =>
-    new URL(page.url, "http://perysee.local").searchParams.get("value"),
-);
+const selected = computed(() => reportFilters(page.url).filters?.[props.dimension]?.[0] || new URL(page.url, "http://perysee.local").searchParams.get("value"));
 const measured = computed(() => props.technologyCoverage[props.dimension] || 0);
 const rows = computed(() =>
     props.dimensionReport.data.map((row) => ({
@@ -41,7 +40,7 @@ const rows = computed(() =>
 const count = (value) => new Intl.NumberFormat("en").format(value);
 const filter = (value) =>
     router.get(
-        queryUrl(props.siteLinks.devices, { ...query.value, value }),
+        queryUrl(props.siteLinks.devices, { ...query.value, ...selectFilter(page.url, props.dimension, value) }),
         {},
         { preserveScroll: true },
     );
@@ -61,6 +60,7 @@ const filter = (value) =>
                     @click="
                         router.get(
                             queryUrl(siteLinks.devices, {
+                                ...reportFilters(page.url),
                                 from: period.from,
                                 to: period.to,
                                 dimension: tab.key,

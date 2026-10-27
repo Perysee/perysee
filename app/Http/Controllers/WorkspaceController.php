@@ -61,6 +61,9 @@ class WorkspaceController extends Controller
             $technologyCoverage = $reports->clientCoverage($website, $period);
         }
 
-        return Ui::render('sites.show', ['website' => $website, 'period' => $period, 'report' => $reports->overview($website, $period), 'series' => $section === 'sessions' ? $reports->series($website, $period) : [], 'dimensions' => [], 'dimension' => $dimension, 'technologyCoverage' => $technologyCoverage, 'countryContext' => $section === 'countries' ? $reports->dimensionReport($website, $period, 'country')['map'] : [], 'recent' => $section === 'realtime' ? $reports->recent($website) : [], 'section' => $section, 'dimensionReport' => in_array($section, ['sessions', 'realtime'], true) ? null : $reports->dimensionReport($website, $period, $dimension, $request->input('value')), 'receptionTotals' => $section === 'realtime' ? $reports->receptionTotals($website) : null]);
+        $mapPeriod = $period;
+        unset($mapPeriod['filters']['country']);
+
+        return Ui::render('sites.show', ['website' => $website, 'period' => $period, 'report' => $reports->overview($website, $period), 'series' => $section === 'sessions' ? $reports->series($website, $period) : [], 'dimensions' => [], 'dimension' => $dimension, 'technologyCoverage' => $technologyCoverage, 'countryContext' => $section === 'countries' ? $reports->dimensionReport($website, $mapPeriod, 'country')['map'] : [], 'recent' => $section === 'realtime' ? $reports->recent($website) : [], 'section' => $section, 'dimensionReport' => in_array($section, ['sessions', 'realtime'], true) ? null : $reports->dimensionReport($website, $period, $dimension, $request->input('value')), 'receptionTotals' => $section === 'realtime' ? $reports->receptionTotals($website) : null]);
     }
 }

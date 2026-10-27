@@ -38,7 +38,7 @@ class Reports
             throw ValidationException::withMessages(['granularity' => 'Hourly reports require one local calendar day.']);
         }
 
-        return ['from' => $from, 'to' => $to, 'start' => $start->copy()->utc(), 'end' => $end->copy()->addDay()->utc(), 'granularity' => $input['granularity'] ?? ($from === $to ? 'hour' : 'day'), 'source_group' => $input['source_group'] ?? 'all', 'provider' => $input['provider'] ?? null];
+        return ['from' => $from, 'to' => $to, 'start' => $start->copy()->utc(), 'end' => $end->copy()->addDay()->utc(), 'granularity' => $input['granularity'] ?? ($from === $to ? 'hour' : 'day'), 'filters' => app(Filters::class)->parse($request), 'source_group' => $input['source_group'] ?? 'all', 'provider' => $input['provider'] ?? null];
     }
 
     public function overview(Website $site, array $period): array
@@ -55,7 +55,7 @@ class Reports
         $knownDimensions = (int) $rows->sum('dimension_pageviews');
         $sessionAvailability = ! $available && $sessions === 0 ? 'unavailable' : ($unknown > 0 || $coverage === 'partial' || ($hasDisabled && $available) || ($measured > 0 && $measured < $pageviews) ? 'partial' : 'available');
 
-        return [
+        $base = [
             'period' => ['from' => $period['from'], 'to' => $period['to'], 'timezone' => $site->timezone],
             'totals' => ['pageviews' => $pageviews, 'custom_events' => (int) $rows->sum('custom_events'), 'sessions' => $available || $sessions > 0 ? $sessions : null],
             'coverage' => ['measured_pageviews' => $measured, 'pageviews' => $pageviews, 'country_pageviews' => (int) $rows->sum('country_pageviews')],
@@ -64,6 +64,8 @@ class Reports
             'availability' => ['sessions' => $sessionAvailability, 'dimensions' => $pageviews === 0 ? 'unavailable' : ($knownDimensions === $pageviews ? 'available' : 'partial'), 'countries' => $rows->sum('country_pageviews') === 0 ? 'unavailable' : ((int) $rows->sum('country_pageviews') < $pageviews ? 'partial' : 'available')],
             'freshness' => ['aggregated_at' => app(InstanceHealth::class)->get('aggregate_site:'.$site->id), 'pending' => DB::table('events')->where('website_id', $site->id)->whereNull('processed_at')->exists()],
         ];
+
+        return ! empty($period['filters']) ? app(SegmentReports::class)->overview($site, $period, $base) : $base;
     }
 
     public function series(Website $site, array $period): array
@@ -93,7 +95,7 @@ class Reports
             $series[] = ['date' => $key, 'label' => $label, 'pageviews' => (int) ($row->pageviews ?? 0), 'custom_events' => (int) ($row->custom_events ?? 0), 'sessions' => $sessionsAvailable || ($row->sessions ?? 0) > 0 ? (int) ($row->sessions ?? 0) : null, 'session_availability' => $availability];
         }
 
-        return $series;
+        return ! empty($period['filters']) ? app(SegmentReports::class)->series($site, $period, $series) : $series;
     }
 
     private function dimensionExpression(string $type): string
@@ -127,6 +129,9 @@ class Reports
 
     public function dimensions(Website $site, array $period, string $type = 'path', ?string $value = null): array
     {
+        if (! empty($period['filters'])) {
+            return app(SegmentReports::class)->dimensionReport($site, $period, $type, $value)['data'];
+        }
         $expression = $this->dimensionExpression($type);
 
         return $this->dimensionQuery($site, $period, $type, $value)->selectRaw($expression.' AS dimension_value, SUM(metric_count) AS count')->groupByRaw($expression)->orderByDesc('count')->orderBy('dimension_value')->limit(100)->get()->map(function ($row) use ($type): array {
@@ -138,6 +143,9 @@ class Reports
 
     public function dimensionReport(Website $site, array $period, string $type, ?string $value = null): array
     {
+        if (! empty($period['filters'])) {
+            return app(SegmentReports::class)->dimensionReport($site, $period, $type, $value);
+        }
         $query = $this->dimensionQuery($site, $period, $type, $value);
         $total = (int) (clone $query)->sum('metric_count');
         $distinct = (int) (clone $query)->selectRaw('COUNT(DISTINCT ('.$this->dimensionExpression($type).')) AS aggregate')->value('aggregate');
@@ -154,6 +162,14 @@ class Reports
 
     public function clientCoverage(Website $site, array $period): array
     {
+        if (! empty($period['filters'])) {
+            $coverage = [];
+            foreach (['device', 'device_brand', 'browser'] as $dimension) {
+                $coverage[$dimension] = (int) app(SegmentReports::class)->query($site, $period)->whereNotNull($dimension)->sum('pageviews');
+            }
+
+            return $coverage;
+        }
         $totals = DB::table('stats_dimension_daily')->where('website_id', $site->id)
             ->whereBetween('stat_date', [$period['from'], $period['to']])
             ->whereIn('dimension_type', ['device', 'device_brand', 'browser'])

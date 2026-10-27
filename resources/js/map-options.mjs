@@ -41,7 +41,7 @@ export function mapOption(geo, rows, theme, state = {}) {
                 zoom: state.zoom || 1,
                 center: state.center,
                 scaleLimit: { min: 1, max: 8 },
-                selectedMode: "single",
+                selectedMode: Array.isArray(state.selected) ? "multiple" : "single",
                 itemStyle: {
                     areaColor: theme.muted,
                     borderColor: theme.background,
@@ -57,7 +57,7 @@ export function mapOption(geo, rows, theme, state = {}) {
                 },
                 data: values.map((row) => ({
                     name: row.value,
-                    selected: row.value === state.selected,
+                    selected: Array.isArray(state.selected) ? state.selected.includes(row.value) : row.value === state.selected,
                     value: row.count,
                 })),
             },
