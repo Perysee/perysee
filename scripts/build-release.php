@@ -84,7 +84,7 @@ function buildRelease(array $options): void
         ['const PERYSEE_REPOSITORY = '.var_export($repository, true).';', 'const PERYSEE_RELEASE = '.var_export($version, true).';'], $installer);
     file_put_contents($output.'/install.php', $installer);
     $bootstrap = str_replace('https://github.com/mattrbdr/perysee/releases/latest/download',
-        'https://github.com/'.$repository.'/releases/download/'.$version, file_get_contents(__DIR__.'/install.sh'));
+        'https://get.perysee.eu/releases/'.$version, file_get_contents(__DIR__.'/install.sh'));
     file_put_contents($output.'/install.sh', $bootstrap);
     $checksums = '';
     foreach (['perysee.zip', 'install.php', 'install.sh'] as $file) {

@@ -16,7 +16,7 @@ L’installateur vérifie PHP, télécharge les fichiers prêts à utiliser, dem
 
 Sans terminal, le ZIP est proposé à `https://get.perysee.eu/perysee.zip`. Extraire son dossier `perysee/` hors de la racine web, puis faire pointer le domaine sur `perysee/public/`. Terminer avec l’assistant web décrit ci-dessous.
 
-Les instructions de fabrication, les tests privés et l’activation du relais de téléchargement sont dans [DEVELOPMENT.md](DEVELOPMENT.md), réservé aux mainteneurs et exclu du ZIP et de la documentation web.
+Les instructions de fabrication, les tests privés et le déploiement du relais PHP sur cPanel sont dans [DEVELOPMENT.md](DEVELOPMENT.md), réservé aux mainteneurs et exclu du ZIP et de la documentation web.
 
 ## Fonctionnalités disponibles
 

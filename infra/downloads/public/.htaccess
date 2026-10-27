@@ -1,0 +1,10 @@
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+<IfModule mod_negotiation.c>
+    Options -MultiViews
+</IfModule>
+
+RewriteEngine On
+RewriteRule ^index\.php$ - [L]
+RewriteRule ^ index.php [L]

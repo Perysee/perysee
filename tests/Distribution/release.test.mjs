@@ -134,11 +134,12 @@ function bootstrapEnvironment(f) {
     mkdirSync(bin);
     const curl = join(bin, 'curl');
     writeFileSync(curl, `#!/usr/bin/env node
-import { copyFileSync } from 'node:fs';
+import { copyFileSync, appendFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 const args = process.argv.slice(2);
 const url = args.find(arg => arg.startsWith('https://'));
 if (!url || process.env.PERYSEE_TEST_DOWNLOAD_FAIL) process.exit(22);
+if (process.env.PERYSEE_TEST_URL_LOG) appendFileSync(process.env.PERYSEE_TEST_URL_LOG, url + '\\n');
 const output = args[args.indexOf('--output') + 1];
 copyFileSync(join(process.env.PERYSEE_TEST_RELEASE, basename(new URL(url).pathname)), output);
 `);
@@ -159,6 +160,21 @@ test('one-line shell bootstrap downloads, verifies and installs the release with
     assert.ok(existsSync(join(f.output, 'install.sh')));
     assert.match(readFileSync(join(f.output, 'SHA256SUMS'), 'utf8'), /  install\.sh\n/);
 });
+test('the published shell installer downloads its pinned version through cPanel without client GitHub credentials', t => {
+    const f = fixture(t);
+    build(f);
+    const env = bootstrapEnvironment(f);
+    delete env.PERYSEE_DOWNLOAD_URL;
+    delete env.GH_TOKEN;
+    delete env.GITHUB_TOKEN;
+    env.PERYSEE_TEST_URL_LOG = join(f.root, 'urls.log');
+    const result = spawnSync('bash', [join(f.output, 'install.sh'), '--target', join(f.root, 'public install'), '--url', 'https://stats.example.com', '--yes'], { encoding: 'utf8', env });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const urls = readFileSync(env.PERYSEE_TEST_URL_LOG, 'utf8').trim().split('\n');
+    assert.equal(urls.length, 3);
+    for (const url of urls) assert.ok(url.startsWith('https://get.perysee.eu/releases/v1.2.3/'), url);
+});
+
 test('shell bootstrap never executes an installer that fails checksum verification', (t) => {
     const f = fixture(t);
     build(f);
