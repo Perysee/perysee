@@ -3,6 +3,7 @@
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DemoController;
+use App\Http\Controllers\FunnelController;
 use App\Http\Controllers\GuideController;
 use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\InstanceHealthController;
@@ -33,6 +34,16 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/api/sites/{website}/filter-options', [AnalyticsController::class, 'filterOptions'])->name('sites.filter-options');
         Route::get('/api/sites/{website}/events/recent', [AnalyticsController::class, 'api'])->defaults('report', 'recent')->name('sites.api.recent');
         Route::get('/api/sites/{website}/{report}', [AnalyticsController::class, 'api'])->whereIn('report', ['overview', 'timeseries', 'dimensions', 'recent'])->name('sites.api');
+        Route::get('/sites/{website}/funnels', [FunnelController::class, 'index'])->name('sites.funnels.index');
+        Route::post('/sites/{website}/funnels', [FunnelController::class, 'store'])->name('sites.funnels.store');
+        Route::post('/sites/{website}/funnels/{funnel}/calculate', [FunnelController::class, 'calculate'])->middleware('throttle:30,1')->name('sites.funnels.calculate');
+        Route::post('/sites/{website}/journeys/calculate', [FunnelController::class, 'calculate'])->middleware('throttle:30,1')->name('sites.journeys.calculate');
+        Route::get('/sites/{website}/funnels/{funnel}', [FunnelController::class, 'show'])->name('sites.funnels.show');
+        Route::put('/sites/{website}/funnels/{funnel}', [FunnelController::class, 'update'])->name('sites.funnels.update');
+        Route::delete('/sites/{website}/funnels/{funnel}', [FunnelController::class, 'archive'])->name('sites.funnels.archive');
+        Route::get('/sites/{website}/journeys', [FunnelController::class, 'journeys'])->middleware('throttle:30,1')->name('sites.journeys');
+        Route::get('/api/sites/{website}/journey-reports/{report}', [FunnelController::class, 'status'])->name('sites.journeys.status');
+        Route::get('/sites/{website}/journey-reports/{report}/export', [FunnelController::class, 'export'])->name('sites.journeys.export');
         Route::get('/sites/{website}/export', [AnalyticsController::class, 'export'])->name('sites.export');
         Route::get('/settings', [WorkspaceController::class, 'settings'])->name('settings');
         Route::get('/sites/{website}/favicon', SiteFaviconController::class)->middleware('throttle:120,1')->name('sites.favicon');

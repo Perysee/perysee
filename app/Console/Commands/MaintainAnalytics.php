@@ -32,10 +32,11 @@ class MaintainAnalytics extends Command
             $site = DB::table('websites')->whereNotNull('deleting_at')->orderBy('id')->first();
             if ($site) {
                 $remaining = $limit;
-                foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions'] as $table) {
+                foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions', 'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels'] as $table) {
                     $query = DB::table($table)->where('website_id', $site->id);
                     $keys = match ($table) {
                         'stats_segment_daily', 'stats_segment_hourly' => ['bucket_start', 'segment_hash'], 'segment_events' => ['event_id'], 'segment_sessions' => ['session_key'],
+                        'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels' => ['id'],
                         'events' => ['id'], 'stats_daily' => ['stat_date'], 'stats_hourly' => ['bucket_start'],
                         'stats_dimension_daily' => ['stat_date', 'dimension_type', 'dimension_hash'], 'measured_sessions' => ['session_key'], 'site_measurement_periods' => ['id'],
                     };
@@ -73,6 +74,15 @@ class MaintainAnalytics extends Command
                 $expired = DB::table($table)->where('stat_date', '<', $cutoff)->orderBy('stat_date');
                 foreach ($expired->limit($limit)->get($keys) as $row) {
                     DB::table($table)->where((array) $row)->delete();
+                }
+            }
+            $expiredReports = DB::table('journey_reports')->where('created_at', '<', now('UTC')->subDay())->orderBy('id')->limit($limit)->pluck('id');
+            foreach (DB::table('journey_report_sessions')->whereIn('report_id', $expiredReports)->limit($limit)->pluck('id') as $id) {
+                DB::table('journey_report_sessions')->where('id', $id)->delete();
+            }
+            foreach ($expiredReports as $id) {
+                if (! DB::table('journey_report_sessions')->where('report_id', $id)->exists()) {
+                    DB::table('journey_reports')->where('id', $id)->delete();
                 }
             }
             $this->call('perysee:prune-tracking', ['--limit' => $limit]);

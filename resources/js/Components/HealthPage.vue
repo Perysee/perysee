@@ -72,6 +72,7 @@ const processing = computed(() =>
         "
         class="mb-5"
     />
+    <UAlert color="neutral" class="mb-5" title="Session-flow calculations" :description="`${health.journey_reports_pending} pending · ${health.journey_reports_errors} failed`" />
     <UAlert v-if="health.segments_rebuild" color="neutral" class="mb-5" title="Cross-filter reconstruction" :description="`${health.segments_rebuild.pending} events pending · last run ${health.segments_rebuild.at}`" />
     <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
         <UCard

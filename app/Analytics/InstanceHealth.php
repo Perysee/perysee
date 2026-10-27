@@ -39,6 +39,8 @@ class InstanceHealth
         }
 
         return [
+            'journey_reports_pending' => DB::table('journey_reports')->whereIn('status', ['scanning', 'reducing'])->count(),
+            'journey_reports_errors' => DB::table('journey_reports')->where('status', 'error')->count(),
             'segments_rebuild' => $this->get('segments_rebuild'),
             'geolocation' => app(Geolocation::class)->status(),
             'heartbeat' => $this->get('heartbeat'), 'aggregate_success' => $this->get('aggregate_success'),

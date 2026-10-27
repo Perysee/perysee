@@ -26,6 +26,9 @@ const title = computed(
                   }[p.value.section]
                 : p.value.website?.name || "Overview",
             "sites.tracking": "Tracking setup",
+            funnels: "Funnels",
+            "funnel.report": p.value.funnel?.name || "Funnel",
+            journeys: "Journeys",
             dashboard: "Dashboard",
             health: "Instance health",
             settings: "Instance settings",
@@ -77,6 +80,8 @@ const sections = [
     ["countries", "Countries", "i-tabler-world"],
     ["events", "Events", "i-tabler-bolt"],
     ["sessions", "Sessions", "i-tabler-users"],
+    ["funnels", "Funnels", "i-tabler-filter"],
+    ["journeys", "Journeys", "i-tabler-route"],
     ["realtime", "Recent activity", "i-tabler-activity"],
 ];
 const nav = computed(() => {
@@ -93,6 +98,7 @@ const nav = computed(() => {
             icon,
             to:
                 queryUrl(p.value.siteLinks[key === "overview" ? "show" : key], key === "realtime" ? {} : {...values, ...Object.fromEntries(dates)}),
+            active: key === "funnels" ? ["funnels","funnel.report"].includes(p.value.screen) : key === "journeys" ? p.value.screen === "journeys" : p.value.screen === "sites.show" && (p.value.section || "overview") === key,
         }));
     }
     return workspaceNav.value;
