@@ -68,4 +68,23 @@ class FunnelEngineTest extends TestCase
         $this->assertSame(1, $result['conversions']);
         $this->assertSame(1, $result['steps'][0]['abandoned']);
     }
+
+    public function test_large_journeys_keep_exit_and_pending_flows_distinct_from_other(): void
+    {
+        $engine = app(FunnelEngine::class);
+        $payload = ['kind' => 'journey', 'start' => ['type' => 'path', 'value' => '/'], 'from' => '2026-10-24 00:00:00', 'to' => '2026-10-25 00:00:00', 'filters' => [], 'at' => '2026-10-26 12:00:00'];
+        $state = [];
+        foreach (range(0, 624) as $i) {
+            $engine->consume($state, $this->events(['/', '/a'.($i % 5), '/b'.(intdiv($i, 5) % 5), '/c'.(intdiv($i, 25) % 5), '/d'.intdiv($i, 125)]), $payload);
+        }
+        $engine->consume($state, $this->events(['/']), $payload);
+        $engine->consume($state, $this->events(['/']), [...$payload, 'at' => '2026-10-24 10:10:00']);
+        $result = $engine->finish($state, $payload);
+        $rootLinks = array_filter($result['links'], fn ($link) => $link['source'] === 'root');
+        $targets = array_column($rootLinks, 'target');
+        $kinds = array_column(array_filter($result['nodes'], fn ($node) => in_array($node['name'], $targets, true)), 'kind');
+        $this->assertSame(627, array_sum(array_column($rootLinks, 'value')));
+        $this->assertContains('exit', $kinds);
+        $this->assertContains('pending', $kinds);
+    }
 }

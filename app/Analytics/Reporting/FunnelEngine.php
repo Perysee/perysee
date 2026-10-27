@@ -113,7 +113,7 @@ class FunnelEngine
             foreach ($groups as $action => $rows) {
                 $count = array_sum(array_column($rows, 'count'));
                 $terminal = str_starts_with($action, ':');
-                if ((! $terminal && $kept++ >= 5) || count($nodes) >= 240) {
+                if (! $terminal && ($kept++ >= 5 || count($nodes) >= 240)) {
                     $other += $count;
 
                     continue;
