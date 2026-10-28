@@ -1,5 +1,11 @@
-<svg width="95" height="96" viewBox="0 0 95 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="45" height="45" transform="matrix(-7.54979e-08 -1 -1 7.54979e-08 45 45)" fill="#F8F8F8"/>
-<rect width="45" height="45" transform="matrix(-7.54979e-08 -1 -1 7.54979e-08 45 95.172)" fill="#F8F8F8"/>
-<rect width="45" height="45" rx="21" transform="matrix(-7.54979e-08 -1 -1 7.54979e-08 95 45)" fill="#5516FF"/>
+<svg width="304" height="416" viewBox="0 0 304 416" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_2020_10)">
+<path d="M192 0V96H288V224H224V160H128V64H64V416H0V0H192Z" fill="#F8F8F8"/>
+<path d="M256 352C282.51 352 304 330.51 304 304C304 277.49 282.51 256 256 256C229.49 256 208 277.49 208 304C208 330.51 229.49 352 256 352Z" fill="#5B21FF"/>
+</g>
+<defs>
+<clipPath id="clip0_2020_10">
+<rect width="304" height="416" fill="white"/>
+</clipPath>
+</defs>
 </svg>

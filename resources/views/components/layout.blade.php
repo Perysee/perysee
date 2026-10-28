@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
     <title>{{ $title }} · Perysee</title>
-    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}?v=5">
     <script src="{{ asset('color-mode.js') }}"></script>
     @vite(['resources/css/legacy.css'])
 </head>

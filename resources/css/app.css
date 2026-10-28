@@ -70,8 +70,8 @@ summary {
     color: var(--ui-text-highlighted);
 }
 .perysee-brand img {
-    width: 30px;
-    height: auto;
+    width: auto;
+    height: 32px;
 }
 .page-heading {
     display: flex;

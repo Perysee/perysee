@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "colors": {
     "primary": "brand",
     "secondary": "brand",
@@ -33,17 +33,17 @@
     },
     "brand": {
       "shades": {
-        "50": "color-mix(in srgb, #5516FF 4%, #F8F8F8)",
-        "100": "color-mix(in srgb, #5516FF 8%, #F8F8F8)",
-        "200": "color-mix(in srgb, #5516FF 18%, #F8F8F8)",
-        "300": "color-mix(in srgb, #5516FF 35%, #F8F8F8)",
-        "400": "color-mix(in srgb, #5516FF 70%, #F8F8F8)",
-        "500": "#5516FF",
-        "600": "color-mix(in srgb, #5516FF 90%, #00020C)",
-        "700": "color-mix(in srgb, #5516FF 75%, #00020C)",
-        "800": "color-mix(in srgb, #5516FF 60%, #00020C)",
-        "900": "color-mix(in srgb, #5516FF 45%, #00020C)",
-        "950": "color-mix(in srgb, #5516FF 30%, #00020C)"
+        "50": "color-mix(in srgb, #5B21FF 4%, #F8F8F8)",
+        "100": "color-mix(in srgb, #5B21FF 8%, #F8F8F8)",
+        "200": "color-mix(in srgb, #5B21FF 18%, #F8F8F8)",
+        "300": "color-mix(in srgb, #5B21FF 35%, #F8F8F8)",
+        "400": "color-mix(in srgb, #5B21FF 70%, #F8F8F8)",
+        "500": "#5B21FF",
+        "600": "color-mix(in srgb, #5B21FF 90%, #00020C)",
+        "700": "color-mix(in srgb, #5B21FF 75%, #00020C)",
+        "800": "color-mix(in srgb, #5B21FF 60%, #00020C)",
+        "900": "color-mix(in srgb, #5B21FF 45%, #00020C)",
+        "950": "color-mix(in srgb, #5B21FF 30%, #00020C)"
       }
     }
   },
@@ -60,7 +60,7 @@
     },
     "tokens": {
       "light": {
-        "--ui-primary": "#5516FF",
+        "--ui-primary": "#5B21FF",
         "--ui-radius": "0",
         "--ui-bg": "#F8F8F8",
         "--ui-bg-inverted": "#00020C",
@@ -80,9 +80,9 @@
         "--ui-border": "color-mix(in srgb, #00020C 11%, #F8F8F8)",
         "--ui-border-muted": "color-mix(in srgb, #00020C 6%, #F8F8F8)",
         "--ui-border-accented": "#7D8597",
-        "--brand-subtle": "color-mix(in srgb, #5516FF 8%, #F8F8F8)",
-        "--brand-action": "#5516FF",
-        "--brand-action-hover": "#4610DA",
+        "--brand-subtle": "color-mix(in srgb, #5B21FF 8%, #F8F8F8)",
+        "--brand-action": "#5B21FF",
+        "--brand-action-hover": "#4C1CDA",
         "--ui-bg-workspace": "var(--ui-bg-muted)",
         "--ui-bg-panel": "#F8F8F8",
         "--ui-bg-overlay": "#F8F8F8",
@@ -111,8 +111,8 @@
         "--ui-border-muted": "#1C202D",
         "--ui-border-accented": "#737B90",
         "--brand-subtle": "#1C1535",
-        "--brand-action": "#5516FF",
-        "--brand-action-hover": "#4610DA",
+        "--brand-action": "#5B21FF",
+        "--brand-action-hover": "#4C1CDA",
         "--ui-secondary": "#B4A0FF",
         "--ui-success": "#B4A0FF",
         "--ui-info": "#B4A0FF",

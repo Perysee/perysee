@@ -1,1 +1,1 @@
-<a class="brand" href="{{ route('sites.index') }}"><img class="brand-logo-light" src="{{ asset('logo.svg') }}" alt="" width="30" height="30"><img class="brand-logo-dark" src="{{ asset('logo-dark.svg') }}" alt="" width="30" height="30">perysee<span>.</span></a>
+<a class="brand" href="{{ route('sites.index') }}"><img class="brand-logo brand-logo-light" src="{{ asset('logo.svg') }}?v=5" alt="" width="304" height="416"><img class="brand-logo brand-logo-dark" src="{{ asset('logo-dark.svg') }}?v=5" alt="" width="304" height="416">perysee<span>.</span></a>

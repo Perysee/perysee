@@ -57,3 +57,17 @@ for (const mode of ['light', 'dark']) {
         assert.ok(divider < control, 'Decorative dividers should be quieter than interactive boundaries');
     });
 }
+
+for (const mode of ['light', 'dark']) {
+    test(`${mode} refreshed brand mark and action labels retain usable contrast`, () => {
+        const tokens = theme.style.tokens[mode];
+        const svg = readFileSync(new URL(`../../public/${mode === 'dark' ? 'logo-dark.svg' : 'logo.svg'}`, import.meta.url), 'utf8');
+        const fills = [...svg.matchAll(/<path[^>]+fill="(#[0-9A-Fa-f]{6})"/g)].map(match => match[1]);
+        assert.equal(fills.length, 2);
+        for (const surface of ['--ui-bg', '--ui-bg-panel', '--ui-bg-overlay']) {
+            check(fills[0], tokens[surface], tokens, 4.5, `Brand silhouette on ${surface}`);
+        }
+        check('#F8F8F8', tokens['--brand-action'], tokens, 4.5, 'New violet action label');
+        check(tokens['--ui-primary'], tokens['--ui-bg-panel'], tokens, 3, 'Chart and focus accent');
+    });
+}
