@@ -29,10 +29,12 @@ class DemoAnalyticsTest extends TestCase
         $sites = Website::where('is_demo', true)->orderBy('id')->get();
         $manifest = app(InstanceHealth::class)->get('demo_manifest:'.$sites[0]->id);
         $this->assertGreaterThan(1000, $manifest['pageviews']);
-        $this->assertSame(4, $manifest['version']);
+        $this->assertSame(5, $manifest['version']);
+        $this->assertSame(now('Europe/Paris')->subDays(89)->toDateString(), $manifest['from']);
         $sessionSite = $sites->firstWhere('tracking_mode', 'sessions');
         $this->assertSame(3, DB::table('funnels')->where('website_id', $sessionSite->id)->count());
-        $this->assertSame(4, DB::table('journey_reports')->where('website_id', $sessionSite->id)->where('status', 'ready')->count());
+        $this->assertSame(12, DB::table('journey_reports')->where('website_id', $sessionSite->id)->where('status', 'ready')->count());
+        $this->assertGreaterThan(0, DB::table('events')->where('website_id', $sessionSite->id)->where('received_at', '>=', now('UTC')->subMinutes(15))->count());
         $daily = DB::table('stats_daily')->where('website_id', $sites[0]->id)->pluck('pageviews')->all();
         $this->assertGreaterThan(20, count(array_unique($daily)));
         $this->assertSame($manifest['pageviews'], (int) DB::table('stats_segment_daily')->where('website_id', $sites[0]->id)->sum('pageviews'));

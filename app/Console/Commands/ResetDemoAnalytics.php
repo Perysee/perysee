@@ -18,7 +18,7 @@ class ResetDemoAnalytics extends Command
 {
     protected $signature = 'perysee:demo-reset {--seed= : Optional seed for reproducible random traffic}';
 
-    protected $description = 'Reset only the two known local demo sites with 30 days of varied analytics and sample funnels';
+    protected $description = 'Reset only the two known local demo sites with '.DemoTraffic::DAYS.' days of varied analytics and sample funnels';
 
     public function handle(Aggregator $aggregator, InstanceHealth $health): int
     {
@@ -55,7 +55,7 @@ class ResetDemoAnalytics extends Command
                     $generated = app(DemoTraffic::class)->generate($site, $seed);
                     $rows = $generated['rows'];
                     $expected = $generated['manifest'];
-                    $start = now($site->timezone)->startOfDay()->subDays(29);
+                    $start = now($site->timezone)->startOfDay()->subDays(DemoTraffic::DAYS - 1);
                     foreach (array_chunk($rows, 200) as $chunk) {
                         DB::table('events')->insert($chunk);
                     }
@@ -109,20 +109,21 @@ class ResetDemoAnalytics extends Command
             'Contact request' => [['type' => 'path', 'value' => '/', 'label' => 'Landing page'], ['type' => 'path', 'value' => '/contact', 'label' => 'Contact page'], ['type' => 'event', 'value' => 'contact_submit', 'label' => 'Message sent']],
         ];
         $ids = $health->get('demo_funnels:'.$site->id, []);
-        $period = app(Reports::class)->period(Request::create('/', 'GET', ['period' => '7d']), $site);
-        $payload = ['from' => $period['start']->toDateTimeString(), 'to' => $period['end']->toDateTimeString(), 'filters' => []];
         foreach ($presets as $name => $steps) {
-            $funnel = isset($ids[$name]) ? DB::table('funnels')->where('website_id', $site->id)->where('id', $ids[$name])->first() : null;
-            if (! $funnel) {
-                $id = DB::table('funnels')->insertGetId(['website_id' => $site->id, 'name' => $name, 'current_version' => 1, 'created_at' => now('UTC'), 'updated_at' => now('UTC')]);
-                DB::table('funnel_versions')->insert(['website_id' => $site->id, 'funnel_id' => $id, 'version' => 1, 'steps' => json_encode($steps, JSON_THROW_ON_ERROR), 'created_at' => now('UTC')]);
-                $ids[$name] = $id;
-                $funnel = DB::table('funnels')->find($id);
+            if (! isset($ids[$name]) || ! DB::table('funnels')->where('website_id', $site->id)->where('id', $ids[$name])->exists()) {
+                $ids[$name] = DB::table('funnels')->insertGetId(['website_id' => $site->id, 'name' => $name, 'current_version' => 1, 'created_at' => now('UTC'), 'updated_at' => now('UTC')]);
+                DB::table('funnel_versions')->insert(['website_id' => $site->id, 'funnel_id' => $ids[$name], 'version' => 1, 'steps' => json_encode($steps, JSON_THROW_ON_ERROR), 'created_at' => now('UTC')]);
             }
-            $version = DB::table('funnel_versions')->where('funnel_id', $funnel->id)->where('version', $funnel->current_version)->firstOrFail();
-            app(JourneyReports::class)->request($site, ['kind' => 'funnel', 'funnel_id' => $funnel->id, 'version' => $version->version, 'steps' => json_decode($version->steps, true, flags: JSON_THROW_ON_ERROR), ...$payload]);
         }
         $health->put('demo_funnels:'.$site->id, $ids);
-        app(JourneyReports::class)->request($site, ['kind' => 'journey', 'start' => ['type' => 'path', 'value' => '/'], ...$payload]);
+        foreach (['today', '7d', '30d'] as $preset) {
+            $period = app(Reports::class)->period(Request::create('/', 'GET', ['period' => $preset]), $site);
+            $payload = ['from' => $period['start']->toDateTimeString(), 'to' => $period['end']->toDateTimeString(), 'filters' => []];
+            foreach ($ids as $id) {
+                $version = DB::table('funnel_versions')->where('funnel_id', $id)->where('version', DB::table('funnels')->where('id', $id)->value('current_version'))->firstOrFail();
+                app(JourneyReports::class)->request($site, ['kind' => 'funnel', 'funnel_id' => $id, 'version' => $version->version, 'steps' => json_decode($version->steps, true, flags: JSON_THROW_ON_ERROR), ...$payload]);
+            }
+            app(JourneyReports::class)->request($site, ['kind' => 'journey', 'start' => ['type' => 'path', 'value' => '/'], ...$payload]);
+        }
     }
 }

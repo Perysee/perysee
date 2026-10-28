@@ -20,6 +20,11 @@ class DemoTrafficTest extends TestCase
         $this->assertGreaterThan(1000, $first['manifest']['pageviews']);
         $this->assertGreaterThan(0, $first['manifest']['events']['signup']);
         $this->assertGreaterThan(0, $first['manifest']['events']['download']);
+        foreach (['video_play', 'pricing_toggle', 'newsletter_subscribe', 'outbound_click', 'copy_snippet'] as $event) {
+            $this->assertGreaterThan(0, $first['manifest']['events'][$event]);
+        }
+        $this->assertEqualsCanonicalizing(['newsletter', 'linkedin', 'twitter', 'producthunt', 'google'], collect($first['rows'])->pluck('utm_source')->filter()->unique()->values()->all());
+        $this->assertGreaterThan(0, collect($first['rows'])->where('received_at', '>=', now('UTC')->subMinutes(15)->format('Y-m-d H:i:s.v'))->count());
         $this->assertLessThanOrEqual(now('UTC')->format('Y-m-d H:i:s.v'), max(array_column($first['rows'], 'received_at')));
         $sessions = collect($first['rows'])->groupBy('session_key');
         foreach ($sessions->take(20) as $events) {
