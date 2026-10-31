@@ -16,7 +16,7 @@ Les questions passent par `/dev/tty` lorsque le script est lancé via un pipe : 
 
 ## Construire une distribution
 
-Le dépôt GitHub `mattrbdr/perysee` contient directement le contenu de `application/`. Les sites Nuxt dans `presentation/` restent séparés.
+Le dépôt GitHub `mattrbdr/perysee` contient directement le contenu de `perysee/`. Les sites Nuxt dans `perysee-web/` restent séparés.
 
 Dans un checkout neuf, avec PHP 8.3+, PHP Zip, Composer 2 et la version Node de `.nvmrc` :
 
@@ -88,7 +88,7 @@ Organisation recommandée (remplacer `CPANEL_USER` par le compte réel) :
 5. Créer le dossier du cache hors de **toutes** les racines web et alias de ce compte. Le relais refuse un cache situé sous sa propre racine web ; l’exploitant doit aussi vérifier les racines de la landing, des docs et des autres domaines. Autoriser uniquement le compte PHP à écrire ; ne pas utiliser 0777.
 6. Publier une release complète puis ouvrir les quatre URLs versionnées et la racine pour préparer le cache. Le premier accès télécharge et vérifie les quatre fichiers avant de rendre la version disponible. Vérifier le temps de réponse à froid et les limites PHP/LiteSpeed ; le relais demande un budget PHP de 300 secondes, qui ne remplace pas les limites de l’hébergeur.
 
-La landing et les docs sont générées dans `presentation/` par `npm ci`, `npm run typecheck` puis `npm run generate`. Déployer `apps/landing/.output/public/` et `apps/docs/.output/public/` sur leurs racines respectives, après configuration de leurs URL publiques. Elles ne nécessitent aucun processus Node sur cPanel.
+La landing et les docs sont générées dans `perysee-web/` par `npm ci`, `npm run typecheck` puis `npm run generate`. Déployer `apps/landing/.output/public/` et `apps/docs/.output/public/` sur leurs racines respectives, après configuration de leurs URL publiques. Elles ne nécessitent aucun processus Node sur cPanel.
 
 ### Routes, cache et erreurs
 
@@ -133,7 +133,7 @@ L’installateur PHP conserve la prise en charge interne de `GH_TOKEN` ou `GITHU
 
 ## Développement local — environnement et démonstrations
 
-Les commandes de cette page s’exécutent dans `application/` dans l’espace de travail local, ou à la racine du dépôt Laravel lorsqu’il est cloné seul. La landing et ce site documentaire sont deux applications séparées dans `presentation/`.
+Les commandes de cette page s’exécutent dans `perysee/` dans l’espace de travail local, ou à la racine du dépôt Laravel lorsqu’il est cloné seul. La landing et ce site documentaire sont deux applications séparées dans `perysee-web/`.
 
 Pour un hébergement en production, suivre [Install on shared hosting](/getting-started/shared-hosting). Pour le suivi et le consentement, consulter [Installer Lueur](/tracking/installation) et [Confidentialité](/tracking/privacy).
 
@@ -288,7 +288,7 @@ Mesures du surcoût géo : `scripts/benchmarks/geo-2026-10-25.md`. Le tracker re
 
 Depuis la refonte du 25/10/2026, les écrans applicatifs utilisent Laravel + Inertia + Vue 3 + Nuxt UI 4.12, sans SSR (`config/inertia.php`). Laravel conserve les sessions, la validation, les permissions, le reporting et les mutations ; les pages Vue consomment les props filtrées du middleware Inertia. Le tracker reste un bundle vanilla séparé. Le site de test local Lueur conserve sa page Blade isolée et sa feuille legacy ; il ne charge pas le routeur de l’administration.
 
-La source du thème reste `../presentation/layers/brand/theme.json`. Depuis le workspace complet, `npm run brand:sync` exporte les palettes, les variantes et la version avec SHA-256 dans `resources/`. `npm run brand:check` contrôle les trois exports. Le dépôt autonome utilise ces exports versionnés ; sa compilation et la CI ne dépendent pas du dossier `presentation/`. Les variantes Nuxt UI, Geist, l’accent violet et les neutres du thème, les angles droits et Tabler suivent cette source.
+La source du thème reste `../perysee-web/layers/brand/theme.json`. Depuis le workspace complet, `npm run brand:sync` exporte les palettes, les variantes et la version avec SHA-256 dans `resources/`. `npm run brand:check` contrôle les trois exports. Le dépôt autonome utilise ces exports versionnés ; sa compilation et la CI ne dépendent pas du dossier `perysee-web/`. Les variantes Nuxt UI, Geist, l’accent violet et les neutres du thème, les angles droits et Tabler suivent cette source.
 
 Les composants sont dans `resources/js/Components/`, la coque persistante dans `Components/WorkspaceLayout.vue` et le contenu dans `Pages/Workspace.vue`. Les écrans sont chargés séparément ; ECharts reste différé, en SVG, avec destruction et observation du redimensionnement au cycle de vie Vue. Les tableaux exacts restent accessibles et les sessions indisponibles restent des interruptions dans la série. Le calendrier utilise UPopover/UCalendar/UInputDate : deux mois sur desktop, un sur mobile, boutons appliquer/annuler, dates calendaires du fuseau du site, conservation des filtres et remise à zéro de la pagination. Le serveur refuse les dates futures, inversées et les plages dépassant 1 095 jours d’écart.
 

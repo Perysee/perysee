@@ -1,6 +1,6 @@
 # Application Perysee
 
-Application autonome **PHP 8.3+ / Laravel 13 / Vue 3 + Nuxt UI / MariaDB 11.4.x**. Ce dossier contient l’application du produit ; `../presentation/` contient sa landing et son site documentaire et n’est pas une dépendance de l’application.
+Application autonome **PHP 8.3+ / Laravel 13 / Vue 3 + Nuxt UI / MariaDB 11.4.x**. Ce dossier contient l’application du produit ; `../perysee-web/` contient sa landing et son site documentaire et n’est pas une dépendance de l’application.
 
 Ce dossier est la racine du dépôt privé [mattrbdr/perysee](https://github.com/mattrbdr/perysee) : `app/`, `artisan` et `.github/` sont directement à sa racine sur GitHub. Les sites de présentation ne font pas partie de ce dépôt.
 
@@ -108,7 +108,7 @@ Cette commande crée une base et un compte **`perysee_test`** distincts. L’uti
 
 ## Documentation du produit
 
-Les guides sont maintenus dans le site documentaire `presentation/apps/docs/`, séparé du dépôt et de la distribution Laravel. En local, lancer `npm run dev:docs` depuis `presentation/` pour ouvrir [la documentation](http://localhost:3001). Les liens ci-dessous utilisent cette adresse locale ; en production, définir `PERYSEE_DOCS_URL` avec l’origine réelle du site documentaire pour les liens de l’application.
+Les guides sont maintenus dans le site documentaire `perysee-web/apps/docs/`, séparé du dépôt et de la distribution Laravel. En local, lancer `npm run dev:docs` depuis `perysee-web/` pour ouvrir [la documentation](http://localhost:3001). Les liens ci-dessous utilisent cette adresse locale ; en production, définir `PERYSEE_DOCS_URL` avec l’origine réelle du site documentaire pour les liens de l’application.
 
 - [Développement local et tests — documentation interne](DEVELOPMENT.md).
 - [Installation sur un hébergement](http://localhost:3001/getting-started/shared-hosting).
