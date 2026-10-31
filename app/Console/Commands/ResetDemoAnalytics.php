@@ -16,9 +16,9 @@ use Throwable;
 
 class ResetDemoAnalytics extends Command
 {
-    protected $signature = 'perysee:demo-reset {--seed= : Optional seed for reproducible random traffic}';
+    protected $signature = 'perysee:demo-reset {--seed= : Optional seed for reproducible random traffic} {--only= : Reset only the perysee.com demo site}';
 
-    protected $description = 'Reset only the two known local demo sites with '.DemoTraffic::DAYS.' days of varied analytics and sample funnels';
+    protected $description = 'Reset only the known local demo sites with '.DemoTraffic::DAYS.' days of varied analytics and sample funnels';
 
     public function handle(Aggregator $aggregator, InstanceHealth $health): int
     {
@@ -33,7 +33,15 @@ class ResetDemoAnalytics extends Command
 
             return self::FAILURE;
         }
-        $publicIds = ['c5d09ee1-e154-4625-b97c-6c8f8b27f102', 'c5d09ee1-e154-4625-b97c-6c8f8b27f103'];
+        $only = $this->option('only');
+        if ($only !== null && $only !== 'perysee.com') {
+            $this->error('Use --only=perysee.com or omit the option.');
+
+            return self::FAILURE;
+        }
+        $classicIds = ['c5d09ee1-e154-4625-b97c-6c8f8b27f102', 'c5d09ee1-e154-4625-b97c-6c8f8b27f103'];
+        $requiredIds = $only === null ? $classicIds : [DemoTraffic::PERYSEE_COM];
+        $publicIds = $only === null ? [...$classicIds, DemoTraffic::PERYSEE_COM] : $requiredIds;
         $lock = 'perysee:aggregate:'.substr(hash('sha256', DB::connection()->getDatabaseName()), 0, 32);
         $maria = in_array(DB::getDriverName(), ['mariadb', 'mysql'], true);
         if ($maria && (int) DB::selectOne('SELECT GET_LOCK(?, 0) AS acquired', [$lock])->acquired !== 1) {
@@ -42,10 +50,10 @@ class ResetDemoAnalytics extends Command
             return self::FAILURE;
         }
         try {
-            $manifests = DB::transaction(function () use ($publicIds, $aggregator, $health, $seed): array {
+            $manifests = DB::transaction(function () use ($publicIds, $requiredIds, $aggregator, $health, $seed): array {
                 $sites = Website::whereIn('public_id', $publicIds)->orderBy('id')->lockForUpdate()->get();
-                if ($sites->count() !== 2 || $sites->contains(fn (Website $site): bool => ! $site->is_demo || $site->deleting_at !== null)) {
-                    throw new RuntimeException('The two known demo sites must exist, be marked demo, and not be pending deletion. Run LocalDemoSeeder first.');
+                if ($sites->whereIn('public_id', $requiredIds)->count() !== count($requiredIds) || $sites->contains(fn (Website $site): bool => ! $site->is_demo || $site->deleting_at !== null)) {
+                    throw new RuntimeException('The known demo sites must exist, be marked demo, and not be pending deletion. Run LocalDemoSeeder first.');
                 }
                 $manifests = [];
                 foreach ($sites as $site) {
@@ -103,11 +111,7 @@ class ResetDemoAnalytics extends Command
 
     private function prepareReports(Website $site, InstanceHealth $health): void
     {
-        $presets = [
-            'Product signup' => [['type' => 'path', 'value' => '/', 'label' => 'Landing page'], ['type' => 'path', 'value' => '/pricing', 'label' => 'Pricing'], ['type' => 'event', 'value' => 'signup', 'label' => 'Account created']],
-            'Guide download' => [['type' => 'path', 'value' => '/articles/analytics-basics', 'label' => 'Read article'], ['type' => 'path', 'value' => '/resources/analytics-guide', 'label' => 'Guide page'], ['type' => 'event', 'value' => 'download', 'label' => 'Download']],
-            'Contact request' => [['type' => 'path', 'value' => '/', 'label' => 'Landing page'], ['type' => 'path', 'value' => '/contact', 'label' => 'Contact page'], ['type' => 'event', 'value' => 'contact_submit', 'label' => 'Message sent']],
-        ];
+        $presets = $site->public_id === DemoTraffic::PERYSEE_COM ? $this->peryseePresets() : $this->classicPresets();
         $ids = $health->get('demo_funnels:'.$site->id, []);
         foreach ($presets as $name => $steps) {
             if (! isset($ids[$name]) || ! DB::table('funnels')->where('website_id', $site->id)->where('id', $ids[$name])->exists()) {
@@ -125,5 +129,25 @@ class ResetDemoAnalytics extends Command
             }
             app(JourneyReports::class)->request($site, ['kind' => 'journey', 'start' => ['type' => 'path', 'value' => '/'], ...$payload]);
         }
+    }
+
+    /** @return array<string, array<int, array{type: string, value: string, label: string}>> */
+    private function classicPresets(): array
+    {
+        return [
+            'Product signup' => [['type' => 'path', 'value' => '/', 'label' => 'Landing page'], ['type' => 'path', 'value' => '/pricing', 'label' => 'Pricing'], ['type' => 'event', 'value' => 'signup', 'label' => 'Account created']],
+            'Guide download' => [['type' => 'path', 'value' => '/articles/analytics-basics', 'label' => 'Read article'], ['type' => 'path', 'value' => '/resources/analytics-guide', 'label' => 'Guide page'], ['type' => 'event', 'value' => 'download', 'label' => 'Download']],
+            'Contact request' => [['type' => 'path', 'value' => '/', 'label' => 'Landing page'], ['type' => 'path', 'value' => '/contact', 'label' => 'Contact page'], ['type' => 'event', 'value' => 'contact_submit', 'label' => 'Message sent']],
+        ];
+    }
+
+    /** @return array<string, array<int, array{type: string, value: string, label: string}>> */
+    private function peryseePresets(): array
+    {
+        return [
+            'Discover to download' => [['type' => 'path', 'value' => '/', 'label' => 'Home'], ['type' => 'path', 'value' => '/product', 'label' => 'Product'], ['type' => 'event', 'value' => 'download_core', 'label' => 'Core downloaded']],
+            'Compare to install' => [['type' => 'path', 'value' => '/compare', 'label' => 'Comparisons'], ['type' => 'path', 'value' => '/docs/getting-started/shared-hosting', 'label' => 'Install guide'], ['type' => 'event', 'value' => 'copy_snippet', 'label' => 'Snippet copied']],
+            'Partner enquiry' => [['type' => 'path', 'value' => '/partners', 'label' => 'Partners'], ['type' => 'path', 'value' => '/pricing', 'label' => 'Editions'], ['type' => 'event', 'value' => 'contact_submit', 'label' => 'Enquiry sent']],
+        ];
     }
 }

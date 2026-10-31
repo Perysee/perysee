@@ -10,6 +10,7 @@ use App\Models\Website;
 use Database\Seeders\LocalDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -76,5 +77,35 @@ class DemoAnalyticsTest extends TestCase
         $this->artisan('perysee:demo-reset')->assertFailed();
         $this->assertDatabaseHas('events', ['website_id' => $site->id, 'path' => '/keep-on-failure']);
         $this->assertDatabaseMissing('stats_daily', ['website_id' => $site->id]);
+    }
+
+    public function test_perysee_demo_site_has_its_own_traffic_funnels_and_embedded_icon(): void
+    {
+        $this->freezeTime();
+        $this->app->instance('env', 'local');
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->seed(LocalDemoSeeder::class);
+        $site = Website::where('domain', 'perysee.com')->firstOrFail();
+        $this->assertTrue($site->is_demo);
+        $this->assertSame('sessions', $site->tracking_mode);
+        $this->assertSame(3, Website::where('is_demo', true)->count());
+        $this->artisan('perysee:demo-reset', ['--seed' => 4242, '--only' => 'perysee.com'])->assertSuccessful();
+        $manifest = app(InstanceHealth::class)->get('demo_manifest:'.$site->id);
+        $this->assertSame(6, $manifest['version']);
+        $this->assertGreaterThan(2000, $manifest['pageviews']);
+        $this->assertGreaterThan(0, $manifest['events']['download_core']);
+        $this->assertSame(0, DB::table('events')->where('website_id', '!=', $site->id)->count());
+        $paths = DB::table('events')->where('website_id', $site->id)->where('event_type', 1)->distinct()->pluck('path')->all();
+        $this->assertContains('/product', $paths);
+        $this->assertContains('/compare/matomo', $paths);
+        $this->assertNotContains('/signup', $paths);
+        $this->assertSame(3, DB::table('funnels')->where('website_id', $site->id)->count());
+        $this->assertSame(12, DB::table('journey_reports')->where('website_id', $site->id)->where('status', 'ready')->count());
+        $this->assertGreaterThan(0, DB::table('stats_dimension_daily')->where('website_id', $site->id)->where('dimension_value', 'chatgpt')->count() + DB::table('stats_dimension_daily')->where('website_id', $site->id)->where('dimension_value', 'like', '%chatgpt%')->count());
+        Http::preventStrayRequests();
+        app(InstallationState::class)->exclusive(fn () => app(InstallationState::class)->complete());
+        $response = $this->actingAs($admin)->get(route('sites.favicon', $site));
+        $response->assertOk()->assertHeader('Content-Type', 'image/svg+xml');
+        $this->assertStringContainsString('#5B21FF', $response->getContent());
     }
 }

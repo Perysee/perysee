@@ -14,6 +14,14 @@ class SiteFaviconController extends Controller
     public function __invoke(Request $request, Website $website, SiteFavicon $favicons): Response|RedirectResponse
     {
         Gate::authorize('view', $website);
+        if ($website->is_demo && preg_match('/^[a-z0-9.-]+$/', $website->domain) === 1 && is_file($path = public_path('demo/'.$website->domain.'.svg'))) {
+            return response(file_get_contents($path), 200, [
+                'Content-Type' => 'image/svg+xml',
+                'Cache-Control' => 'private, max-age=3600',
+                'X-Content-Type-Options' => 'nosniff',
+                'Content-Security-Policy' => "default-src 'none'; sandbox",
+            ]);
+        }
         $icon = $favicons->forDomain($website->domain);
         if (! $icon) {
             return redirect('/site-icon.svg')->header('Cache-Control', 'private, max-age=300');

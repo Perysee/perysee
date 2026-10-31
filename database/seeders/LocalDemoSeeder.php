@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Analytics\DemoTraffic;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Database\Seeder;
@@ -28,7 +29,13 @@ class LocalDemoSeeder extends Seeder
                 }
                 $website->members()->syncWithoutDetaching([$admin->id => ['role' => 'owner']]);
             }
+            $perysee = Website::where('public_id', DemoTraffic::PERYSEE_COM)->first();
+            if (! $perysee) {
+                $perysee = new Website(['name' => 'Perysee', 'domain' => 'perysee.com', 'allowed_domains' => ['perysee.com', 'www.perysee.com', 'localhost', '127.0.0.1'], 'timezone' => 'Europe/Paris', 'tracking_mode' => 'sessions', 'consent_required' => true]);
+                $perysee->forceFill(['public_id' => DemoTraffic::PERYSEE_COM, 'is_demo' => true])->save();
+            }
+            $perysee->members()->syncWithoutDetaching([$admin->id => ['role' => 'owner']]);
         });
-        $this->command?->info('Two demo sites are ready. Existing passwords and site settings were preserved.');
+        $this->command?->info('Three demo sites are ready. Existing passwords and site settings were preserved.');
     }
 }
