@@ -1,7 +1,9 @@
 <script setup>
-import { computed, ref, onBeforeUnmount } from "vue";
+import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
+import { useToast } from "@nuxt/ui/composables";
 import { queryUrl, reportFilters } from "../interface-query.mjs";
+import { createBusyTracker, networkErrorToast } from "../navigation-feedback.mjs";
 import BrandLogo from "./BrandLogo.vue";
 import ColorModeButton from "./ColorModeButton.vue";
 const page = usePage(),
@@ -188,10 +190,27 @@ const accountMenu = computed(() => [
         },
     ],
 ]);
-const stopNavigation = router.on("navigate", () => {
-    mobileOpen.value = false;
-});
-onBeforeUnmount(stopNavigation);
+const toast = useToast(),
+    busy = ref(false),
+    tracker = createBusyTracker((value) => (busy.value = value));
+watch(
+    () => p.value.flash?.status,
+    (status) => {
+        if (status && p.value.auth)
+            toast.add({ title: status, color: "success", icon: "i-tabler-circle-check" });
+    },
+    { immediate: true },
+);
+const stops = [
+    router.on("navigate", () => {
+        mobileOpen.value = false;
+    }),
+    router.on("start", tracker.start),
+    router.on("finish", tracker.finish),
+    router.on("exception", () => toast.add(networkErrorToast())),
+    router.on("invalid", () => toast.add(networkErrorToast())),
+];
+onBeforeUnmount(() => stops.forEach((stop) => stop()));
 </script>
 <template>
     <UApp>
@@ -382,15 +401,12 @@ onBeforeUnmount(stopNavigation);
                         /></UDropdownMenu>
                     </div>
                 </header>
-                <main id="main" class="perysee-content">
-                    <UAlert
-                        v-if="p.flash.status"
-                        icon="i-tabler-circle-check"
-                        color="success"
-                        variant="soft"
-                        :description="p.flash.status"
-                        class="mb-6"
-                    />
+                <main
+                    id="main"
+                    class="perysee-content"
+                    :class="{ 'is-navigating': busy }"
+                    :aria-busy="busy"
+                >
                     <slot />
                 </main>
             </div>

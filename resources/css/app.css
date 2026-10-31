@@ -168,8 +168,10 @@ summary {
     object-fit: contain;
     flex-shrink: 0;
     padding: 2px;
-    background: #fff;
     border-radius: 2px;
+}
+.source-logo-mono {
+    background: #fff;
 }
 .breakdown-label {
     position: relative;
@@ -549,4 +551,16 @@ summary {
 
 .report-panel tbody tr {
     border-color: var(--ui-border-muted);
+}
+.perysee-content {
+    transition: opacity 0.15s ease;
+}
+.perysee-content.is-navigating {
+    opacity: 0.55;
+    pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .perysee-content {
+        transition: none;
+    }
 }

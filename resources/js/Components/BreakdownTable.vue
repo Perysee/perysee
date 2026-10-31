@@ -1,5 +1,6 @@
 <script setup>
 import ShareValue from "./ShareValue.vue";
+import EmptyState from "./EmptyState.vue";
 import { computed } from "vue";
 import { usePage, router } from "@inertiajs/vue3";
 import { queryUrl, selectFilter } from "../interface-query.mjs";
@@ -12,6 +13,8 @@ const props = defineProps({
     query: { type: Object, default: () => ({}) },
 });
 const page = usePage();
+const monoLogos = ["chatgpt", "grok"];
+const logoUrl = (logo) => `${page.props.assets.brands}/color/${logo}.svg`;
 const columns = [
     {
         accessorKey: "value",
@@ -76,13 +79,17 @@ const share = (row) =>
     <UTable
         :data="visible"
         :columns="columns"
-        empty="No data for this selection"
         :ui="{
             th: 'text-xs text-muted font-medium',
             td: 'text-sm py-3 tabular-nums',
             root: 'w-full',
         }"
     >
+        <template #empty
+            ><EmptyState
+                title="No data for this selection"
+                description="Adjust the period or filters, or check that the tracking snippet is installed."
+        /></template>
         <template #value-cell="{ row }"
             ><a
                 :href="
@@ -105,20 +112,21 @@ const share = (row) =>
                 "
                 ><img
                     v-if="type === 'source' && row.original.icon"
-                    :src="
-                        page.props.assets.brands +
-                        '/' +
-                        row.original.icon +
-                        '.svg'
-                    "
+                    :src="logoUrl(row.original.icon)"
                     alt=""
                     class="source-logo"
+                    :class="{ 'source-logo-mono': monoLogos.includes(row.original.icon) }"
                 /><UIcon
                     v-else-if="type === 'source'"
                     name="i-tabler-world"
                     class="size-4 text-muted"
+                /><img
+                    v-else-if="['browser', 'device_brand'].includes(type) && row.original.logo"
+                    :src="logoUrl(row.original.logo)"
+                    alt=""
+                    class="source-logo"
                 /><UIcon
-                    v-if="['browser', 'device_brand'].includes(type)"
+                    v-else-if="['browser', 'device_brand'].includes(type)"
                     :name="row.original.icon"
                     class="size-5 text-muted shrink-0"
                 /><span>{{ name(row.original) }}</span></a

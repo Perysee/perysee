@@ -19,10 +19,10 @@ class LocalDemoSeederTest extends TestCase
         $this->seed(LocalDemoSeeder::class);
         $this->seed(LocalDemoSeeder::class);
         $this->assertDatabaseCount('users', 1);
-        $this->assertDatabaseCount('websites', 2);
+        $this->assertDatabaseCount('websites', 3);
         $this->assertSame($password, $admin->fresh()->password);
-        $this->assertCount(2, $admin->websites);
-        $this->assertSame(['pageviews', 'sessions'], Website::orderBy('tracking_mode')->pluck('tracking_mode')->all());
+        $this->assertCount(3, $admin->websites);
+        $this->assertSame(['pageviews', 'sessions', 'sessions'], Website::orderBy('tracking_mode')->pluck('tracking_mode')->all());
     }
 
     public function test_production_refuses_demo_data(): void

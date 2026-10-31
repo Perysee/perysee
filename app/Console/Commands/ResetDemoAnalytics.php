@@ -16,7 +16,7 @@ use Throwable;
 
 class ResetDemoAnalytics extends Command
 {
-    protected $signature = 'perysee:demo-reset {--seed= : Optional seed for reproducible random traffic} {--only= : Reset only the perysee.com demo site}';
+    protected $signature = 'perysee:demo-reset {--seed= : Optional seed for reproducible random traffic} {--only= : Reset the perysee.com demo site instead of the two classic ones}';
 
     protected $description = 'Reset only the known local demo sites with '.DemoTraffic::DAYS.' days of varied analytics and sample funnels';
 
@@ -41,7 +41,7 @@ class ResetDemoAnalytics extends Command
         }
         $classicIds = ['c5d09ee1-e154-4625-b97c-6c8f8b27f102', 'c5d09ee1-e154-4625-b97c-6c8f8b27f103'];
         $requiredIds = $only === null ? $classicIds : [DemoTraffic::PERYSEE_COM];
-        $publicIds = $only === null ? [...$classicIds, DemoTraffic::PERYSEE_COM] : $requiredIds;
+        $publicIds = $requiredIds;
         $lock = 'perysee:aggregate:'.substr(hash('sha256', DB::connection()->getDatabaseName()), 0, 32);
         $maria = in_array(DB::getDriverName(), ['mariadb', 'mysql'], true);
         if ($maria && (int) DB::selectOne('SELECT GET_LOCK(?, 0) AS acquired', [$lock])->acquired !== 1) {

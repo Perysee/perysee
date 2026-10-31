@@ -1,5 +1,6 @@
 <script setup>
 import ShareValue from "./ShareValue.vue";
+import EmptyState from "./EmptyState.vue";
 import { computed } from "vue";
 import { queryUrl, selectFilter } from "../interface-query.mjs";
 import {usePage} from "@inertiajs/vue3";
@@ -42,11 +43,15 @@ const columns = [
     <UTable
         :data="campaigns"
         :columns="columns"
-        empty="No campaigns measured. UTM-tagged pageviews will appear here."
         :ui="{
             th: 'text-xs text-muted font-normal',
             td: 'text-sm py-4 tabular-nums',
         }"
+        ><template #empty
+            ><EmptyState
+                title="No campaigns measured"
+                description="UTM-tagged pageviews will appear here."
+                icon="i-tabler-speakerphone" /></template
         ><template #name-cell="{ row }"
             ><UButton
                 :to="
