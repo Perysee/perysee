@@ -71,3 +71,23 @@ for (const mode of ['light', 'dark']) {
         check(tokens['--ui-primary'], tokens['--ui-bg-panel'], tokens, 3, 'Chart and focus accent');
     });
 }
+
+for (const mode of ['light', 'dark']) {
+    test(`${mode} text keeps three distinct roles that stay readable`, () => {
+        const tokens = theme.style.tokens[mode];
+        const roles = ['--ui-text', '--ui-text-muted', '--ui-text-dimmed'].map(key => luminance(rgb(tokens[key], tokens)));
+        const sign = mode === 'light' ? 1 : -1;
+        assert.ok(sign * (roles[1] - roles[0]) > 0.01, 'Secondary text should sit one step below primary');
+        assert.ok(sign * (roles[2] - roles[1]) > 0.01, 'Muted text should sit one step below secondary');
+    });
+    test(`${mode} success, warning and error signals differ from the brand accent and from each other`, () => {
+        const tokens = theme.style.tokens[mode];
+        const keys = ['--ui-primary', '--ui-success', '--ui-warning', '--ui-error'];
+        assert.equal(new Set(keys.map(key => tokens[key])).size, keys.length, 'Signals must not share a colour');
+        for (const key of keys.slice(1)) {
+            for (const surface of ['--ui-bg', '--ui-bg-panel', '--ui-bg-muted', '--ui-bg-overlay']) {
+                check(tokens[key], tokens[surface], tokens, 4.5, `${key} on ${surface}`);
+            }
+        }
+    });
+}
