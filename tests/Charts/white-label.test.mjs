@@ -26,7 +26,9 @@ const stubs = {
     UCard: { render() { return h("section", this.$slots.default()); } },
     UFormField: { props: ["label", "hint", "error"], render() { return h("div", [h("label", this.label), h("small", this.hint), this.error ? h("p", { role: "alert" }, this.error) : null, this.$slots.default()]); } },
     UInput: { props: ["modelValue", "placeholder"], render() { return h("input", { value: this.modelValue, placeholder: this.placeholder }); } },
-    UButton: { props: ["label"], render() { return h("button", this.label); } },
+    UButton: { props: ["label"], render() { return h("button", this.$attrs, this.label ?? this.$slots.default?.()); } },
+    UPopover: { render() { return h("div", { class: "popover" }, this.$slots.default?.()); } },
+    UColorPicker: { render() { return h("div", { class: "picker" }); } },
 };
 
 const data = {
@@ -62,7 +64,8 @@ test("the section shows the saved values, the logo and a way to remove it", asyn
     assert.match(html, /value="#12ab34"/);
     assert.match(html, /src="\/modules\/white-label\/public\/logo\?v=1"/);
     assert.match(html, /Remove logo/);
-    assert.match(html, /Reset to Perysee/);
+    assert.match(html, /Reset everything to Perysee/);
+    assert.equal((html.match(/Use default/g) ?? []).length, 2, "one way back to the default for the name and one for the color");
 });
 
 test("validation errors from the server appear next to their field", async () => {

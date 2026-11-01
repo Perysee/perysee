@@ -16,6 +16,7 @@
             });
             const form = reactive({ name: "", accent: "" });
             const busy = ref("");
+            const confirming = ref(false);
             watch(
                 data,
                 (value) => {
@@ -35,6 +36,10 @@
                 event?.preventDefault();
                 send("save", "post", data.value.links.save, { name: form.name, accent: form.accent });
             };
+            const reset = () => {
+                confirming.value = false;
+                send("reset", "delete", data.value.links.reset, {});
+            };
             const upload = (event) => {
                 const file = event.target.files?.[0];
                 if (file) {
@@ -52,7 +57,10 @@
                 const Field = resolveComponent("UFormField");
                 const Input = resolveComponent("UInput");
                 const Button = resolveComponent("UButton");
+                const Popover = resolveComponent("UPopover");
+                const ColorPicker = resolveComponent("UColorPicker");
                 const accent = form.accent || value.defaults.accent;
+                const useDefault = (label, show, clear) => h(Button, { label, color: "neutral", variant: "link", size: "xs", disabled: !show, onClick: clear });
 
                 return h(Card, { class: "mt-6" }, {
                     default: () => [
@@ -62,41 +70,51 @@
                         ]),
                         h("form", { class: "space-y-5", onSubmit: save }, [
                             h(Field, { label: "Product name", hint: `Leave empty to keep ${value.defaults.name}`, error: props.errors?.name }, {
-                                default: () => h(Input, {
-                                    modelValue: form.name,
-                                    "onUpdate:modelValue": (next) => (form.name = next),
-                                    placeholder: value.defaults.name,
-                                    maxlength: 40,
-                                    class: "w-full max-w-sm",
-                                }),
+                                default: () => h("div", { class: "flex items-center gap-2" }, [
+                                    h(Input, {
+                                        modelValue: form.name,
+                                        "onUpdate:modelValue": (next) => (form.name = next),
+                                        placeholder: value.defaults.name,
+                                        maxlength: 40,
+                                        class: "w-full max-w-sm",
+                                    }),
+                                    useDefault("Use default", !!form.name, () => (form.name = "")),
+                                ]),
                             }),
                             h(Field, { label: "Accent color", hint: "Used for buttons, links and charts", error: props.errors?.accent }, {
-                                default: () => h("div", { class: "flex items-center gap-3" }, [
-                                    h("input", {
-                                        type: "color",
-                                        value: accent,
-                                        "aria-label": "Pick the accent color",
-                                        class: "h-9 w-12 cursor-pointer border border-default bg-transparent p-1",
-                                        onInput: (event) => (form.accent = event.target.value),
+                                default: () => h("div", { class: "flex flex-wrap items-center gap-2" }, [
+                                    h(Popover, null, {
+                                        default: () => h(Button, { color: "neutral", variant: "outline", "aria-label": "Pick the accent color" }, {
+                                            leading: () => h("span", { class: "size-4 border border-default", style: { background: accent } }),
+                                            default: () => accent,
+                                        }),
+                                        content: () => h("div", { class: "p-3" }, [
+                                            h(ColorPicker, {
+                                                modelValue: accent,
+                                                "onUpdate:modelValue": (next) => (form.accent = next),
+                                                format: "hex",
+                                            }),
+                                        ]),
                                     }),
                                     h(Input, {
                                         modelValue: form.accent,
                                         "onUpdate:modelValue": (next) => (form.accent = next),
                                         placeholder: value.defaults.accent,
                                         maxlength: 7,
-                                        class: "w-32",
+                                        class: "w-28",
                                     }),
+                                    useDefault("Use default", !!form.accent, () => (form.accent = "")),
                                 ]),
                             }),
-                            h("div", { class: "flex flex-wrap gap-3" }, [
+                            h("div", { class: "flex flex-wrap items-center gap-3" }, [
                                 h(Button, { type: "submit", label: "Save", loading: busy.value === "save" }),
-                                h(Button, {
-                                    label: "Reset to Perysee",
-                                    color: "neutral",
-                                    variant: "outline",
-                                    loading: busy.value === "reset",
-                                    onClick: () => send("reset", "delete", value.links.reset, {}),
-                                }),
+                                confirming.value
+                                    ? [
+                                        h("span", { class: "text-sm text-muted" }, "This removes the name, color and logo."),
+                                        h(Button, { label: "Yes, reset", color: "error", loading: busy.value === "reset", onClick: reset }),
+                                        h(Button, { label: "Cancel", color: "neutral", variant: "ghost", onClick: () => (confirming.value = false) }),
+                                    ]
+                                    : h(Button, { label: "Reset everything to Perysee", color: "neutral", variant: "outline", icon: "i-tabler-restore", onClick: () => (confirming.value = true) }),
                             ]),
                         ]),
                         h("div", { class: "mt-8 border-t border-default pt-6" }, [
