@@ -1,8 +1,20 @@
 <script setup>
 import { computed, ref } from "vue";
 import { router } from "@inertiajs/vue3";
-const props = defineProps(["installed", "invalid", "path"]);
+const props = defineProps(["installed", "invalid", "path", "installer"]);
 const busy = ref("");
+const installing = ref(false);
+const sending = ref(false);
+const bundle = ref(null);
+const send = () => {
+    if (!bundle.value) return;
+    sending.value = true;
+    router.post(props.installer.link, { bundle: bundle.value }, {
+        forceFormData: true,
+        onSuccess: () => { installing.value = false; bundle.value = null; },
+        onFinish: () => (sending.value = false),
+    });
+};
 const change = (module, action) => {
     busy.value = module.id;
     router.post(module.links[action], {}, { preserveScroll: true, onFinish: () => (busy.value = "") });
@@ -29,7 +41,46 @@ const enabledCount = computed(() => props.installed.filter((module) => module.en
                 {{ enabledCount }} of {{ installed.length }} installed modules enabled
             </p>
         </div>
+        <div class="flex flex-col items-end gap-1">
+            <UButton
+                label="Install a module"
+                icon="i-tabler-upload"
+                :disabled="!installer.available"
+                @click="installing = true"
+            />
+            <p v-if="!installer.available" class="text-xs text-muted max-w-64 text-right">{{ installer.reason }}</p>
+        </div>
     </div>
+    <UModal
+        v-model:open="installing"
+        title="Install a module"
+        description="Upload the ZIP archive of a module. It is unpacked but not run: you enable it afterwards."
+    >
+        <template #body>
+            <UAlert
+                color="warning"
+                variant="soft"
+                icon="i-tabler-alert-triangle"
+                title="Only install code you trust"
+                description="A module is PHP code that runs with the same access as Perysee, including your database and files. Archives are not signed yet."
+                class="mb-5"
+            />
+            <input
+                type="file"
+                accept=".zip,application/zip"
+                aria-label="Module archive"
+                class="block w-full text-sm file:mr-4 file:border file:border-default file:bg-default file:px-3 file:py-1.5 file:text-sm"
+                @change="bundle = $event.target.files?.[0] ?? null"
+            />
+            <p class="text-xs text-muted mt-2">ZIP file, {{ installer.maxMb }} MB at most, with a module.json at its top.</p>
+        </template>
+        <template #footer>
+            <div class="flex justify-end gap-3 w-full">
+                <UButton label="Cancel" color="neutral" variant="ghost" @click="installing = false" />
+                <UButton label="Install" icon="i-tabler-upload" :disabled="!bundle" :loading="sending" @click="send" />
+            </div>
+        </template>
+    </UModal>
     <UEmpty
         v-if="!installed.length && !invalid.length"
         title="No module installed"
