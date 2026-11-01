@@ -44,3 +44,16 @@ test('crossed filters survive date changes and serialize as Laravel arrays', () 
     assert.deepEqual(url.searchParams.getAll('filters[device][]'), ['mobile']);
     assert.equal(url.searchParams.has('page'), false);
 });
+
+test("a path stays a path, so the link it builds is followed by Inertia instead of reloading the page", () => {
+    const url = queryUrl("/sites/3/sources", { period: "30d", filters: { source: ["news"] } });
+
+    assert.equal(url.startsWith("/sites/3/sources?"), true);
+    assert.doesNotMatch(url, /^[a-z]+:/i);
+    assert.equal(new URL(url, "http://perysee.local").searchParams.get("period"), "30d");
+});
+
+test("an absolute address keeps its origin and a path loses any previous query", () => {
+    assert.equal(queryUrl("https://stats.test/sites/3", { period: "7d" }), "https://stats.test/sites/3?period=7d");
+    assert.equal(queryUrl("/sites/3?old=1", { period: "7d" }), "/sites/3?period=7d");
+});

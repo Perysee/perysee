@@ -88,7 +88,7 @@ class ReportConsistencyTest extends TestCase
     {
         $site = $this->memberSite();
         $response = $this->get('/sites/'.$site->id.'?from=2026-10-24&to=2026-10-24')->assertOk();
-        $response->assertInertia(fn (Assert $page) => $page->where('period.from', '2026-10-24')->where('period.to', '2026-10-24')->where('siteLinks.campaigns', url('/sites/'.$site->id.'/campaigns'))->missing('section'));
+        $response->assertInertia(fn (Assert $page) => $page->where('period.from', '2026-10-24')->where('period.to', '2026-10-24')->where('siteLinks.campaigns', '/sites/'.$site->id.'/campaigns')->missing('section'));
         $this->get('/sites/'.$site->id.'/sessions?period=today')->assertOk()->assertInertia(fn (Assert $page) => $page->where('section', 'sessions')->has('dimensions', 0)->where('dimensionReport', null)->has('report.availability.sessions'));
     }
 }

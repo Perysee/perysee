@@ -29,7 +29,7 @@ class DashboardPresentationTest extends TestCase
         DB::table('stats_dimension_daily')->insert(['website_id' => $site->id, 'stat_date' => '2026-10-24', 'dimension_type' => 'source', 'dimension_hash' => hash('sha256', 'newsletter.example'), 'dimension_value' => 'newsletter.example', 'metric_count' => 8]);
         $response = $this->actingAs($user)->get('/sites/'.$site->id.'?from=2026-10-24&to=2026-10-24');
         $response->assertOk()->assertSee('newsletter.example')->assertSee('12');
-        $response->assertInertia(fn (Assert $page) => $page->where('period.from', '2026-10-24')->where('period.to', '2026-10-24')->where('siteLinks.sources', url('/sites/'.$site->id.'/sources'))->where('report.totals.pageviews', 12)->where('report.availability.sessions', 'unavailable')->where('canUpdate', false));
+        $response->assertInertia(fn (Assert $page) => $page->where('period.from', '2026-10-24')->where('period.to', '2026-10-24')->where('siteLinks.sources', '/sites/'.$site->id.'/sources')->where('report.totals.pageviews', 12)->where('report.availability.sessions', 'unavailable')->where('canUpdate', false));
     }
 
     public function test_reception_page_keeps_recent_events_separate_from_historical_totals(): void

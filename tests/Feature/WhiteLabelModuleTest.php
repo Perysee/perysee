@@ -160,7 +160,7 @@ class WhiteLabelModuleTest extends TestCase
     {
         $this->actingAs($this->admin())->get('/settings/modules/white-label')->assertInertia(fn (Assert $page) => $page
             ->where('modules.data.white-label.defaults', ['name' => 'Perysee', 'accent' => '#5B21FF'])
-            ->where('modules.data.white-label.links.save', url('/modules/white-label/settings'))
+            ->where('modules.data.white-label.links.save', '/modules/white-label/settings')
             ->where('modules.data.white-label.has_logo', false));
         $this->actingAs(User::factory()->create())->get('/sites')->assertInertia(fn (Assert $page) => $page
             ->where('modules.data.white-label', []));

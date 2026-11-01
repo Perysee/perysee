@@ -22,7 +22,7 @@ class WorkspaceNavigationTest extends TestCase
     public function test_global_pages_have_workspace_navigation_and_pixels_placeholder(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
-        $this->actingAs($admin)->get('/sites')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.index')->where('auth.is_admin', true)->where('links.settings', url('/settings'))->where('links', fn ($links) => $links['password.edit'] === route('password.edit')));
+        $this->actingAs($admin)->get('/sites')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.index')->where('auth.is_admin', true)->where('links.settings', '/settings')->where('links', fn ($links) => $links['password.edit'] === '/account/password'));
         $this->get('/pixels')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'placeholder')->where('title', 'Pixels'));
         $this->get('/dashboard')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'dashboard'));
         $this->get('/settings')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'settings')->has('settings'));

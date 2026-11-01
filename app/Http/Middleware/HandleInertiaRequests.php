@@ -7,6 +7,7 @@ use App\Modules\ModuleExtensions;
 use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
 use App\Modules\ModuleScope;
+use App\Support\Ui;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -24,15 +25,15 @@ class HandleInertiaRequests extends Middleware
         $links['modules'] = route('modules.index');
 
         return [...parent::share($request),
-            'currentUrl' => $request->url(),
+            'currentUrl' => $request->getBaseUrl().$request->getPathInfo(),
             'assets' => ['logo' => asset('logo.svg'), 'world' => asset('maps/world.json'), 'brands' => asset('brands')],
             'auth' => $user ? [...$user->only(['id', 'name', 'email']), 'is_admin' => (bool) $user->is_admin] : null,
-            'navigation' => fn () => $user ? $user->websites()->whereNull('deleting_at')->orderBy('name')->limit(50)->get()->map(fn ($site) => ['id' => $site->id, 'name' => $site->name, 'domain' => $site->domain, 'url' => route('sites.show', $site), 'favicon_url' => route('sites.favicon', $site)])->all() : [],
-            'links' => $links,
+            'navigation' => fn () => $user ? $user->websites()->whereNull('deleting_at')->orderBy('name')->limit(50)->get()->map(fn ($site) => ['id' => $site->id, 'name' => $site->name, 'domain' => $site->domain, 'url' => route('sites.show', $site, false), 'favicon_url' => route('sites.favicon', $site, false)])->all() : [],
+            'links' => Ui::relativize($links),
             'branding' => fn () => app(ModuleExtensions::class)->branding($this->currentSite($request)),
             'modules' => fn () => $user ? [
-                'navigation' => app(ModuleExtensions::class)->navigation((bool) $user->is_admin, $this->currentSite($request)),
-                'data' => app(ModuleExtensions::class)->data($request, $this->currentSite($request)),
+                'navigation' => Ui::relativize(app(ModuleExtensions::class)->navigation((bool) $user->is_admin, $this->currentSite($request))),
+                'data' => Ui::relativize(app(ModuleExtensions::class)->data($request, $this->currentSite($request))),
                 'active' => $this->activeModules($this->currentSite($request)),
                 'scripts' => $this->moduleAssets('module.js'),
                 'styles' => $this->moduleAssets('module.css'),

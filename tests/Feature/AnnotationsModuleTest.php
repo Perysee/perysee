@@ -62,8 +62,8 @@ class AnnotationsModuleTest extends TestCase
             ->where('screen', 'module:annotations')
             ->where('website.id', $this->site->id)
             ->where('canWrite', true)
-            ->where('noteLinks.store', url('/modules/annotations/sites/'.$this->site->id.'/notes'))
-            ->where('links.dashboard', route('dashboard'), 'the menu links of the application must survive on a module page')
+            ->where('noteLinks.store', '/modules/annotations/sites/'.$this->site->id.'/notes')
+            ->where('links.dashboard', '/dashboard', 'the menu links of the application must survive on a module page')
             ->where('notes.0', fn ($note) => $note['body'] === 'Launched the new pricing page' && $note['noted_on'] === '2026-10-20' && $note['author'] === $this->owner->name));
     }
 
@@ -136,7 +136,7 @@ class AnnotationsModuleTest extends TestCase
 
         $this->actingAs($this->viewer)->get('/sites/'.$this->site->id)->assertInertia(fn (Assert $page) => $page
             ->where('modules.data.annotations.recent', fn ($recent) => count($recent) === 3 && $recent[0]['body'] === 'Note 2026-10-04')
-            ->where('modules.data.annotations.page', url('/modules/annotations/sites/'.$this->site->id)));
+            ->where('modules.data.annotations.page', '/modules/annotations/sites/'.$this->site->id));
         $this->get('/sites')->assertInertia(fn (Assert $page) => $page->missing('modules.data.annotations.recent'));
     }
 
