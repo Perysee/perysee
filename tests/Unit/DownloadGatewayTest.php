@@ -44,7 +44,7 @@ class DownloadGatewayTest extends TestCase
 
     private function gateway(array $overrides = []): Gateway
     {
-        return new Gateway(array_replace(['origin' => 'https://get.perysee.eu', 'repository' => 'mattrbdr/perysee', 'token' => 'private-test-token', 'cache_path' => $this->directory.'/cache'], $overrides), function (string $url, array $headers, string $destination, int $limit): array {
+        return new Gateway(array_replace(['origin' => 'https://get.perysee.eu', 'repository' => 'Perysee/app', 'token' => 'private-test-token', 'cache_path' => $this->directory.'/cache'], $overrides), function (string $url, array $headers, string $destination, int $limit): array {
             $this->calls[] = ['url' => $url, 'headers' => $headers];
             if ($this->offline) {
                 throw new \RuntimeException('private-test-token: upstream failed');

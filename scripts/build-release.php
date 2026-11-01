@@ -80,10 +80,10 @@ function buildRelease(array $options): void
         }
     }
     $installer = file_get_contents(__DIR__.'/install.php');
-    $installer = str_replace(["const PERYSEE_REPOSITORY = 'mattrbdr/perysee';", "const PERYSEE_RELEASE = 'latest';"],
+    $installer = str_replace(["const PERYSEE_REPOSITORY = 'Perysee/app';", "const PERYSEE_RELEASE = 'latest';"],
         ['const PERYSEE_REPOSITORY = '.var_export($repository, true).';', 'const PERYSEE_RELEASE = '.var_export($version, true).';'], $installer);
     file_put_contents($output.'/install.php', $installer);
-    $bootstrap = str_replace('https://github.com/mattrbdr/perysee/releases/latest/download',
+    $bootstrap = str_replace('https://github.com/Perysee/app/releases/latest/download',
         'https://get.perysee.eu/releases/'.$version, file_get_contents(__DIR__.'/install.sh'));
     file_put_contents($output.'/install.sh', $bootstrap);
     $checksums = '';

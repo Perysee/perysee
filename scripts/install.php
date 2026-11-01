@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-const PERYSEE_REPOSITORY = 'mattrbdr/perysee';
+const PERYSEE_REPOSITORY = 'Perysee/app';
 const PERYSEE_RELEASE = 'latest';
 
 function installationPrompt(string $label, string $default = ''): string
