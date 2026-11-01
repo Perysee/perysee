@@ -44,7 +44,7 @@ class DownloadGatewayTest extends TestCase
 
     private function gateway(array $overrides = []): Gateway
     {
-        return new Gateway(array_replace(['origin' => 'https://get.perysee.eu', 'repository' => 'Perysee/app', 'token' => 'private-test-token', 'cache_path' => $this->directory.'/cache'], $overrides), function (string $url, array $headers, string $destination, int $limit): array {
+        return new Gateway(array_replace(['origin' => 'https://get.perysee.com', 'repository' => 'Perysee/app', 'token' => 'private-test-token', 'cache_path' => $this->directory.'/cache'], $overrides), function (string $url, array $headers, string $destination, int $limit): array {
             $this->calls[] = ['url' => $url, 'headers' => $headers];
             if ($this->offline) {
                 throw new \RuntimeException('private-test-token: upstream failed');
@@ -76,7 +76,7 @@ class DownloadGatewayTest extends TestCase
     {
         $response = $this->gateway()->handle('GET', '/');
         $this->assertSame(200, $response['status']);
-        $this->assertStringContainsString("PERYSEE_DOWNLOAD_URL='https://get.perysee.eu/releases/v1.2.3'", $this->body($response));
+        $this->assertStringContainsString("PERYSEE_DOWNLOAD_URL='https://get.perysee.com/releases/v1.2.3'", $this->body($response));
         $this->assertStringEndsWith($this->files['install.sh'], $this->body($response));
         $this->assertStringNotContainsString('private-test-token', $this->body($response));
         $this->assertSame('Bearer private-test-token', $this->calls[0]['headers']['Authorization']);
@@ -102,7 +102,7 @@ class DownloadGatewayTest extends TestCase
         $gateway = $this->gateway();
         $response = $gateway->handle('HEAD', '/perysee.zip');
         $this->assertSame(302, $response['status']);
-        $this->assertSame('https://get.perysee.eu/releases/v1.2.3/perysee.zip', $response['headers']['Location']);
+        $this->assertSame('https://get.perysee.com/releases/v1.2.3/perysee.zip', $response['headers']['Location']);
         $this->assertSame('', $response['body']);
         $gateway->handle('GET', '/');
         $count = count($this->calls);
