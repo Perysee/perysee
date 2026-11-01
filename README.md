@@ -9,12 +9,12 @@ Ce dossier est la racine du dépôt privé [Perysee/app](https://github.com/Pery
 Sur un hébergement compatible, la commande publique d’installation est :
 
 ```sh
-curl -fsSL https://get.perysee.eu | bash
+curl -fsSL https://get.perysee.com | bash
 ```
 
 L’installateur vérifie PHP, télécharge les fichiers prêts à utiliser, demande le dossier de destination et l’URL HTTPS, puis affiche le document root (`DOSSIER/public`) et le lien `/install`. Ni npm, ni Node, ni Composer ne sont nécessaires sur l’hébergement. PHP CLI 8.3+, les extensions de l’application et PHP Zip sont nécessaires pour cette commande.
 
-Sans terminal, le ZIP est proposé à `https://get.perysee.eu/perysee.zip`. Extraire son dossier `perysee/` hors de la racine web, puis faire pointer le domaine sur `perysee/public/`. Terminer avec l’assistant web décrit ci-dessous.
+Sans terminal, le ZIP est proposé à `https://get.perysee.com/perysee.zip`. Extraire son dossier `perysee/` hors de la racine web, puis faire pointer le domaine sur `perysee/public/`. Terminer avec l’assistant web décrit ci-dessous.
 
 Les instructions de fabrication, les tests privés et le déploiement du relais PHP sur cPanel sont dans [DEVELOPMENT.md](DEVELOPMENT.md), réservé aux mainteneurs et exclu du ZIP et de la documentation web.
 

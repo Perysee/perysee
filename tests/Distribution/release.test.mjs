@@ -172,7 +172,7 @@ test('the published shell installer downloads its pinned version through cPanel 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const urls = readFileSync(env.PERYSEE_TEST_URL_LOG, 'utf8').trim().split('\n');
     assert.equal(urls.length, 3);
-    for (const url of urls) assert.ok(url.startsWith('https://get.perysee.eu/releases/v1.2.3/'), url);
+    for (const url of urls) assert.ok(url.startsWith('https://get.perysee.com/releases/v1.2.3/'), url);
 });
 
 test('shell bootstrap never executes an installer that fails checksum verification', (t) => {

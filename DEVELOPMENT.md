@@ -7,7 +7,7 @@ Ce fichier est réservé aux mainteneurs. Il reste dans le dépôt privé et n�
 La seule commande montrée aux utilisateurs est :
 
 ```sh
-curl -fsSL https://get.perysee.eu | bash
+curl -fsSL https://get.perysee.com | bash
 ```
 
 Le script contrôle PHP CLI, télécharge les assets, vérifie le SHA-256 de l’installateur PHP avant de l’exécuter, puis lui transmet le ZIP et ses sommes de contrôle. L’installateur PHP vérifie à son tour le ZIP, demande le dossier et l’URL HTTPS, extrait dans un dossier temporaire, refuse toute destination non vide et affiche le document root et le lien `/install`.
@@ -35,7 +35,7 @@ php scripts/build-release.php --version v0.1.1 --repository Perysee/app
 - `install.sh` : point d’entrée shell, lié à cette version.
 - `SHA256SUMS` : empreintes des trois fichiers précédents.
 
-Le script shell publié utilise par défaut `https://get.perysee.eu/releases/VERSION` : son exécution directe ne nécessite aucun identifiant GitHub côté client. La racine du relais fixe également cette adresse pour chaque installation.
+Le script shell publié utilise par défaut `https://get.perysee.com/releases/VERSION` : son exécution directe ne nécessite aucun identifiant GitHub côté client. La racine du relais fixe également cette adresse pour chaque installation.
 
 Le packager utilise une liste explicite de chemins. Il ne distribue ni `.env`, ni secrets/verrous d’installation locaux, ni sessions, logs, caches PHP générés, tests, infrastructure, `node_modules/` ou ce fichier `DEVELOPMENT.md`. Les procédures Markdown internes ne sont pas incluses ; les guides publics sont servis par le site documentaire Nuxt.
 
@@ -58,7 +58,7 @@ git push origin v0.1.1
 
 Utiliser un nouveau tag pour chaque release. Les versions avec suffixe, par exemple `v0.2.0-beta.1`, sont marquées comme préversions et ne deviennent pas la dernière version stable. Ne pas remplacer les assets d’un tag déjà publié : le relais met les URLs versionnées en cache.
 
-## Relais PHP cPanel : get.perysee.eu
+## Relais PHP cPanel : get.perysee.com
 
 Le relais autonome est dans `infra/downloads/`. Il nécessite PHP **8.3+**, les extensions cURL/JSON/hash, HTTPS sortant vers GitHub, et un espace disque privé accessible en écriture. Aucun Laravel, Composer, Node ni accès SQL n’est nécessaire sur ce sous-domaine. GitHub Actions continue à fabriquer et publier les releases privées ; le relais les découvre automatiquement.
 
@@ -75,15 +75,15 @@ Organisation recommandée (remplacer `CPANEL_USER` par le compte réel) :
   perysee-downloads/
     Gateway.php
     config.php                        privé, permissions 0600
-    public/                           racine web de get.perysee.eu
+    public/                           racine web de get.perysee.com
       index.php
       .htaccess
   perysee-download-cache/              privé, permissions 0700
 ```
 
 1. Copier `Gateway.php` et `public/` depuis `infra/downloads/` vers `perysee-downloads/`. Conserver le fichier caché `.htaccess`.
-2. Dans cPanel, configurer **get.perysee.eu** avec la racine `/home/CPANEL_USER/perysee-downloads/public`, activer HTTPS et PHP 8.3 ou supérieur avec cURL. Apache/LiteSpeed doit autoriser les règles de réécriture et `Options -Indexes -MultiViews`. Ne jamais utiliser le dossier parent comme racine web.
-3. Copier `config.example.php` vers `perysee-downloads/config.php`. Configurer `origin`, `repository`, `token` et le chemin absolu `cache_path`. L’origine doit être `https://get.perysee.eu`, sans barre finale ; elle est indépendante du header Host reçu.
+2. Dans cPanel, configurer **get.perysee.com** avec la racine `/home/CPANEL_USER/perysee-downloads/public`, activer HTTPS et PHP 8.3 ou supérieur avec cURL. Apache/LiteSpeed doit autoriser les règles de réécriture et `Options -Indexes -MultiViews`. Ne jamais utiliser le dossier parent comme racine web.
+3. Copier `config.example.php` vers `perysee-downloads/config.php`. Configurer `origin`, `repository`, `token` et le chemin absolu `cache_path`. L’origine doit être `https://get.perysee.com`, sans barre finale ; elle est indépendante du header Host reçu.
 4. Créer un jeton GitHub finement limité au dépôt `Perysee/app`, avec **Contents: read** (le propriétaire de la ressource est l'organisation `Perysee`, qui doit autoriser les jetons à granularité fine), et l’enregistrer uniquement dans ce fichier privé. Le jeton n’est ni un paramètre d’URL ni une valeur à mettre dans le frontend, les logs ou le dépôt. Renouveler le jeton avant son expiration.
 5. Créer le dossier du cache hors de **toutes** les racines web et alias de ce compte. Le relais refuse un cache situé sous sa propre racine web ; l’exploitant doit aussi vérifier les racines de la landing, des docs et des autres domaines. Autoriser uniquement le compte PHP à écrire ; ne pas utiliser 0777.
 6. Publier une release complète puis ouvrir les quatre URLs versionnées et la racine pour préparer le cache. Le premier accès télécharge et vérifie les quatre fichiers avant de rendre la version disponible. Vérifier le temps de réponse à froid et les limites PHP/LiteSpeed ; le relais demande un budget PHP de 300 secondes, qui ne remplace pas les limites de l’hébergeur.
@@ -109,7 +109,7 @@ Chaque transfert a une limite de 120 secondes, avec connexion limitée à 10 sec
 Depuis une machine cliente sans identifiants GitHub :
 
 ```sh
-curl -fsSL https://get.perysee.eu -o /tmp/perysee-install.sh
+curl -fsSL https://get.perysee.com -o /tmp/perysee-install.sh
 bash /tmp/perysee-install.sh
 ```
 
