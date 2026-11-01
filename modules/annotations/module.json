@@ -1,0 +1,9 @@
+{
+    "id": "annotations",
+    "name": "Annotations",
+    "version": "1.0.0",
+    "core": "0.1.1",
+    "requires": [],
+    "entitlement": "annotations",
+    "description": "Dated notes on a site, such as a launch or an incident, shown under its reports."
+}

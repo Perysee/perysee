@@ -7,6 +7,8 @@ use App\Http\Controllers\FunnelController;
 use App\Http\Controllers\GuideController;
 use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\InstanceHealthController;
+use App\Http\Controllers\ModuleAssetController;
+use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\SiteFaviconController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WorkspaceController;
@@ -27,6 +29,7 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
     Route::middleware('auth')->group(function (): void {
         Route::get('/dashboard', [WorkspaceController::class, 'dashboard'])->name('dashboard');
         Route::get('/pixels', [WorkspaceController::class, 'pixels'])->name('pixels');
+        Route::get('/modules/{module}/assets/{file}', ModuleAssetController::class)->where('file', '[A-Za-z0-9_.-]+')->name('modules.assets');
         Route::get('/health', [InstanceHealthController::class, 'show'])->name('health');
         Route::put('/health', [InstanceHealthController::class, 'update'])->name('health.update');
         Route::get('/api/instance/health', [InstanceHealthController::class, 'api'])->name('health.api');
@@ -46,6 +49,11 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/sites/{website}/journey-reports/{report}/export', [FunnelController::class, 'export'])->name('sites.journeys.export');
         Route::get('/sites/{website}/export', [AnalyticsController::class, 'export'])->name('sites.export');
         Route::get('/settings', [WorkspaceController::class, 'settings'])->name('settings');
+        Route::get('/settings/modules', [ModuleController::class, 'index'])->name('modules.index');
+        Route::get('/settings/modules/{module}', [ModuleController::class, 'settings'])->name('modules.settings');
+        Route::post('/settings/modules/{module}/scope', [ModuleController::class, 'updateScope'])->name('modules.scope');
+        Route::post('/settings/modules/{module}/enable', [ModuleController::class, 'enable'])->name('modules.enable');
+        Route::post('/settings/modules/{module}/disable', [ModuleController::class, 'disable'])->name('modules.disable');
         Route::get('/sites/{website}/favicon', SiteFaviconController::class)->middleware('throttle:120,1')->name('sites.favicon');
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
         Route::get('/sites/{website}/{section}', [WorkspaceController::class, 'sitePage'])->whereIn('section', ['countries', 'pages', 'events', 'sessions', 'realtime', 'sources', 'campaigns', 'devices', 'pixels'])->name('sites.section');

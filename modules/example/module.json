@@ -1,0 +1,9 @@
+{
+    "id": "example",
+    "name": "Example",
+    "version": "1.0.0",
+    "core": "0.1.1",
+    "requires": [],
+    "entitlement": "example",
+    "description": "A small module that shows how modules extend Perysee. Safe to enable, change and remove."
+}
