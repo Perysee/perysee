@@ -5,12 +5,11 @@ import vm from "node:vm";
 import * as Vue from "vue";
 import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
-import { createServer, loadConfigFromFile } from "vite";
+import { createRenderServer, root } from "./fixtures/render-server.mjs";
 
 // Renders the real settings page, the real module host, the real compiled module scripts and the real
 // Nuxt UI components together, the way the browser does. Nothing here is stubbed: a stub once hid the fact
 // that components were not registered globally.
-const root = new URL("../../", import.meta.url).pathname;
 let server;
 let runtime;
 let registerModuleComponents;
@@ -19,23 +18,7 @@ let ui;
 let Page;
 
 before(async () => {
-    const loaded = await loadConfigFromFile({ command: "serve", mode: "test" }, `${root}vite.config.js`, root);
-    server = await createServer({
-        ...loaded.config,
-        root,
-        configFile: false,
-        server: { middlewareMode: true, hmr: false, watch: null },
-        appType: "custom",
-        logLevel: "silent",
-        ssr: { noExternal: [/@nuxt\/ui/, /@inertiajs/] },
-        resolve: {
-            ...loaded.config.resolve,
-            alias: [
-                { find: "@inertiajs/vue3", replacement: `${root}tests/Charts/fixtures/inertia.mjs` },
-                { find: /^.*\/module-runtime\.js$/, replacement: `${root}tests/Charts/fixtures/module-runtime.mjs` },
-            ],
-        },
-    });
+    server = await createRenderServer();
     runtime = await server.ssrLoadModule("/tests/Charts/fixtures/module-runtime.mjs");
     const registry = await server.ssrLoadModule("/resources/js/module-components.js");
     registerModuleComponents = registry.registerModuleComponents;

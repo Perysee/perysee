@@ -13,7 +13,6 @@ import { reportItems } from "../palette.mjs";
 import { applyColorMode } from "../color-mode.mjs";
 import { siteAvatar } from "../site-avatar.mjs";
 const page = usePage(),
-    mobileOpen = ref(false),
     siteSearch = ref("");
 const p = computed(() => page.props);
 const title = computed(
@@ -339,7 +338,6 @@ function syncPeriod() {
 }
 const stops = [
     router.on("navigate", () => {
-        mobileOpen.value = false;
         syncPeriod();
     }),
     router.on("start", tracker.start),
@@ -390,10 +388,28 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                 Your data. Your infrastructure.
             </p>
         </div>
-        <div v-else class="perysee-shell">
-            <aside class="perysee-sidebar" aria-label="Main navigation">
-                <div class="h-16 flex items-center px-6"><BrandLogo /></div>
-                <div class="flex-1 overflow-y-auto px-4 py-3">
+        <UDashboardGroup
+            v-else
+            unit="px"
+            :persistent="false"
+            class="perysee-shell"
+        >
+            <UDashboardSidebar
+                :default-size="232"
+                :min-size="232"
+                :max-size="232"
+                class="perysee-sidebar"
+                :ui="{
+                    root: 'border-e border-default bg-default',
+                    header: 'h-16 px-6 border-0',
+                    body: 'px-4 py-3 gap-0',
+                    footer: 'border-t border-default px-4 py-3',
+                    content: 'max-w-xs',
+                }"
+                aria-label="Main navigation"
+            >
+                <template #header><BrandLogo /></template>
+                <div class="perysee-nav">
                     <button
                         type="button"
                         class="sidebar-search"
@@ -487,52 +503,29 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                         :ui="{ link: 'py-1.5 text-sm' }"
                     />
                 </div>
-                <div
-                    class="border-t border-default px-4 py-3 flex gap-2 items-center whitespace-nowrap text-xs text-muted"
-                >
-                    <UIcon
-                        name="i-tabler-shield-check"
-                        class="size-4 shrink-0"
-                    /><span>Your data, your infrastructure</span>
-                </div>
-            </aside>
-            <div class="perysee-workspace">
-                <header class="perysee-topbar">
-                    <div class="flex min-w-0 items-center gap-3">
-                        <USlideover
-                            v-model:open="mobileOpen"
-                            side="left"
-                            title="Navigation"
-                            class="lg:hidden"
-                            :ui="{ content: 'max-w-xs' }"
-                            ><UButton
-                                icon="i-tabler-menu-2"
-                                color="neutral"
-                                variant="ghost"
-                                aria-label="Open navigation" /><template #body
-                                ><BrandLogo />
-                                <div class="mt-8">
-                                    <UNavigationMenu
-                                        :items="nav"
-                                        orientation="vertical"
-                                        class="sidebar-nav"
-                                    /><UNavigationMenu
-                                        v-if="hasSite && siteModules.length"
-                                        :items="siteModules"
-                                        orientation="vertical"
-                                        class="mt-4"
-                                    /><UNavigationMenu
-                                        v-if="!hasSite"
-                                        :items="quickSites"
-                                        orientation="vertical"
-                                        class="mt-6"
-                                    /><USeparator
-                                        class="my-5"
-                                    /><UNavigationMenu
-                                        :items="configNav"
-                                        orientation="vertical"
-                                    /></div></template></USlideover
-                        ><span class="hidden sm:block text-xs text-muted"
+                <template #footer>
+                    <div
+                        class="flex gap-2 items-center whitespace-nowrap text-xs text-muted"
+                    >
+                        <UIcon
+                            name="i-tabler-shield-check"
+                            class="size-4 shrink-0"
+                        /><span>Your data, your infrastructure</span>
+                    </div>
+                </template>
+            </UDashboardSidebar>
+            <UDashboardPanel
+                id="workspace"
+                class="perysee-workspace"
+                :ui="{ root: 'min-h-0 h-full lg:not-last:border-e-0' }"
+            >
+                <UDashboardNavbar
+                        class="perysee-topbar"
+                        :toggle="{ color: 'neutral', variant: 'ghost', 'aria-label': 'Open navigation' }"
+                    >
+                        <template #left
+                            ><div class="flex min-w-0 items-center gap-3">
+                                <span class="hidden sm:block text-xs text-muted"
                             >{{ p.branding.name }}</span
                         ><span class="hidden sm:block text-dimmed text-xs"
                             >/</span
@@ -547,8 +540,11 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                         ><span v-else class="text-sm text-muted">{{
                             title
                         }}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
+
+                            </div></template
+                        >
+                        <template #right
+                            ><div class="flex items-center gap-2">
                         <UButton
                             color="neutral"
                             variant="outline"
@@ -572,17 +568,19 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                                 :label="p.auth.name"
                                 aria-label="Account menu"
                         /></UDropdownMenu>
-                    </div>
-                </header>
+                            </div></template
+                        >
+                    </UDashboardNavbar>
                 <main
                     id="main"
-                    class="perysee-content"
+                    scroll-region
+                    class="perysee-scroll"
                     :class="{ 'is-navigating': busy }"
                     :aria-busy="busy"
                 >
-                    <slot />
+                    <div class="perysee-content"><slot /></div>
                 </main>
-            </div>
-        </div>
+            </UDashboardPanel>
+        </UDashboardGroup>
     </UApp>
 </template>

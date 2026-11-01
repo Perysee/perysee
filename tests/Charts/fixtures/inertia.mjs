@@ -13,3 +13,4 @@ export const Link = {
     },
 };
 export const useForm = (data) => reactive({ ...data, post() {}, processing: false, errors: {} });
+export const Head = { render: () => null };
