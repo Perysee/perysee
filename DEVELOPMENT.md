@@ -16,7 +16,7 @@ Les questions passent par `/dev/tty` lorsque le script est lancé via un pipe : 
 
 ## Construire une distribution
 
-Le dépôt GitHub `mattrbdr/perysee` contient directement le contenu de `perysee/`. Les sites Nuxt dans `perysee-web/` restent séparés.
+Le dépôt GitHub `Perysee/app` contient directement le contenu de `perysee/`. Les sites Nuxt dans `perysee-web/` restent séparés.
 
 Dans un checkout neuf, avec PHP 8.3+, PHP Zip, Composer 2 et la version Node de `.nvmrc` :
 
@@ -25,7 +25,7 @@ composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 composer check-platform-reqs --no-dev
 npm ci
 npm run build
-php scripts/build-release.php --version v0.1.1 --repository mattrbdr/perysee
+php scripts/build-release.php --version v0.1.1 --repository Perysee/app
 ```
 
 `dist/` reçoit quatre fichiers :
@@ -84,7 +84,7 @@ Organisation recommandée (remplacer `CPANEL_USER` par le compte réel) :
 1. Copier `Gateway.php` et `public/` depuis `infra/downloads/` vers `perysee-downloads/`. Conserver le fichier caché `.htaccess`.
 2. Dans cPanel, configurer **get.perysee.eu** avec la racine `/home/CPANEL_USER/perysee-downloads/public`, activer HTTPS et PHP 8.3 ou supérieur avec cURL. Apache/LiteSpeed doit autoriser les règles de réécriture et `Options -Indexes -MultiViews`. Ne jamais utiliser le dossier parent comme racine web.
 3. Copier `config.example.php` vers `perysee-downloads/config.php`. Configurer `origin`, `repository`, `token` et le chemin absolu `cache_path`. L’origine doit être `https://get.perysee.eu`, sans barre finale ; elle est indépendante du header Host reçu.
-4. Créer un jeton GitHub finement limité au dépôt `mattrbdr/perysee`, avec **Contents: read**, et l’enregistrer uniquement dans ce fichier privé. Le jeton n’est ni un paramètre d’URL ni une valeur à mettre dans le frontend, les logs ou le dépôt. Renouveler le jeton avant son expiration.
+4. Créer un jeton GitHub finement limité au dépôt `Perysee/app`, avec **Contents: read** (le propriétaire de la ressource est l'organisation `Perysee`, qui doit autoriser les jetons à granularité fine), et l’enregistrer uniquement dans ce fichier privé. Le jeton n’est ni un paramètre d’URL ni une valeur à mettre dans le frontend, les logs ou le dépôt. Renouveler le jeton avant son expiration.
 5. Créer le dossier du cache hors de **toutes** les racines web et alias de ce compte. Le relais refuse un cache situé sous sa propre racine web ; l’exploitant doit aussi vérifier les racines de la landing, des docs et des autres domaines. Autoriser uniquement le compte PHP à écrire ; ne pas utiliser 0777.
 6. Publier une release complète puis ouvrir les quatre URLs versionnées et la racine pour préparer le cache. Le premier accès télécharge et vérifie les quatre fichiers avant de rendre la version disponible. Vérifier le temps de réponse à froid et les limites PHP/LiteSpeed ; le relais demande un budget PHP de 300 secondes, qui ne remplace pas les limites de l’hébergeur.
 

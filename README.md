@@ -2,7 +2,7 @@
 
 Application autonome **PHP 8.3+ / Laravel 13 / Vue 3 + Nuxt UI / MariaDB 11.4.x**. Ce dossier contient l’application du produit ; `../perysee-web/` contient sa landing et son site documentaire et n’est pas une dépendance de l’application.
 
-Ce dossier est la racine du dépôt privé [mattrbdr/perysee](https://github.com/mattrbdr/perysee) : `app/`, `artisan` et `.github/` sont directement à sa racine sur GitHub. Les sites de présentation ne font pas partie de ce dépôt.
+Ce dossier est la racine du dépôt privé [Perysee/app](https://github.com/Perysee/app) : `app/`, `artisan` et `.github/` sont directement à sa racine sur GitHub. Les sites de présentation ne font pas partie de ce dépôt.
 
 ## Installer Perysee
 
