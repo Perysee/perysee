@@ -120,3 +120,10 @@ test("inside a site the menu still lists the site sections after Home", async ()
     assert.ok(html.indexOf("Home") < html.indexOf("Overview"), "Home comes before the site sections");
     assert.match(html, /href="\/sites\/1\/pages"/);
 });
+
+test("the command palette has a single entry point, the search field of the sidebar", async () => {
+    const html = await render(signedIn());
+
+    assert.equal((html.match(/aria-keyshortcuts="Meta\+K Control\+K"/g) ?? []).length, 1);
+    assert.doesNotMatch(html, /Open the command palette/);
+});
