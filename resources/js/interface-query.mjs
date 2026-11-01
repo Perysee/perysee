@@ -12,7 +12,7 @@ export function queryUrl(base, values = {}) {
 }
 export function reportFilters(url) {
     const params = new URL(url, 'http://perysee.local').searchParams;
-    const values = Object.fromEntries(['value','source_group','provider','dimension','version','start_type','start_value'].filter(key => params.has(key)).map(key => [key,params.get(key)]));
+    const values = Object.fromEntries(['value','source_group','provider','dimension','version','start_type','start_value','compare'].filter(key => params.has(key)).map(key => [key,params.get(key)]));
     const filters = {};
     for (const [key,value] of params) {
         const match = key.match(/^filters\[([a-z_]+)\]\[(?:\d*)\]$/);

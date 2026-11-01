@@ -51,4 +51,17 @@ class DashboardPresentationTest extends TestCase
         DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => now('UTC')->toDateString(), 'pageviews' => 42]);
         $this->actingAs($user)->get('/dashboard')->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'dashboard')->has('sites.data', 1)->where('sites.data.0.name', 'My journal')->where('summaries.'.$site->id.'.totals.pageviews', 42))->assertDontSee('Hidden client');
     }
+
+    public function test_dashboard_compares_each_site_with_the_previous_period_only_when_asked(): void
+    {
+        $user = User::factory()->create(['is_admin' => true]);
+        $site = Website::factory()->create();
+        $site->members()->attach($user, ['role' => 'viewer']);
+        DB::table('stats_daily')->insert([
+            ['website_id' => $site->id, 'stat_date' => '2026-10-24', 'pageviews' => 12],
+            ['website_id' => $site->id, 'stat_date' => '2026-10-23', 'pageviews' => 5],
+        ]);
+        $this->actingAs($user)->get('/dashboard?from=2026-10-24&to=2026-10-24&compare=previous')->assertOk()->assertInertia(fn (Assert $page) => $page->where('summaries.'.$site->id.'.totals.pageviews', 12)->where('comparisons.'.$site->id.'.totals.pageviews', 5));
+        $this->actingAs($user)->get('/dashboard?from=2026-10-24&to=2026-10-24')->assertOk()->assertInertia(fn (Assert $page) => $page->where('comparisons', []));
+    }
 }

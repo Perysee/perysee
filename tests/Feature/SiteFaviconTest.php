@@ -76,6 +76,14 @@ class SiteFaviconTest extends TestCase
         Http::assertSentCount($requests * 2);
     }
 
+    public function test_missing_favicon_returns_no_content_when_the_interface_wants_initials(): void
+    {
+        $site = $this->site();
+        Http::fake(['*' => Http::response('', 404)]);
+        $this->get('/sites/'.$site->id.'/favicon?initials=1')->assertNoContent();
+        $this->get('/sites/'.$site->id.'/favicon')->assertRedirect('/site-icon.svg');
+    }
+
     public function test_declared_relative_icon_is_discovered_from_the_homepage(): void
     {
         $site = $this->site();

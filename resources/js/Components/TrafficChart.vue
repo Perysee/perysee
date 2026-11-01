@@ -5,6 +5,7 @@ import { usePage, router } from "@inertiajs/vue3";
 import { zoomMap } from "../map-navigation.mjs";
 const props = defineProps({
     series: { type: Array, default: () => [] },
+    comparison: { type: Array, default: null },
     metric: { type: String, default: "pageviews" },
     compact: Boolean,
     countries: Array,
@@ -66,7 +67,10 @@ async function draw() {
     if (!chart || props.map) return;
     const { lineOption } = await import("../chart-options.mjs");
     if (alive)
-        chart.setOption(lineOption(props.series, props.metric, options()), {
+        chart.setOption(lineOption(props.series, props.metric, {
+                ...options(),
+                comparison: props.comparison,
+            }), {
             notMerge: true,
         });
 }
@@ -129,7 +133,9 @@ onMounted(async () => {
         chart = null;
     }
 });
-watch(() => [props.series, props.metric], draw, { deep: true });
+watch(() => [props.series, props.metric, props.comparison], draw, {
+    deep: true,
+});
 watch(
     () => [props.countries, props.selectedCountry],
     async () => {

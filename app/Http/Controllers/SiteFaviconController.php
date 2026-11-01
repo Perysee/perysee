@@ -24,6 +24,11 @@ class SiteFaviconController extends Controller
         }
         $icon = $favicons->forDomain($website->domain);
         if (! $icon) {
+            // The interface asks for no content so it can draw the site's initials instead.
+            if ($request->boolean('initials')) {
+                return response()->noContent()->header('Cache-Control', 'private, max-age=300');
+            }
+
             return redirect('/site-icon.svg')->header('Cache-Control', 'private, max-age=300');
         }
         $response = response($icon['body'], 200, [

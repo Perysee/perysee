@@ -6,6 +6,7 @@ import {
     TooltipComponent,
     VisualMapComponent,
     AriaComponent,
+    LegendComponent,
 } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
 use([
@@ -15,6 +16,7 @@ use([
     TooltipComponent,
     VisualMapComponent,
     AriaComponent,
+    LegendComponent,
     SVGRenderer,
 ]);
 let worldData;

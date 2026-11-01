@@ -30,7 +30,7 @@ const update = () =>
             <h1
                 class="text-3xl tracking-tight text-highlighted font-medium mt-2"
             >
-                Sign in to Perysee
+                Sign in to {{ page.props.branding.name }}
             </h1>
             <p class="text-sm text-muted mt-2">Your sites, in one place.</p>
         </div>
