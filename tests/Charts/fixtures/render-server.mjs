@@ -5,6 +5,8 @@ import { createServer, loadConfigFromFile } from "vite";
 export const root = new URL("../../../", import.meta.url).pathname;
 
 export async function createRenderServer() {
+    // The Laravel plugin refuses to start a Vite server when CI is set. This one only renders components in memory.
+    process.env.LARAVEL_BYPASS_ENV_CHECK ??= "1";
     const loaded = await loadConfigFromFile({ command: "serve", mode: "test" }, `${root}vite.config.js`, root);
 
     return createServer({
