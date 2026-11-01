@@ -3,7 +3,7 @@ export default { inheritAttrs: false };
 </script>
 <script setup>
 import { computed, ref } from "vue";
-import { Link, router } from "@inertiajs/vue3";
+import { router } from "@inertiajs/vue3";
 import { moduleHost } from "../module-runtime.js";
 import ModuleSlotBoundary from "./ModuleSlotBoundary.vue";
 const props = defineProps(["module", "scope", "siteChoices", "links"]);
@@ -24,7 +24,15 @@ const save = () => {
 <template>
     <div class="page-heading">
         <div>
-            <Link :href="links.back" class="eyebrow">&larr; Modules</Link>
+            <UButton
+                :to="links.back"
+                label="Modules"
+                icon="i-tabler-arrow-left"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                class="-ml-2.5 mb-1"
+            />
             <h1>{{ module.name }}</h1>
             <p class="text-sm text-muted">
                 v{{ module.version }}<span v-if="module.description"> · {{ module.description }}</span>
