@@ -33,7 +33,7 @@ class WebsiteTest extends TestCase
         $this->assertSame('example.com', $website->domain);
         $this->assertContains('example.com', $website->allowed_domains);
         $this->assertSame('owner', $website->members()->first()->pivot->role);
-        $this->get('/sites/'.$website->id)->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.show')->where('canUpdate', true)->where('siteLinks.tracking', url('/sites/'.$website->id.'/tracking')));
+        $this->get('/sites/'.$website->id)->assertOk()->assertInertia(fn (Assert $page) => $page->where('screen', 'sites.show')->where('canUpdate', true)->where('siteLinks.tracking', '/sites/'.$website->id.'/tracking'));
         $this->put('/sites/'.$website->id, array_merge($this->payload(), ['name' => 'Updated', 'public_id' => 'forged']))->assertSessionHasNoErrors();
         $this->assertSame($publicId, $website->fresh()->public_id);
         $this->assertSame('Updated', $website->fresh()->name);

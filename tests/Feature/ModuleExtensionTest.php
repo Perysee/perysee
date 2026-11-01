@@ -119,7 +119,7 @@ class ModuleExtensionTest extends TestCase
         $this->enable('ext-nav');
 
         $this->actingAs($this->admin())->get('/sites')->assertInertia(fn (Assert $page) => $page
-            ->where('modules.navigation.workspace.0', fn ($item) => $item['label'] === 'Greeter' && $item['icon'] === 'i-tabler-hand-stop' && $item['url'] === url('/modules/ext-nav'))
+            ->where('modules.navigation.workspace.0', fn ($item) => $item['label'] === 'Greeter' && $item['icon'] === 'i-tabler-hand-stop' && $item['url'] === '/modules/ext-nav')
             ->where('modules.navigation.admin.0.label', 'Greeter admin'));
         $this->actingAs(User::factory()->create())->get('/sites')->assertInertia(fn (Assert $page) => $page
             ->where('modules.navigation.workspace.0.label', 'Greeter')
@@ -269,7 +269,7 @@ class ModuleExtensionTest extends TestCase
         app(ModuleScope::class)->limitTo('ext-sitenav', [$inside->id]);
 
         $this->actingAs($user)->get('/sites/'.$inside->id)->assertInertia(fn (Assert $page) => $page
-            ->where('modules.navigation.site', [['module' => 'ext-sitenav', 'label' => 'Notes', 'icon' => 'i-tabler-note', 'url' => url('/modules/ext-sitenav/sites/'.$inside->id)]]));
+            ->where('modules.navigation.site', [['module' => 'ext-sitenav', 'label' => 'Notes', 'icon' => 'i-tabler-note', 'url' => '/modules/ext-sitenav/sites/'.$inside->id]]));
         $this->get('/sites/'.$outside->id)->assertInertia(fn (Assert $page) => $page->where('modules.navigation.site', []));
         $this->get('/sites')->assertInertia(fn (Assert $page) => $page->where('modules.navigation.site', []));
     }

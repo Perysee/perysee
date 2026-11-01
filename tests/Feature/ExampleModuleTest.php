@@ -46,7 +46,7 @@ class ExampleModuleTest extends TestCase
             ->where('modules.data.example.greeting', 'Welcome aboard')
             ->where('modules.data.example.save', null));
         $this->actingAs($admin)->get('/settings/modules/example')->assertInertia(fn (Assert $page) => $page
-            ->where('modules.data.example.save', url('/modules/example/greeting')));
+            ->where('modules.data.example.save', '/modules/example/greeting'));
     }
 
     public function test_only_administrators_can_change_it_and_the_text_is_validated(): void

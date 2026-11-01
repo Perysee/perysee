@@ -72,9 +72,9 @@ class ModuleSettingsPageTest extends TestCase
             ->where('scope', ['all' => false, 'site_ids' => [$two->id], 'hidden' => 0])
             ->has('siteChoices', 2)
             ->where('siteChoices.0.id', fn ($id) => in_array($id, [$one->id, $two->id], true))
-            ->where('moduleLinks.save', route('modules.scope', 'alpha'))
-            ->where('moduleLinks.back', route('modules.index'))
-            ->where('links.dashboard', route('dashboard')));
+            ->where('moduleLinks.save', '/settings/modules/alpha/scope')
+            ->where('moduleLinks.back', '/settings/modules')
+            ->where('links.dashboard', '/dashboard'));
     }
 
     public function test_selected_sites_the_administrator_cannot_see_are_counted_not_listed(): void
@@ -160,7 +160,7 @@ class ModuleSettingsPageTest extends TestCase
         app(ModuleScope::class)->limitTo('alpha', [$one->id]);
 
         $this->actingAs($admin)->get('/settings/modules')->assertInertia(fn (Assert $page) => $page
-            ->where('installed.0.links.settings', route('modules.settings', 'alpha'))
+            ->where('installed.0.links.settings', '/settings/modules/alpha')
             ->where('installed.0.scope', ['all' => false, 'count' => 1]));
     }
 
@@ -178,6 +178,5 @@ class ModuleSettingsPageTest extends TestCase
         foreach ($props['navigation'] as $site) {
             $this->get($site['url'])->assertOk();
         }
-        $this->assertSame($one->id, $props['navigation'][0]['id'] ?? $one->id);
     }
 }

@@ -1,5 +1,7 @@
 export function queryUrl(base, values = {}) {
-    const url = new URL(base);
+    // A path in, a path out: an address with a protocol is an external link for Nuxt UI and reloads the page.
+    const isPath = !/^[a-z][a-z0-9+.-]*:/i.test(base) && !base.startsWith('//');
+    const url = new URL(base, 'http://perysee.local');
     url.search = '';
     const append = (key, value) => {
         if (value === null || value === undefined || value === '') return;
@@ -8,7 +10,7 @@ export function queryUrl(base, values = {}) {
         else url.searchParams.append(key, String(value));
     };
     Object.entries(values).forEach(([key,value]) => append(key,value));
-    return url.href;
+    return isPath ? url.pathname + url.search + url.hash : url.href;
 }
 export function reportFilters(url) {
     const params = new URL(url, 'http://perysee.local').searchParams;

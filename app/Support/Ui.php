@@ -42,13 +42,33 @@ class Ui
         if ($screen === 'install' && $data['authorized'] && ! $data['migrated']) {
             $data['databaseDefaults'] = collect(config('database.connections.mariadb'))->only(['host', 'port', 'database', 'username'])->all();
         }
+        // Displayed as text, so they keep their absolute form: the tracking snippet and the instance settings.
+        $verbatim = array_intersect_key($data, array_flip(['snippet', 'settings']));
+        $data = $verbatim + self::relativize($data);
         foreach (['websites', 'sites'] as $key) {
             if (isset($data[$key])) {
-                $data[$key]->through(fn (Website $website): array => $website->toArray() + ['url' => route('sites.show', $website), 'edit_url' => route('sites.edit', $website), 'favicon_url' => route('sites.favicon', $website), 'can_update' => Gate::allows('update', $website)]);
+                $data[$key]->through(fn (Website $website): array => $website->toArray() + ['url' => route('sites.show', $website, false), 'edit_url' => route('sites.edit', $website, false), 'favicon_url' => route('sites.favicon', $website, false), 'can_update' => Gate::allows('update', $website)]);
+                $data[$key]->withPath(request()->getPathInfo());
             }
         }
 
         return Inertia::render('Workspace', ['screen' => $screen] + $data);
+    }
+
+    /**
+     * Turns the links of this application into paths. Nuxt UI renders any link that carries a protocol as an
+     * external anchor, which reloads the whole document instead of making an Inertia visit, so every address
+     * the interface may follow must be sent without its host.
+     */
+    public static function relativize(mixed $value): mixed
+    {
+        $root = rtrim(url('/'), '/');
+
+        return match (true) {
+            is_string($value) => str_starts_with($value, $root.'/') ? substr($value, strlen($root)) : $value,
+            is_array($value) => array_map(fn (mixed $item): mixed => self::relativize($item), $value),
+            default => $value,
+        };
     }
 
     private static function siteLinks(Website $site): array

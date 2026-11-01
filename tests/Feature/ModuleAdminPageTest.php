@@ -58,7 +58,7 @@ class ModuleAdminPageTest extends TestCase
         $this->actingAs($this->admin())->get('/settings/modules')->assertInertia(fn (Assert $page) => $page
             ->has('installed', 3)
             ->where('installed.0', fn ($module) => $module['id'] === 'addon' && $module['enabled'] === false && $module['compatible'] === true && $module['missing_dependencies'] === [])
-            ->where('installed.1', fn ($module) => $module['id'] === 'alpha' && $module['enabled'] === true && $module['dependents'] === [] && $module['links']['disable'] === route('modules.disable', 'alpha'))
+            ->where('installed.1', fn ($module) => $module['id'] === 'alpha' && $module['enabled'] === true && $module['dependents'] === [] && $module['links']['disable'] === route('modules.disable', 'alpha', false))
             ->where('installed.2', fn ($module) => $module['id'] === 'future' && $module['compatible'] === false && $module['core'] === '9.0.0'));
     }
 
@@ -113,6 +113,6 @@ class ModuleAdminPageTest extends TestCase
 
     public function test_the_admin_navigation_links_to_the_page(): void
     {
-        $this->actingAs($this->admin())->get('/settings')->assertInertia(fn (Assert $page) => $page->where('links.modules', route('modules.index')));
+        $this->actingAs($this->admin())->get('/settings')->assertInertia(fn (Assert $page) => $page->where('links.modules', '/settings/modules'));
     }
 }
