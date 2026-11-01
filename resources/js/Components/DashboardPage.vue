@@ -5,7 +5,7 @@ import TrafficChart from "./TrafficChart.vue";
 import DateRange from "./DateRange.vue";
 import { queryUrl } from "../interface-query.mjs";
 import { variation, describeVariation } from "../comparison.mjs";
-const props = defineProps(["sites", "summaries", "charts", "period", "today", "sitePeriods", "comparisons"]);
+const props = defineProps(["sites", "summaries", "charts", "period", "today", "sitePeriods", "comparisons", "attention"]);
 // With three sites or more, the busiest one leads the grid at full width.
 const featuredId = computed(() => {
     if (props.sites.data.length < 3) return null;
@@ -14,6 +14,15 @@ const featuredId = computed(() => {
         .sort((a, b) => b[1] - a[1]);
     return ranked[0][1] > ranked[1][1] ? ranked[0][0] : null;
 });
+// A site that was never measured, as opposed to one that is quiet in this period. Demonstration sites carry synthetic data.
+const waiting = (site) => !site.first_collected_at && !site.is_demo;
+// Totals of the sites on screen. With several pages they would be misleading, so they are shown for a single page only.
+const totals = computed(() =>
+    ["pageviews", "custom_events"].reduce(
+        (sum, key) => ({ ...sum, [key]: props.sites.data.reduce((total, site) => total + (props.summaries[site.id]?.totals[key] ?? 0), 0) }),
+        {},
+    ),
+);
 const quiet = (site) =>
     Object.values(props.summaries[site.id].totals).every((total) => !total);
 const variationOf = (site, key) => {
@@ -33,7 +42,7 @@ const number = (value) =>
 <template>
     <div class="page-heading">
         <div>
-            <h1>Dashboard</h1>
+            <h1>Home</h1>
             <p class="text-sm text-muted">
                 Consolidated activity, each site in its own timezone
             </p>
@@ -44,8 +53,25 @@ const number = (value) =>
             label="Add site"
         />
     </div>
+    <UAlert
+        v-for="item in attention ?? []"
+        :key="item.code"
+        color="warning"
+        variant="soft"
+        icon="i-tabler-alert-triangle"
+        title="Something needs your attention"
+        :description="item.message"
+        :actions="[{ label: 'Instance health', to: item.link, color: 'neutral', variant: 'outline', size: 'xs' }]"
+        class="mb-6"
+    />
     <div class="report-toolbar">
-        <p class="text-xs text-muted">{{ sites.total }} websites</p>
+        <p class="text-xs text-muted">
+            {{ sites.total }} {{ sites.total === 1 ? "site" : "sites"
+            }}<template v-if="sites.data.length && sites.last_page === 1">
+                · <strong class="text-default font-medium">{{ number(totals.pageviews) }}</strong> pageviews ·
+                <strong class="text-default font-medium">{{ number(totals.custom_events) }}</strong> custom events</template
+            >
+        </p>
         <DateRange :period="period" :today="today" />
     </div>
     <div class="grid xl:grid-cols-2 xl:grid-flow-dense gap-6">
@@ -123,7 +149,16 @@ const number = (value) =>
                     >
                 </div>
             </div>
-            <div v-if="quiet(site)" class="site-trend is-quiet">
+            <div v-if="waiting(site)" class="site-trend is-quiet">
+                <div class="flex flex-col items-start gap-2 px-6 py-5">
+                    <p class="text-sm font-medium">Waiting for the first event</p>
+                    <p class="text-xs text-muted">
+                        Add the Lueur script to your website to start measuring.
+                    </p>
+                    <UButton :to="site.tracking_url" label="Set up tracking" size="xs" />
+                </div>
+            </div>
+            <div v-else-if="quiet(site)" class="site-trend is-quiet">
                 <p class="text-xs text-muted">No traffic in this period</p>
             </div>
             <div v-else class="site-trend">

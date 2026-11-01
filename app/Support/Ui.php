@@ -45,7 +45,7 @@ class Ui
         $data = $verbatim + self::relativize($data);
         foreach (['websites', 'sites'] as $key) {
             if (isset($data[$key])) {
-                $data[$key]->through(fn (Website $website): array => $website->toArray() + ['url' => route('sites.show', $website, false), 'edit_url' => route('sites.edit', $website, false), 'favicon_url' => route('sites.favicon', $website, false), 'can_update' => Gate::allows('update', $website)]);
+                $data[$key]->through(fn (Website $website): array => $website->toArray() + ['url' => route('sites.show', $website, false), 'edit_url' => route('sites.edit', $website, false), 'tracking_url' => route('sites.tracking', $website, false), 'favicon_url' => route('sites.favicon', $website, false), 'can_update' => Gate::allows('update', $website)]);
                 $data[$key]->withPath(request()->getPathInfo());
             }
         }

@@ -14,6 +14,8 @@ let ui;
 let registerModuleComponents;
 
 before(async () => {
+    // The site menu reads the origin to keep the chosen period in its links.
+    globalThis.location = new URL("http://localhost/sites/1");
     server = await createRenderServer();
     inertia = await server.ssrLoadModule("/tests/Charts/fixtures/inertia.mjs");
     Layout = (await server.ssrLoadModule("/resources/js/Components/WorkspaceLayout.vue")).default;
@@ -92,4 +94,29 @@ test("a visitor who is not signed in gets the plain sign-in shell, not the dashb
 
     assert.match(html, /auth-shell/);
     assert.doesNotMatch(html, /perysee-sidebar|perysee-topbar/);
+});
+
+const inSite = () =>
+    signedIn({
+        screen: "sites.show",
+        currentUrl: "/sites/1",
+        website: { id: 1, name: "Acme", domain: "acme.test" },
+        canUpdate: true,
+        siteLinks: Object.fromEntries(["show", "pages", "sources", "campaigns", "devices", "countries", "sessions", "events", "funnels", "journeys", "realtime", "tracking", "edit", "favicon"].map((key) => [key, `/sites/1${key === "show" ? "" : `/${key}`}`])),
+    });
+
+test("Home is the first entry of the menu, inside a site as well, so there is always a way back", async () => {
+    for (const [label, props] of [["outside a site", signedIn()], ["inside a site", inSite()]]) {
+        const html = await render(props);
+
+        assert.match(html, /<a[^>]*href="\/dashboard"[^>]*>(?:(?!<\/a>).)*Home/s, `Home links to the home page ${label}`);
+        assert.doesNotMatch(html, />Dashboard</, `the old name is gone ${label}`);
+    }
+});
+
+test("inside a site the menu still lists the site sections after Home", async () => {
+    const html = await render(inSite());
+
+    assert.ok(html.indexOf("Home") < html.indexOf("Overview"), "Home comes before the site sections");
+    assert.match(html, /href="\/sites\/1\/pages"/);
 });
