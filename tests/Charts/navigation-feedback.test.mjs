@@ -50,3 +50,25 @@ test("network errors produce an actionable error toast", () => {
     assert.equal(toast.color, "error");
     assert.match(toast.description, /connection|reload/i);
 });
+
+test("an HTTP error gets a message that matches what happened, not a connection hint", async () => {
+    const { httpErrorToast } = await import("../../resources/js/navigation-feedback.mjs");
+
+    assert.match(httpErrorToast(403).title, /access/i);
+    assert.match(httpErrorToast(404).title, /not found|does not exist/i);
+    assert.match(httpErrorToast(419).title, /session/i);
+    assert.match(httpErrorToast(429).title, /too many/i);
+    assert.match(httpErrorToast(500).title, /server/i);
+    assert.match(httpErrorToast(503).title, /server/i);
+    for (const status of [403, 404, 419, 429, 500, undefined, 418]) {
+        assert.equal(httpErrorToast(status).color, "error");
+        assert.ok(httpErrorToast(status).icon);
+    }
+});
+
+test("an unknown status falls back to a generic failure", async () => {
+    const { httpErrorToast } = await import("../../resources/js/navigation-feedback.mjs");
+
+    assert.match(httpErrorToast(undefined).title, /request failed/i);
+    assert.match(httpErrorToast(418).title, /request failed/i);
+});
