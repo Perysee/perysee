@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -12,9 +13,19 @@ class ModuleBootIsolationTest extends TestCase
 {
     private string $database;
 
+    /** @var array<string, array{0: string|false, 1: mixed, 2: mixed}> the environment as the test run set it */
+    private array $environment = [];
+
     protected function setUp(): void
     {
         parent::setUp();
+        // These tests start a second application on a throwaway SQLite file: they only make sense when the suite itself runs on SQLite.
+        if (config('database.default') !== 'sqlite') {
+            $this->markTestSkipped('Needs a throwaway SQLite database.');
+        }
+        foreach (['DB_DATABASE', 'PERYSEE_MODULES_PATH'] as $key) {
+            $this->environment[$key] = [getenv($key), $_ENV[$key] ?? null, $_SERVER[$key] ?? null];
+        }
         $this->database = $this->installationDirectory.'/modules.sqlite';
         touch($this->database);
     }
@@ -101,9 +112,11 @@ class ModuleBootIsolationTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (['DB_DATABASE' => ':memory:', 'PERYSEE_MODULES_PATH' => null] as $key => $value) {
-            $value === null ? putenv($key) : putenv("{$key}={$value}");
-            $value === null ? ($_ENV[$key] = $_SERVER[$key] = null) : ($_ENV[$key] = $_SERVER[$key] = $value);
+        // Put the environment back exactly as it was, so the next tests of the run, on SQLite or MariaDB, see their own database.
+        foreach ($this->environment as $key => [$process, $env, $server]) {
+            $process === false ? putenv($key) : putenv("{$key}={$process}");
+            $env === null ? Arr::forget($_ENV, $key) : $_ENV[$key] = $env;
+            $server === null ? Arr::forget($_SERVER, $key) : $_SERVER[$key] = $server;
         }
         parent::tearDown();
     }
