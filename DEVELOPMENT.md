@@ -117,6 +117,13 @@ Utiliser une destination neuve. Vérifier les questions interactives, le documen
 
 Les tests automatiques du service sont dans `tests/Unit/DownloadGatewayTest.php` ; les contrôles HTTP du vrai point d’entrée PHP sont dans `tests/Distribution/cpanel.test.mjs`. Ces derniers démarrent un serveur local temporaire. Ils ne remplacent pas la qualification des réécritures Apache/LiteSpeed, des permissions et des limites sur le compte réel.
 
+## Interface : navigation Inertia et Nuxt UI
+
+- **Liens internes = chemins.** Nuxt UI rend en simple `<a>` (donc recharge tout le document) tout lien qui porte un protocole. Les adresses envoyées à l'interface sont donc des chemins : `Ui::relativize` s'en charge pour les données de page et les propriétés partagées, et `queryUrl` garde un chemin comme chemin. `InternalLinksTest` échoue si un écran envoie un lien interne absolu. Un lien vers un autre site (`docsUrl`) reste absolu et doit porter `external: true`.
+- **Propriétés partagées réservées.** `Ui::render` refuse un écran qui envoie `links`, `auth`, `branding`, `modules`, `assets`, `navigation`, `flash`, `currentUrl`, `docsUrl` ou `errors` : la propriété de page remplacerait la propriété partagée pour toute l'interface.
+- **Événements Inertia v3.** Seuls `httpException` et `networkError` existent pour les erreurs (`invalid` et `exception` n'existent plus). Le layout les écoute et affiche un toast ; en développement, la modale d'Inertia reste affichée pour voir la page d'exception.
+- **Rechargements pendant le développement.** Chaque `npm run build` change la version des assets : la visite suivante est un rechargement complet (réponse 409). C'est normal. `npm run dev` l'évite.
+
 ## Modules
 
 Les fonctionnalités optionnelles sont des modules (architecture : `docs/planning/02-ARCHITECTURE-TECHNIQUE.md`, section 11 ; guide public : documentation, `Modules > Build a module`).

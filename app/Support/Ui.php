@@ -14,11 +14,9 @@ class Ui
 
     public static function render(string $screen, array $data = []): Response
     {
-        if (str_starts_with($screen, 'module:') || str_starts_with($screen, 'modules')) {
-            foreach (self::SHARED as $key) {
-                if (array_key_exists($key, $data)) {
-                    throw new \LogicException("The page property \"{$key}\" is shared by the application and would replace it on screen \"{$screen}\". Use another name.");
-                }
+        foreach (self::SHARED as $key) {
+            if (array_key_exists($key, $data)) {
+                throw new \LogicException("The page property \"{$key}\" is shared by the application and would replace it on screen \"{$screen}\". Use another name.");
             }
         }
         $site = $data['website'] ?? null;

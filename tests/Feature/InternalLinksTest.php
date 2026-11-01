@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Website;
 use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
+use App\Support\Ui;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -83,5 +84,17 @@ class InternalLinksTest extends TestCase
         }
 
         $this->assertSame([], array_keys($offenders), "These links are absolute, so Nuxt UI renders them as external anchors and every click reloads the page:\n".implode("\n", array_keys($offenders)));
+    }
+
+    public function test_a_screen_cannot_reuse_a_property_the_application_shares_with_every_page(): void
+    {
+        foreach (['links', 'modules', 'navigation', 'auth'] as $shared) {
+            try {
+                Ui::render('sites.index', [$shared => []]);
+                $this->fail("A screen sent \"{$shared}\" without an error.");
+            } catch (\LogicException $exception) {
+                $this->assertStringContainsString("\"{$shared}\"", $exception->getMessage());
+            }
+        }
     }
 }
