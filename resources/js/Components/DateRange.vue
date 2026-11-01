@@ -9,11 +9,14 @@ import {
 } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { parseDate } from "@internationalized/date";
+import { defineShortcuts } from "@nuxt/ui/composables";
 import { queryUrl, reportFilters } from "../interface-query.mjs";
+import { shiftPeriod, currentRange } from "../period-shift.mjs";
 const props = defineProps({
     period: { type: Object, required: true },
     today: { type: String, required: true },
     timezone: { type: String, default: "UTC" },
+    comparable: Boolean,
 });
 const page = usePage(),
     open = ref(false),
@@ -30,6 +33,12 @@ const activePreset = computed(
     () =>
         new URL(page.url, "http://perysee.local").searchParams.get("period") ||
         "",
+);
+const comparing = computed(
+    () =>
+        new URL(page.url, "http://perysee.local").searchParams.get(
+            "compare",
+        ) === "previous",
 );
 const valid = computed(
     () =>
@@ -65,6 +74,16 @@ const navigate = (values) => {
         { preserveScroll: true },
     );
 };
+const shift = (direction) => {
+    const next = shiftPeriod(
+        props.period.from,
+        props.period.to,
+        direction,
+        props.today,
+    );
+    if (next) navigate({ ...next, period: null });
+};
+defineShortcuts({ "[": () => shift(-1), "]": () => shift(1) });
 const apply = () => {
     if (valid.value)
         navigate({
@@ -99,6 +118,23 @@ onBeforeUnmount(() => media?.removeEventListener("change", adapt));
                 size="sm"
                 @click="navigate({ period: preset.key })"
         /></UButtonGroup>
+        <UButton
+            v-if="comparable"
+            icon="i-tabler-arrows-diff"
+            :label="small ? undefined : 'Compare'"
+            aria-label="Compare with the previous period"
+            color="neutral"
+            :variant="comparing ? 'soft' : 'ghost'"
+            size="sm"
+            :aria-pressed="comparing"
+            title="Compare with the previous period of the same length"
+            @click="
+                navigate({
+                    ...currentRange(page.url, period),
+                    compare: comparing ? null : 'previous',
+                })
+            "
+        />
         <UPopover
             v-model:open="open"
             :content="{ align: 'end', sideOffset: 8 }"

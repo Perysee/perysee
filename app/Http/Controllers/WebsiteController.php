@@ -57,7 +57,13 @@ class WebsiteController extends Controller
             return redirect()->route('sites.section', ['website' => $website, 'section' => 'pages'] + $request->only(['from', 'to', 'period', 'value']));
         }
 
-        return Ui::render('sites.show', ['website' => $website, 'period' => $period, 'report' => $reports->overview($website, $period), 'series' => $reports->series($website, $period), 'dimensions' => $reports->dimensions($website, $period, 'path', $request->input('value')), 'dimension' => 'path', 'breakdowns' => ['source' => $reports->dimensions($website, $period, 'source')]]);
+        $props = ['website' => $website, 'period' => $period, 'report' => $reports->overview($website, $period), 'series' => $reports->series($website, $period), 'dimensions' => $reports->dimensions($website, $period, 'path', $request->input('value')), 'dimension' => 'path', 'breakdowns' => ['source' => $reports->dimensions($website, $period, 'source')]];
+        if ($period['compare'] === 'previous') {
+            $previous = $reports->previousPeriod($period, $website);
+            $props['comparison'] = ['period' => ['from' => $previous['from'], 'to' => $previous['to']], 'totals' => $reports->overview($website, $previous)['totals'], 'series' => $reports->series($website, $previous)];
+        }
+
+        return Ui::render('sites.show', $props);
     }
 
     public function destroy(Request $request, Website $website): RedirectResponse

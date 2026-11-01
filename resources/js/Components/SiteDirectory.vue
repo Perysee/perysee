@@ -1,4 +1,5 @@
 <script setup>
+import { siteAvatar } from "../site-avatar.mjs";
 import { ref, watch } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
 const props = defineProps(["websites", "search"]);
@@ -87,9 +88,7 @@ const columns = [
                     <span
                         class="flex size-9 shrink-0 items-center justify-center border border-default"
                         ><UAvatar
-                            :src="row.original.favicon_url"
-                            alt=""
-                            icon="i-tabler-world"
+                            v-bind="siteAvatar(row.original.favicon_url, row.original.name)"
                             size="xs"
                     /></span>
                     <div class="min-w-0">

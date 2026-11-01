@@ -14,9 +14,10 @@ export function lineOption(
         border = "#00020C24",
         background = "#F8F8F8",
         font = "Geist, sans-serif",
+        comparison = null,
     } = {},
 ) {
-    return {
+    const option = {
         animation: !reduced && !compact,
         animationDuration: 300,
         textStyle: { fontFamily: font, color: text },
@@ -78,4 +79,29 @@ export function lineOption(
             },
         ],
     };
+    if (!comparison) return option;
+    option.legend = { show: !compact, top: 0, right: 0, textStyle: { color: text, fontSize: 12 } };
+    option.tooltip.formatter = (points) => {
+        const index = points[0].dataIndex;
+        return [
+            series[index]?.label,
+            ...points.map(({ seriesName, value }, position) =>
+                position === 0 || !comparison[index]
+                    ? `${seriesName}: ${value ?? "—"}`
+                    : `${seriesName} (${comparison[index].label}): ${value ?? "—"}`,
+            ),
+        ].join("\n");
+    };
+    option.series.push({
+        name: "Previous period",
+        type: "line",
+        data: series.map((_, index) => comparison[index]?.[metric] ?? null),
+        connectNulls: false,
+        smooth: false,
+        showSymbol: false,
+        lineStyle: { color: text, width: 1.5, type: "dashed", opacity: 0.55 },
+        itemStyle: { color: text, opacity: 0.55 },
+        emphasis: { focus: "series" },
+    });
+    return option;
 }

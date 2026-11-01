@@ -1,11 +1,17 @@
 <script setup>
-import { computed, ref, watch, onBeforeUnmount } from "vue";
+import { computed, ref, watch, onMounted, onBeforeUnmount } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
-import { useToast } from "@nuxt/ui/composables";
+import { useToast, defineShortcuts } from "@nuxt/ui/composables";
 import { queryUrl, reportFilters } from "../interface-query.mjs";
 import { createBusyTracker, networkErrorToast } from "../navigation-feedback.mjs";
+import { remember, restore } from "../period-memory.mjs";
+import { groupedItems, limitSites } from "../navigation.mjs";
 import BrandLogo from "./BrandLogo.vue";
 import ColorModeButton from "./ColorModeButton.vue";
+import CommandPalette from "./CommandPalette.vue";
+import { reportItems } from "../palette.mjs";
+import { applyColorMode } from "../color-mode.mjs";
+import { siteAvatar } from "../site-avatar.mjs";
 const page = usePage(),
     mobileOpen = ref(false),
     siteSearch = ref("");
@@ -34,6 +40,8 @@ const title = computed(
             dashboard: "Dashboard",
             health: "Instance health",
             settings: "Instance settings",
+            modules: "Modules",
+            "modules.settings": "Module settings",
             "auth.login": "Sign in",
             "auth.password": "Password",
             install: "Install Perysee",
@@ -44,6 +52,13 @@ const title = computed(
 const hasSite = computed(
     () => p.value.website?.id && p.value.screen !== "sites.index",
 );
+const moduleItems = (zone) =>
+    (p.value.modules?.navigation?.[zone] ?? []).map((item) => ({
+        label: item.label,
+        icon: item.icon,
+        to: item.url,
+        active: p.value.currentUrl === item.url,
+    }));
 const workspaceNav = computed(() => [
     {
         label: "Dashboard",
@@ -57,35 +72,47 @@ const workspaceNav = computed(() => [
         to: p.value.links["sites.index"],
         active: p.value.screen === "sites.index",
     },
+    ...moduleItems("workspace"),
 ]);
-const quickSites = computed(() =>
-    p.value.navigation
-        .filter((site) =>
-            (site.name + " " + site.domain)
-                .toLowerCase()
-                .includes(siteSearch.value.toLowerCase()),
-        )
-        .slice(0, 8)
-        .map((site) => ({
+const siteModules = computed(() =>
+    (p.value.modules?.menu ?? []).map((item) => ({
+        label: item.label,
+        icon: item.icon,
+        to: item.url,
+        active: p.value.currentUrl === item.url,
+    })),
+);
+const matchingSites = computed(() =>
+    p.value.navigation.filter((site) =>
+        (site.name + " " + site.domain)
+            .toLowerCase()
+            .includes(siteSearch.value.toLowerCase()),
+    ),
+);
+const quickSites = computed(() => {
+    const { visible, hidden } = limitSites(matchingSites.value, 8);
+    return [
+        ...visible.map((site) => ({
             label: site.name,
             to: site.url,
-            avatar: { src: site.favicon_url, alt: "" },
+            avatar: siteAvatar(site.favicon_url, site.name),
             active: site.id === p.value.website?.id,
         })),
-);
-const sections = [
-    ["overview", "Overview", "i-tabler-chart-line"],
-    ["pages", "Pages", "i-tabler-file-text"],
-    ["sources", "Sources", "i-tabler-arrow-up-right"],
-    ["campaigns", "Campaigns", "i-tabler-speakerphone"],
-    ["devices", "Devices", "i-tabler-device-desktop"],
-    ["countries", "Countries", "i-tabler-world"],
-    ["events", "Events", "i-tabler-bolt"],
-    ["sessions", "Sessions", "i-tabler-users"],
-    ["funnels", "Funnels", "i-tabler-filter"],
-    ["journeys", "Journeys", "i-tabler-route"],
-    ["realtime", "Recent activity", "i-tabler-activity"],
-];
+        ...(hidden
+            ? [
+                  {
+                      label: `View all ${matchingSites.value.length} sites`,
+                      to: p.value.links["sites.index"],
+                      icon: "i-tabler-arrow-right",
+                  },
+              ]
+            : []),
+    ];
+});
+const openFirstSite = () => {
+    const first = matchingSites.value[0];
+    if (first) router.visit(first.url);
+};
 const nav = computed(() => {
     if (hasSite.value) {
         const values = {...reportFilters(page.url)};
@@ -95,13 +122,17 @@ const nav = computed(() => {
         const params = new URL(page.url, location.origin).searchParams;
         for (const key of ["from", "to", "period"])
             if (params.has(key)) dates.set(key, params.get(key));
-        return sections.map(([key, label, icon]) => ({
+        const moduleEntries = moduleItems("site");
+        return [...groupedItems(({ key, label, icon, keywords }) => ({
             label,
             icon,
+            keywords,
             to:
                 queryUrl(p.value.siteLinks[key === "overview" ? "show" : key], key === "realtime" ? {} : {...values, ...Object.fromEntries(dates)}),
             active: key === "funnels" ? ["funnels","funnel.report"].includes(p.value.screen) : key === "journeys" ? p.value.screen === "journeys" : p.value.screen === "sites.show" && (p.value.section || "overview") === key,
-        }));
+        })),
+        ...(moduleEntries.length ? [{ label: "Modules", type: "label" }, ...moduleEntries] : []),
+        ];
     }
     return workspaceNav.value;
 });
@@ -140,6 +171,13 @@ const configNav = computed(() =>
                             to: p.value.links.settings,
                             active: p.value.screen === "settings",
                         },
+                        {
+                            label: "Modules",
+                            icon: "i-tabler-puzzle",
+                            to: p.value.links.modules,
+                            active: p.value.screen === "modules",
+                        },
+                        ...moduleItems("admin"),
                     ]
                   : []),
               {
@@ -154,13 +192,18 @@ const siteMenu = computed(() => [
     p.value.navigation.map((site) => ({
         label: site.name,
         to: site.url,
-        avatar: { src: site.favicon_url, alt: "" },
+        avatar: siteAvatar(site.favicon_url, site.name),
     })),
     [
         {
+            label: "Dashboard",
+            to: p.value.links.dashboard,
+            icon: "i-tabler-layout-dashboard",
+        },
+        {
             label: "All sites",
             to: p.value.links["sites.index"],
-            icon: "i-tabler-arrow-left",
+            icon: "i-tabler-world",
         },
     ],
 ]);
@@ -190,9 +233,81 @@ const accountMenu = computed(() => [
         },
     ],
 ]);
+const paletteOpen = ref(false);
+const toggleColorMode = () => {
+    let storage = null;
+    try {
+        storage = localStorage;
+    } catch {
+        // Appearance still works when storage is unavailable.
+    }
+    applyColorMode(!document.documentElement.classList.contains("dark"), document.documentElement, storage);
+    window.dispatchEvent(new Event("perysee:color-mode"));
+};
+const hasFilterBar = computed(
+    () => hasSite.value && p.value.screen === "sites.show" && p.value.section !== "realtime",
+);
+const paletteGroups = computed(() => {
+    const report = reportItems({
+        url: page.url,
+        currentUrl: p.value.currentUrl,
+        period: p.value.period,
+        siteLinks: hasSite.value && p.value.screen === "sites.show" ? p.value.siteLinks : null,
+        overview: !p.value.section || p.value.section === "overview",
+        brands: p.value.assets?.brands,
+    });
+    return [
+        { id: "sections", label: "This site", items: hasSite.value ? nav.value.filter((item) => item.type !== "label").map((item) => (item.active ? { ...item, suffix: "Current" } : item)) : [] },
+        { id: "period", label: "Period", items: report.period },
+        { id: "filters", label: "AI sources and browsers", items: report.filters },
+        {
+            id: "sites",
+            label: "Sites",
+            items: p.value.navigation.map((site) => ({
+                label: site.name,
+                suffix: site.id === p.value.website?.id ? `${site.domain} · Current` : site.domain,
+                active: site.id === p.value.website?.id,
+                keywords: [site.domain, "site"],
+                to: site.url,
+                avatar: siteAvatar(site.favicon_url, site.name),
+            })),
+        },
+        {
+            id: "actions",
+            label: "Actions",
+            items: [
+                ...(p.value.links?.dashboard
+                    ? [{ label: "Dashboard", icon: "i-tabler-layout-dashboard", keywords: ["home", "accueil"], to: p.value.links.dashboard, kbds: ["g", "d"], ...(p.value.screen === "dashboard" ? { active: true, suffix: "Current" } : {}) }]
+                    : []),
+                { label: "All sites", icon: "i-tabler-world", keywords: ["sites", "list"], to: p.value.links["sites.index"], kbds: ["g", "s"], ...(p.value.screen === "sites.index" ? { active: true, suffix: "Current" } : {}) },
+                { label: "Add site", icon: "i-tabler-plus", keywords: ["new", "create", "ajouter", "nouveau"], to: p.value.links["sites.create"] },
+                ...(hasFilterBar.value
+                    ? [{ label: "Add a filter", icon: "i-tabler-filter-plus", keywords: ["filter", "filtre", "segment"], kbds: ["/"], run: () => window.dispatchEvent(new Event("perysee:open-filter")) }]
+                    : []),
+                { label: "Toggle light / dark mode", icon: "i-tabler-moon", keywords: ["theme", "dark", "light", "sombre", "clair", "appearance"], run: toggleColorMode },
+                { label: "Sign out", icon: "i-tabler-logout", keywords: ["logout", "deconnexion"], run: () => router.post(p.value.links.logout) },
+            ],
+        },
+    ];
+});
+const togglePalette = () => (paletteOpen.value = !paletteOpen.value);
+defineShortcuts({
+    meta_k: { usingInput: true, handler: togglePalette },
+    ctrl_k: { usingInput: true, handler: togglePalette },
+    "g-d": () => p.value.auth && router.visit(p.value.links.dashboard),
+    "g-s": () => p.value.auth && router.visit(p.value.links["sites.index"]),
+});
 const toast = useToast(),
     busy = ref(false),
     tracker = createBusyTracker((value) => (busy.value = value));
+watch(
+    () => p.value.flash?.error,
+    (error) => {
+        if (error && p.value.auth)
+            toast.add({ title: error, color: "error", icon: "i-tabler-alert-circle" });
+    },
+    { immediate: true },
+);
 watch(
     () => p.value.flash?.status,
     (status) => {
@@ -201,21 +316,49 @@ watch(
     },
     { immediate: true },
 );
+const localStorageOrNull = () => {
+    try {
+        return window.localStorage;
+    } catch {
+        return null;
+    }
+};
+function syncPeriod() {
+    const site = p.value.website?.id;
+    if (!site || p.value.screen !== "sites.show" || p.value.section === "realtime")
+        return;
+    const [path, search = ""] = page.url.split("?");
+    const storage = localStorageOrNull();
+    if (!storage) return;
+    remember(storage, site, search);
+    const restored = restore(storage, site, search);
+    if (!restored) return;
+    const next = new URLSearchParams(search);
+    for (const [name, value] of new URLSearchParams(restored)) next.set(name, value);
+    router.get(`${path}?${next}`, {}, { replace: true, preserveScroll: true });
+}
 const stops = [
     router.on("navigate", () => {
         mobileOpen.value = false;
+        syncPeriod();
     }),
     router.on("start", tracker.start),
     router.on("finish", tracker.finish),
     router.on("exception", () => toast.add(networkErrorToast())),
     router.on("invalid", () => toast.add(networkErrorToast())),
 ];
+onMounted(syncPeriod);
 onBeforeUnmount(() => stops.forEach((stop) => stop()));
 </script>
 <template>
     <UApp>
         <Head :title="title" />
         <a href="#main" class="skip-link">Skip to content</a>
+        <CommandPalette
+            v-if="p.auth && p.screen !== 'install'"
+            v-model:open="paletteOpen"
+            :groups="paletteGroups"
+        />
         <div v-if="!p.auth || p.screen === 'install'" class="auth-shell">
             <div class="mb-9 flex items-center gap-6">
                 <BrandLogo /><ColorModeButton />
@@ -241,39 +384,42 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
         </div>
         <div v-else class="perysee-shell">
             <aside class="perysee-sidebar" aria-label="Main navigation">
-                <div class="h-18 flex items-center px-6"><BrandLogo /></div>
+                <div class="h-16 flex items-center px-6"><BrandLogo /></div>
                 <div class="flex-1 overflow-y-auto px-4 py-3">
-                    <UNavigationMenu
-                        v-if="hasSite"
-                        :items="workspaceNav"
-                        orientation="vertical"
-                        :ui="{ link: 'py-2 text-[13px]' }"
-                        class="mb-5"
-                    />
-                    <div v-if="hasSite" class="sidebar-site-context">
-                        <UAvatar :src="p.siteLinks.favicon" alt="" size="sm" />
-                        <div class="min-w-0">
-                            <p class="text-sm font-medium truncate">
-                                {{ p.website.name }}
-                            </p>
-                            <p class="text-xs text-muted truncate">
-                                {{ p.website.domain }}
-                            </p>
-                        </div>
-                    </div>
-                    <p class="text-xs font-medium text-muted px-2 mb-3">
-                        {{ hasSite ? "Traffic" : "Workspace" }}
+                    <button
+                        type="button"
+                        class="sidebar-search"
+                        aria-haspopup="dialog"
+                        aria-keyshortcuts="Meta+K Control+K"
+                        @click="paletteOpen = true"
+                    >
+                        <UIcon
+                            name="i-tabler-search"
+                            class="size-4 shrink-0"
+                            aria-hidden="true"
+                        />
+                        <span>Search</span>
+                        <span class="ml-auto inline-flex gap-0.5"
+                            ><UKbd value="meta" /><UKbd value="K"
+                        /></span>
+                    </button>
+                    <p
+                        v-if="!hasSite"
+                        class="text-xs font-medium text-muted px-2 mb-2"
+                    >
+                        Workspace
                     </p>
                     <UNavigationMenu
                         :items="nav"
                         orientation="vertical"
                         color="primary"
                         variant="pill"
-                        :ui="{ link: 'py-2 text-[13px]' }"
+                        :ui="{ link: 'py-1.5 text-sm' }"
+                        class="sidebar-nav"
                     />
                     <section v-if="!hasSite" class="sidebar-sites">
                         <div
-                            class="flex items-center justify-between px-2 mb-3"
+                            class="flex items-center justify-between px-2 mb-2"
                         >
                             <h2 class="text-xs font-medium text-muted">
                                 Your sites
@@ -294,11 +440,12 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                             placeholder="Find a site"
                             aria-label="Find a site"
                             size="sm"
-                            class="w-full mb-3"
+                            class="w-full mb-2"
+                            @keydown.enter="openFirstSite"
                         /><UNavigationMenu
                             :items="quickSites"
                             orientation="vertical"
-                            :ui="{ link: 'py-2 text-[13px]' }"
+                            :ui="{ link: 'py-1.5 text-sm' }"
                         />
                         <p
                             v-if="!quickSites.length"
@@ -315,22 +462,30 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                             color="neutral"
                         />
                     </section>
-                    <p class="text-xs font-medium text-muted px-2 mt-5 mb-2">
+                    <template v-if="hasSite && siteModules.length">
+                        <p class="sidebar-label">Workspace</p>
+                        <UNavigationMenu
+                            :items="siteModules"
+                            orientation="vertical"
+                            :ui="{ link: 'py-1.5 text-sm' }"
+                        />
+                    </template>
+                    <p class="sidebar-label">
                         {{ hasSite ? "Configuration" : "Manage" }}
                     </p>
                     <UNavigationMenu
                         :items="configNav"
                         orientation="vertical"
-                        :ui="{ link: 'py-2 text-[13px]' }"
+                        :ui="{ link: 'py-1.5 text-sm' }"
                     />
                 </div>
                 <div
-                    class="border-t border-default px-6 py-4 flex gap-3 items-center text-xs text-muted"
+                    class="border-t border-default px-4 py-3 flex gap-2 items-center whitespace-nowrap text-xs text-muted"
                 >
                     <UIcon
                         name="i-tabler-shield-check"
-                        class="size-5 shrink-0"
-                    /><span>Your data.<br />Your infrastructure.</span>
+                        class="size-4 shrink-0"
+                    /><span>Your data, your infrastructure</span>
                 </div>
             </aside>
             <div class="perysee-workspace">
@@ -350,19 +505,19 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                                 ><BrandLogo />
                                 <div class="mt-8">
                                     <UNavigationMenu
-                                        v-if="hasSite"
-                                        :items="workspaceNav"
-                                        orientation="vertical"
-                                        class="mb-5"
-                                    />
-                                    <UNavigationMenu
                                         :items="nav"
                                         orientation="vertical"
+                                        class="sidebar-nav"
+                                    /><UNavigationMenu
+                                        v-if="hasSite && siteModules.length"
+                                        :items="siteModules"
+                                        orientation="vertical"
+                                        class="mt-4"
                                     /><UNavigationMenu
                                         v-if="!hasSite"
                                         :items="quickSites"
                                         orientation="vertical"
-                                        class="mt-5"
+                                        class="mt-6"
                                     /><USeparator
                                         class="my-5"
                                     /><UNavigationMenu
@@ -370,17 +525,14 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                                         orientation="vertical"
                                     /></div></template></USlideover
                         ><span class="hidden sm:block text-xs text-muted"
-                            >Perysee</span
+                            >{{ p.branding.name }}</span
                         ><span class="hidden sm:block text-dimmed text-xs"
                             >/</span
                         ><UDropdownMenu v-if="hasSite" :items="siteMenu"
                             ><UButton
                                 color="neutral"
                                 variant="ghost"
-                                :avatar="{
-                                    src: p.siteLinks.favicon,
-                                    alt: p.website.name,
-                                }"
+                                :avatar="siteAvatar(p.siteLinks.favicon, p.website.name)"
                                 trailing-icon="i-tabler-chevron-down"
                                 :label="p.website.domain"
                                 class="max-w-52 sm:max-w-sm truncate" /></UDropdownMenu
@@ -389,6 +541,19 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                         }}</span>
                     </div>
                     <div class="flex items-center gap-2">
+                        <UButton
+                            color="neutral"
+                            variant="outline"
+                            size="sm"
+                            icon="i-tabler-search"
+                            aria-label="Open the command palette"
+                            aria-haspopup="dialog"
+                            aria-keyshortcuts="Meta+K Control+K"
+                            @click="paletteOpen = true"
+                            ><span class="hidden sm:inline">Search</span
+                            ><span class="hidden sm:inline-flex gap-0.5"
+                                ><UKbd value="meta" /><UKbd value="K" /></span
+                        ></UButton>
                         <ColorModeButton />
                         <UDropdownMenu :items="accountMenu"
                             ><UButton

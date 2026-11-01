@@ -7,8 +7,14 @@ const page = usePage();
     <Link
         :href="page.props.links['sites.index']"
         class="perysee-brand"
-        aria-label="Perysee"
+        :aria-label="page.props.branding.name"
         ><img
+            v-if="page.props.branding.logo"
+            class="brand-logo-custom"
+            :src="page.props.branding.logo"
+            alt=""
+        /><template v-else
+            ><img
             class="brand-logo-light"
             :src="`${page.props.assets.logo}?v=${brand.version}`"
             width="304"
@@ -20,6 +26,10 @@ const page = usePage();
             width="304"
             height="416"
             alt=""
-        /><span>perysee<span class="text-primary">.</span></span></Link
+        /></template
+        ><span v-if="page.props.branding.name !== 'Perysee'">{{
+            page.props.branding.name
+        }}</span
+        ><span v-else>perysee<span class="text-primary">.</span></span></Link
     >
 </template>

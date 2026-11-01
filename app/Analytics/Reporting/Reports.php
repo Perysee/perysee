@@ -22,6 +22,7 @@ class Reports
             'dimension' => ['sometimes', 'in:path,source,campaign,device,event,country,browser,device_brand'],
             'source_group' => ['sometimes', 'in:all,ai'], 'provider' => ['nullable', 'in:chatgpt,claude,perplexity,gemini,copilot,grok'],
             'value' => ['nullable', 'string', 'max:512'], 'granularity' => ['sometimes', 'in:day,hour'],
+            'compare' => ['sometimes', 'in:previous'],
         ]);
         $today = now($site->timezone)->startOfDay();
         $days = match ($input['period'] ?? '7d') {
@@ -38,7 +39,28 @@ class Reports
             throw ValidationException::withMessages(['granularity' => 'Hourly reports require one local calendar day.']);
         }
 
-        return ['from' => $from, 'to' => $to, 'start' => $start->copy()->utc(), 'end' => $end->copy()->addDay()->utc(), 'granularity' => $input['granularity'] ?? ($from === $to ? 'hour' : 'day'), 'filters' => app(Filters::class)->parse($request), 'source_group' => $input['source_group'] ?? 'all', 'provider' => $input['provider'] ?? null];
+        return ['from' => $from, 'to' => $to, 'start' => $start->copy()->utc(), 'end' => $end->copy()->addDay()->utc(), 'granularity' => $input['granularity'] ?? ($from === $to ? 'hour' : 'day'), 'filters' => app(Filters::class)->parse($request), 'source_group' => $input['source_group'] ?? 'all', 'provider' => $input['provider'] ?? null, 'compare' => $input['compare'] ?? null];
+    }
+
+    /**
+     * The period of the same length that ends the day before $period starts, with the same filters.
+     *
+     * @param  array<string, mixed>  $period
+     * @return array<string, mixed>
+     */
+    public function previousPeriod(array $period, Website $site): array
+    {
+        $start = Carbon::createFromFormat('!Y-m-d', $period['from'], $site->timezone);
+        $end = Carbon::createFromFormat('!Y-m-d', $period['to'], $site->timezone);
+        $days = (int) $start->diffInDays($end) + 1;
+        $previousEnd = $start->copy()->subDay();
+        $previousStart = $previousEnd->copy()->subDays($days - 1);
+
+        return [
+            'from' => $previousStart->toDateString(), 'to' => $previousEnd->toDateString(),
+            'start' => $previousStart->copy()->utc(), 'end' => $previousEnd->copy()->addDay()->utc(),
+            'granularity' => $days === 1 ? 'hour' : 'day',
+        ] + $period;
     }
 
     public function overview(Website $site, array $period): array

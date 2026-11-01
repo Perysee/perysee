@@ -2,12 +2,14 @@
 import { computed, ref, watch } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
 import FilterBar from "./FilterBar.vue";
+import ReportHeader from "./ReportHeader.vue";
 import TrafficChart from "./TrafficChart.vue";
 import DateRange from "./DateRange.vue";
 import BreakdownTable from "./BreakdownTable.vue";
 import ClientReport from "./ClientReport.vue";
 import CampaignTable from "./CampaignTable.vue";
 import { queryUrl, reportFilters } from "../interface-query.mjs";
+import { variation, describeVariation } from "../comparison.mjs";
 const props = defineProps([
     "website",
     "canUpdate",
@@ -17,6 +19,7 @@ const props = defineProps([
     "period",
     "today",
     "series",
+    "comparison",
     "dimension",
     "dimensions",
     "dimensionReport",
@@ -93,6 +96,22 @@ const icons = {
 };
 const format = (value) =>
     value === null ? "—" : new Intl.NumberFormat("en").format(value);
+const variationIcons = {
+    up: "i-tabler-arrow-up-right",
+    down: "i-tabler-arrow-down-right",
+    flat: "i-tabler-minus",
+};
+const variationOf = (key) => {
+    const change = variation(
+        props.report.totals[key],
+        props.comparison?.totals[key] ?? null,
+    );
+    return {
+        ...describeVariation(change),
+        direction: change?.direction ?? "new",
+        icon: variationIcons[change?.direction] ?? "i-tabler-plus",
+    };
+};
 const chartColumns = computed(() => [
     { accessorKey: "label", header: "Period" },
     ...(overview.value ? Object.keys(labels) : [metric.value]).map((key) => ({
@@ -120,86 +139,85 @@ const lastConsolidation = computed(() =>
 );
 </script>
 <template>
-    <UBadge
-        v-if="website.is_demo"
-        color="warning"
-        variant="subtle"
-        size="sm"
-        class="mb-4"
-        >Demonstration data · synthetic events</UBadge
+    <ReportHeader
+        :title="
+            overview
+                ? website.name
+                : isRecent
+                  ? 'Recent activity'
+                  : isSessions
+                    ? 'Sessions'
+                    : current === 'devices'
+                      ? 'Devices & browsers'
+                      : headings[dimension]
+        "
     >
-    <div class="page-heading">
-        <div>
-            <p class="eyebrow">
-                {{ overview ? "Site overview" : website.name }}
-            </p>
-            <h1>
-                {{
-                    overview
-                        ? website.name
-                        : isRecent
-                          ? "Recent activity"
-                          : isSessions
-                            ? "Sessions"
-                            : current === "devices"
-                              ? "Devices & browsers"
-                              : headings[dimension]
-                }}
-            </h1>
-            <p class="text-xs text-muted">
-                {{ website.domain }} <span class="mx-2 text-dimmed">/</span
-                >{{ website.timezone }}
-            </p>
-        </div>
-        <div class="flex gap-2">
-            <UButton
-                v-if="isRecent"
-                icon="i-tabler-refresh"
-                color="neutral"
-                variant="outline"
-                label="Refresh"
-                @click="router.reload({ preserveScroll: true })"
-            /><UButton
-                v-else
-                :href="exportUrl"
-                external
-                icon="i-tabler-download"
-                color="neutral"
-                variant="outline"
-                class="text-xs"
-                ><span class="hidden sm:inline">{{
-                    isDimension ? "Export table CSV" : "Export daily CSV"
-                }}</span></UButton
-            ><UButton
-                v-if="canUpdate"
-                :to="siteLinks.edit"
-                icon="i-tabler-settings"
-                color="neutral"
-                variant="ghost"
-                aria-label="Edit site"
-            />
-        </div>
-    </div>
-    <div v-if="!isRecent" class="report-toolbar">
-        <div class="text-xs text-muted flex flex-wrap gap-2 items-center">
-            <span
-                class="size-1.5 rounded-full"
-                :class="report.freshness.pending ? 'bg-warning' : 'bg-success'"
-            /><span>{{
-                report.freshness.pending
-                    ? "Consolidation pending"
-                    : "Consolidated data"
-            }}</span
-            ><span class="hidden xl:inline text-dimmed"
-                >· {{ lastConsolidation }}</span
+        <template #meta>
+            <span>{{ website.domain }}</span
+            ><span class="text-dimmed"> · </span
+            ><span>{{ website.timezone }}</span
+            ><template v-if="website.is_demo"
+                ><span class="text-dimmed"> · </span
+                ><span
+                    class="report-demo"
+                    title="Demonstration data · synthetic events"
+                    >Demonstration data</span
+                ></template
+            ><template v-if="!isRecent"
+                ><span class="text-dimmed"> · </span
+                ><span
+                    class="report-status"
+                    :class="
+                        report.freshness.pending
+                            ? 'is-pending'
+                            : 'is-consolidated'
+                    "
+                    >{{
+                        report.freshness.pending
+                            ? "Consolidation pending"
+                            : "Consolidated"
+                    }}</span
+                ><span class="hidden xl:inline text-dimmed"
+                    > · {{ lastConsolidation }}</span
+                ></template
             >
-        </div>
+        </template>
         <DateRange
+            v-if="!isRecent"
             :period="period"
             :today="today"
             :timezone="website.timezone"
+            :comparable="overview"
         />
-    </div>
+        <UButton
+            v-if="isRecent"
+            icon="i-tabler-refresh"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            label="Refresh"
+            @click="router.reload({ preserveScroll: true })"
+        /><UButton
+            v-else
+            :href="exportUrl"
+            external
+            icon="i-tabler-download"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            :aria-label="isDimension ? 'Export table CSV' : 'Export daily CSV'"
+            :title="isDimension ? 'Export table CSV' : 'Export daily CSV'"
+            ><span class="hidden 2xl:inline">Export CSV</span></UButton
+        ><UButton
+            v-if="canUpdate"
+            :to="siteLinks.edit"
+            icon="i-tabler-settings"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            aria-label="Edit site"
+        />
+    </ReportHeader>
     <FilterBar v-if="!isRecent" :period="period" :site-links="siteLinks" :active-dimension="dimension" />
     <UAlert v-if="report.segment_coverage && report.segment_coverage.status !== 'available'" color="warning" :description="report.segment_coverage.message" class="mb-5" />
     <UAlert
@@ -327,6 +345,19 @@ const lastConsolidation = computed(() =>
                         ><strong class="metric-value">{{
                             format(report.totals[key])
                         }}</strong
+                        ><span
+                            v-if="comparison"
+                            class="metric-variation"
+                            :class="`is-${variationOf(key).direction}`"
+                            :title="variationOf(key).label"
+                            ><UIcon
+                                :name="variationOf(key).icon"
+                                class="size-3.5"
+                                aria-hidden="true"
+                            />{{ variationOf(key).text
+                            }}<span class="sr-only">
+                                {{ variationOf(key).label }}</span
+                            ></span
                         ><span class="metric-caption">{{
                             key === "pageviews"
                                 ? "Pages viewed in this period"
@@ -423,7 +454,11 @@ const lastConsolidation = computed(() =>
                         }}</span></span
                     >
                 </div>
-                <TrafficChart :series="series" :metric="metric" />
+                <TrafficChart
+                    :series="series"
+                    :metric="metric"
+                    :comparison="comparison?.series"
+                />
                 <UCollapsible
                     v-model:open="dataOpen"
                     class="border-t border-default"

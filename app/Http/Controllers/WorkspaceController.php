@@ -18,14 +18,18 @@ class WorkspaceController extends Controller
         $summaries = [];
         $charts = [];
         $sitePeriods = [];
+        $comparisons = [];
         foreach ($sites as $site) {
             $period = $reports->period($request, $site);
             $sitePeriods[$site->id] = ['from' => $period['from'], 'to' => $period['to'], 'timezone' => $site->timezone];
             $summaries[$site->id] = $reports->overview($site, $period);
             $charts[$site->id] = $reports->series($site, $period);
+            if ($period['compare'] === 'previous') {
+                $comparisons[$site->id] = ['totals' => $reports->overview($site, $reports->previousPeriod($period, $site))['totals']];
+            }
         }
 
-        return Ui::render('dashboard', compact('sites', 'summaries', 'charts', 'sitePeriods'));
+        return Ui::render('dashboard', compact('sites', 'summaries', 'charts', 'sitePeriods', 'comparisons'));
     }
 
     public function pixels(): Response

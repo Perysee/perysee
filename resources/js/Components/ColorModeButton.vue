@@ -1,13 +1,20 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
+import { applyColorMode } from "../color-mode.mjs";
 const dark = ref(document.documentElement.classList.contains("dark"));
+const sync = () => (dark.value = document.documentElement.classList.contains("dark"));
 function toggle() {
     dark.value = !dark.value;
-    document.documentElement.classList.toggle("dark", dark.value);
+    let storage = null;
     try {
-        localStorage.setItem("perysee-color-mode", dark.value ? "dark" : "light");
-    } catch { /* Appearance still works when storage is unavailable. */ }
+        storage = localStorage;
+    } catch {
+        // Appearance still works when storage is unavailable.
+    }
+    applyColorMode(dark.value, document.documentElement, storage);
 }
+onMounted(() => window.addEventListener("perysee:color-mode", sync));
+onBeforeUnmount(() => window.removeEventListener("perysee:color-mode", sync));
 </script>
 <template>
     <UButton

@@ -1,9 +1,31 @@
 <script setup>
+import { computed } from "vue";
 import { usePage, router } from "@inertiajs/vue3";
 import TrafficChart from "./TrafficChart.vue";
 import DateRange from "./DateRange.vue";
 import { queryUrl } from "../interface-query.mjs";
-defineProps(["sites", "summaries", "charts", "period", "today", "sitePeriods"]);
+import { variation, describeVariation } from "../comparison.mjs";
+const props = defineProps(["sites", "summaries", "charts", "period", "today", "sitePeriods", "comparisons"]);
+// With three sites or more, the busiest one leads the grid at full width.
+const featuredId = computed(() => {
+    if (props.sites.data.length < 3) return null;
+    const ranked = props.sites.data
+        .map((site) => [site.id, props.summaries[site.id].totals.pageviews ?? 0])
+        .sort((a, b) => b[1] - a[1]);
+    return ranked[0][1] > ranked[1][1] ? ranked[0][0] : null;
+});
+const quiet = (site) =>
+    Object.values(props.summaries[site.id].totals).every((total) => !total);
+const variationOf = (site, key) => {
+    const previous = props.comparisons?.[site.id]?.totals[key];
+    const current = props.summaries[site.id].totals[key];
+    if (previous === undefined || current === null) return null;
+    const change = variation(current, previous);
+    return {
+        ...describeVariation(change),
+        direction: change?.direction ?? "new",
+    };
+};
 const page = usePage();
 const number = (value) =>
     value === null ? "—" : new Intl.NumberFormat("en").format(value);
@@ -11,11 +33,9 @@ const number = (value) =>
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">Your workspace</p>
             <h1>Dashboard</h1>
             <p class="text-sm text-muted">
-                Consolidated activity · each site follows its own reporting
-                timezone.
+                Consolidated activity, each site in its own timezone
             </p>
         </div>
         <UButton
@@ -28,12 +48,15 @@ const number = (value) =>
         <p class="text-xs text-muted">{{ sites.total }} websites</p>
         <DateRange :period="period" :today="today" />
     </div>
-    <div class="grid xl:grid-cols-2 gap-6">
-        <article v-for="site in sites.data" :key="site.id" class="report-panel">
-            <header
-                class="p-5 flex items-start justify-between border-b border-default"
-            >
-                <div>
+    <div class="grid xl:grid-cols-2 xl:grid-flow-dense gap-6">
+        <article
+            v-for="site in sites.data"
+            :key="site.id"
+            class="report-panel site-card"
+            :class="{ 'is-featured': site.id === featuredId }"
+        >
+            <header class="site-header">
+                <div class="min-w-0">
                     <UButton
                         :to="
                             queryUrl(site.url, {
@@ -46,54 +69,73 @@ const number = (value) =>
                         variant="link"
                         class="p-0 font-medium"
                     />
-                    <p class="text-xs text-muted mt-1">{{ site.domain }}</p><p class="text-xs text-muted mt-1">{{ sitePeriods[site.id].from }} – {{ sitePeriods[site.id].to }} · {{ site.timezone }}</p>
-                    <UBadge
-                        v-if="site.is_demo"
-                        color="warning"
-                        variant="subtle"
-                        size="xs"
-                        class="mt-2"
-                        >Demonstration data</UBadge
-                    >
+                    <p class="text-xs text-muted mt-1">
+                        {{ site.domain
+                        }}<template v-if="site.is_demo"> · Demonstration data</template>
+                    </p>
                 </div>
-                <UBadge
-                    :color="
+                <span
+                    class="site-status"
+                    :class="
                         summaries[site.id].freshness.pending
-                            ? 'warning'
-                            : 'success'
+                            ? 'is-pending'
+                            : 'is-consolidated'
                     "
-                    variant="subtle"
-                    size="xs"
                     >{{
                         summaries[site.id].freshness.pending
                             ? "Pending"
                             : "Consolidated"
-                    }}</UBadge
+                    }}</span
                 >
             </header>
             <div class="metric-grid">
                 <div
                     v-for="[key, label] in [
                         ['pageviews', 'Pageviews'],
-                        ['sessions', 'Sessions started'],
+                        ['sessions', 'Sessions'],
                         ['custom_events', 'Custom events'],
                     ]"
                     :key="key"
                     class="metric-cell"
                 >
                     <span class="metric-label">{{ label }}</span
-                    ><strong class="metric-value !text-2xl">{{
+                    ><strong class="metric-value">{{
                         number(summaries[site.id].totals[key])
-                    }}</strong>
+                    }}</strong
+                    ><span
+                        v-if="variationOf(site, key)"
+                        class="metric-variation"
+                        :class="`is-${variationOf(site, key).direction}`"
+                        :title="variationOf(site, key).label"
+                        >{{ variationOf(site, key).text
+                        }}<span class="metric-versus"> vs previous</span
+                        ><span class="sr-only">
+                            {{ variationOf(site, key).label }}</span
+                        ></span
+                    ><span
+                        v-else-if="
+                            key === 'sessions' &&
+                            summaries[site.id].availability.sessions ===
+                                'unavailable'
+                        "
+                        class="metric-caption"
+                        >Unavailable</span
+                    >
                 </div>
             </div>
-            <TrafficChart :series="charts[site.id]" compact />
+            <div v-if="quiet(site)" class="site-trend is-quiet">
+                <p class="text-xs text-muted">No traffic in this period</p>
+            </div>
+            <div v-else class="site-trend">
+                <TrafficChart :series="charts[site.id]" compact />
+            </div>
             <footer
-                class="px-5 py-3 border-t border-default flex items-center justify-between"
+                class="site-footer"
             >
-                <span class="text-xs text-muted"
-                    >Sessions
-                    {{ summaries[site.id].availability.sessions }}</span
+                <span class="text-xs text-muted tabular-nums"
+                    >{{ sitePeriods[site.id].from }} –
+                    {{ sitePeriods[site.id].to }} ·
+                    {{ site.timezone }}</span
                 ><UButton
                     :to="
                         queryUrl(site.url, { from: sitePeriods[site.id].from, to: sitePeriods[site.id].to })
@@ -103,6 +145,7 @@ const number = (value) =>
                     color="neutral"
                     variant="link"
                     size="xs"
+                    class="shrink-0 px-0"
                 />
             </footer>
         </article>
