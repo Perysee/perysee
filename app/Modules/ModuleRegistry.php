@@ -28,6 +28,14 @@ final class ModuleRegistry
     }
 
     /**
+     * Forgets what was read, so a module added to the folder during this request is seen.
+     */
+    public function refresh(): void
+    {
+        $this->modules = null;
+    }
+
+    /**
      * Enabled modules in dependency order.
      *
      * @return array<string, Module>

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Website;
+use App\Modules\InvalidModuleBundle;
 use App\Modules\Module;
+use App\Modules\ModuleInstaller;
 use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
 use App\Modules\ModuleScope;
@@ -11,6 +13,7 @@ use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Response;
 use RuntimeException;
@@ -43,7 +46,17 @@ class ModuleController extends Controller
             $invalid[] = ['directory' => $directory, 'reason' => $reason];
         }
 
-        return Ui::render('modules', ['installed' => $modules, 'invalid' => $invalid, 'path' => config('perysee.modules_path')]);
+        return Ui::render('modules', [
+            'installed' => $modules,
+            'invalid' => $invalid,
+            'path' => config('perysee.modules_path'),
+            'installer' => [
+                'available' => ModuleInstaller::unavailableReason() === null,
+                'reason' => ModuleInstaller::unavailableReason(),
+                'link' => route('modules.install', [], false),
+                'maxMb' => intdiv((int) config('perysee.module_upload_max_kb'), 1024),
+            ],
+        ]);
     }
 
     public function settings(Request $request, ModuleRegistry $registry, ModuleLoader $loader, ModuleScope $scope, string $module): Response
@@ -93,6 +106,21 @@ class ModuleController extends Controller
         }
 
         return redirect()->route('modules.settings', $module)->with('status', 'Availability saved.');
+    }
+
+    public function install(Request $request, ModuleInstaller $installer): RedirectResponse
+    {
+        $this->authorizeAdministrator($request);
+        abort_unless(config('perysee.module_uploads'), 403, 'Uploading modules is turned off on this instance.');
+        $request->validate(['bundle' => ['required', 'file', 'mimes:zip', 'max:'.(int) config('perysee.module_upload_max_kb')]]);
+        try {
+            $manifest = $installer->install($request->file('bundle')->getRealPath());
+        } catch (InvalidModuleBundle $exception) {
+            return redirect()->route('modules.index')->with('error', $exception->getMessage());
+        }
+        Log::info('A module was installed from an archive.', ['module' => $manifest->id, 'version' => $manifest->version, 'user' => $request->user()->id]);
+
+        return redirect()->route('modules.index')->with('status', "Module {$manifest->name} installed. Enable it to start using it.");
     }
 
     public function enable(Request $request, ModuleRegistry $registry, string $module): RedirectResponse
