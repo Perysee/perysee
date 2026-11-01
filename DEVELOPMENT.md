@@ -117,6 +117,17 @@ Utiliser une destination neuve. Vérifier les questions interactives, le documen
 
 Les tests automatiques du service sont dans `tests/Unit/DownloadGatewayTest.php` ; les contrôles HTTP du vrai point d’entrée PHP sont dans `tests/Distribution/cpanel.test.mjs`. Ces derniers démarrent un serveur local temporaire. Ils ne remplacent pas la qualification des réécritures Apache/LiteSpeed, des permissions et des limites sur le compte réel.
 
+## Modules
+
+Les fonctionnalités optionnelles sont des modules (architecture : `docs/planning/02-ARCHITECTURE-TECHNIQUE.md`, section 11 ; guide public : documentation, `Modules > Build a module`).
+
+- **Sources** : les modules maison sont dans `modules/<id>/` (White label, Annotations, Example). Ils sont versionnés avec le Core mais **absents du ZIP** : `scripts/build-release.php` n'embarque que sa liste explicite de chemins, et `storage/` n'en fait pas partie. `resources/module-template/` (gabarit de `perysee:make-module`) est en revanche distribué.
+- **En local** : relier un module au dossier chargé par l'application, par exemple `ln -s ../../../modules/annotations storage/app/modules/annotations`, puis `php artisan perysee:modules enable annotations`. L'activation écrit en base ; la première installe aussi les migrations du module.
+- **Nouveau module** : `php artisan perysee:make-module <id>` crée le squelette dans le dossier des modules ; le déplacer dans `modules/` pour le versionner. Préfixer les tables et les noms de migration par l'identifiant (les noms de migration sont communs à tous les modules).
+- **Tests** : `php artisan test --compact --filter=Module` (registre, chargeur, installation, périmètre, extensions, pages d'administration, robustesse), `AnnotationsModuleTest`, `WhiteLabelModuleTest`, `ExampleModuleTest`, `MakeModuleTest`, et `npm run test:charts` (hôte JavaScript, rendu des modules). Un module qui s'appuie sur un autre sujet de test charge `base_path('modules')` via `perysee.modules_path`.
+- **Avant de livrer un module** : activation sans erreur de chargement, refus des rôles insuffisants, absence hors du périmètre choisi, activation répétée sans seconde migration, désinstallation limitée à ses tables. Le guide public donne la même liste.
+- **Limites actuelles** : pas de téléchargement, de signature ni de droits par module. La suite MariaDB (`composer test:mariadb`) n'a pas encore été lancée sur ces migrations.
+
 ## Tests privés avant activation du domaine
 
 Le test hors réseau d’un ZIP reste disponible :

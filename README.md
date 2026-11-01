@@ -27,6 +27,7 @@ Les instructions de fabrication, les tests privés et le déploiement du relais 
 - Interface Vue 3 / Inertia / Nuxt UI en anglais, responsive, accordée à la landing et à la documentation : Geist, palette commune et icônes Tabler locales. Aucun SSR ni serveur Node sur l’hébergement.
 
 **Lueur et le collecteur sont disponibles**, avec pages vues sans identifiant ou sessions, consentement configurable et événements nommés. Les rapports consolidés couvrent pages, sessions commencées, sources, campagnes et appareils, avec exports CSV. Le contrôle de réception sur quinze minutes reste distinct des rapports. Le scheduler consolide les données et effectue la maintenance toutes les cinq minutes. Les administrateurs disposent d’une page de santé et de réglages de rétention. Hors sites de démonstration explicitement signalés, aucune statistique fictive n’est affichée ; la collecte confirme un événement après son insertion SQL. Les pays sont déterminés approximativement à partir d’une base MMDB locale, avec couverture explicite ; l’attribution distingue les sources IA reconnues. Les filtres croisés sont reconstruits depuis les événements conservés. Les funnels versionnés et parcours automatiques sont mesurés dans une même session, avec Sankey ECharts, calcul par lots et couverture historique explicite. Les pixels, invitations et inscriptions publiques ne sont pas implémentés.
+- **Modules** : le Core accueille des fonctionnalités optionnelles sous forme de modules, activables et désactivables depuis la page **Modules** (administrateurs), limitables à certains sites, avec leur propre page de réglages. Trois modules sont maintenus avec les sources : White label, Annotations et Example. Voir [Modules](#modules).
 
 ## Développement local
 
@@ -105,6 +106,20 @@ composer test:mariadb
 Cette commande crée une base et un compte **`perysee_test`** distincts. L’utilisateur SQL n’a des droits que sur cette base. `.env.testing` et les identifiants de test sont privés et ignorés par Git. Le bootstrap refuse toute autre base/utilisateur, une URL SQL alternative, un cache de configuration ou une base de développement portant le même nom.
 
 **Les tests MariaDB réinitialisent uniquement cette base dédiée.** Ils couvrent installation à partir d’une base vide, reprise, verrouillage, erreurs SQL, authentification, CSRF, récupération et isolation entre sites. Les tests n’installent pas l’instance locale et ne créent pas son administrateur.
+
+## Modules
+
+Un module est un dossier (`module.json`, `src/`, `routes.php`, `database/migrations/`, `dist/module.js`) placé dans `storage/app/modules` (ou `PERYSEE_MODULES_PATH`). La première activation l'installe et exécute ses migrations ; désactiver conserve ses données. Les modules maison sont versionnés dans `modules/` et ne sont pas inclus dans le ZIP du Core.
+
+```sh
+php artisan perysee:modules list
+php artisan perysee:modules enable annotations
+php artisan perysee:modules disable annotations
+php artisan perysee:modules uninstall annotations --force   # supprime tables et réglages
+php artisan perysee:make-module pdf-export --name="PDF export"
+```
+
+En local, relier un module maison au dossier des modules : `ln -s ../../../modules/example storage/app/modules/example`. Le guide d'écriture est dans la documentation (`Modules > Build a module`) et l'architecture dans `docs/planning/02-ARCHITECTURE-TECHNIQUE.md` (section 11). Les droits par module et le téléchargement de bundles signés ne sont pas implémentés.
 
 ## Documentation du produit
 
