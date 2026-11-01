@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { router } from "@inertiajs/vue3";
-const props = defineProps(["modules", "invalid", "path"]);
+const props = defineProps(["installed", "invalid", "path"]);
 const busy = ref("");
 const change = (module, action) => {
     busy.value = module.id;
@@ -18,7 +18,7 @@ const blockedReason = (module) => {
     if (!module.enabled && module.missing_dependencies.length) return `Enable ${module.missing_dependencies.join(", ")} first`;
     return "";
 };
-const enabledCount = computed(() => props.modules.filter((module) => module.enabled).length);
+const enabledCount = computed(() => props.installed.filter((module) => module.enabled).length);
 </script>
 <template>
     <div class="page-heading">
@@ -26,19 +26,19 @@ const enabledCount = computed(() => props.modules.filter((module) => module.enab
             <p class="eyebrow">Administration</p>
             <h1>Modules</h1>
             <p class="text-sm text-muted">
-                {{ enabledCount }} of {{ modules.length }} installed modules enabled
+                {{ enabledCount }} of {{ installed.length }} installed modules enabled
             </p>
         </div>
     </div>
     <UEmpty
-        v-if="!modules.length && !invalid.length"
+        v-if="!installed.length && !invalid.length"
         title="No module installed"
         description="Modules add features to Perysee, such as white label. Install one in the modules folder, then enable it here."
         icon="i-tabler-puzzle"
     />
-    <UCard v-else-if="modules.length">
+    <UCard v-else-if="installed.length">
         <ul class="divide-y divide-default">
-            <li v-for="module in modules" :key="module.id" class="py-5 first:pt-0 last:pb-0 flex flex-wrap items-start justify-between gap-4">
+            <li v-for="module in installed" :key="module.id" class="py-5 first:pt-0 last:pb-0 flex flex-wrap items-start justify-between gap-4">
                 <div class="min-w-0 flex-1 basis-72">
                     <div class="flex flex-wrap items-center gap-2">
                         <h2 class="font-medium">{{ module.name }}</h2>

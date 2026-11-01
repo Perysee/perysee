@@ -321,4 +321,15 @@ class ModuleExtensionTest extends TestCase
         $this->assertArrayHasKey('ext-parse', app(ModuleLoader::class)->failures());
         $this->actingAs(User::factory()->create())->get('/sites')->assertOk();
     }
+
+    public function test_a_module_page_cannot_replace_the_properties_the_application_shares(): void
+    {
+        $this->install('ext-reserved', 'ExtReserved', "\$this->loadModuleRoutes(__DIR__.'/../routes.php');", "Route::get('/', fn () => \\App\\Support\\Ui::render('module:greeter', ['links' => ['mine' => '/x']]))->name('index');");
+        $this->enable('ext-reserved');
+
+        $response = $this->actingAs(User::factory()->create())->withoutExceptionHandling();
+
+        $this->expectExceptionMessage('"links" is shared by the application');
+        $response->get('/modules/ext-reserved');
+    }
 }

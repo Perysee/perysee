@@ -25,7 +25,7 @@ class NoteController extends Controller
             'website' => $website,
             'notes' => $notes->forSite($website, 200),
             'canWrite' => Gate::allows('update', $website),
-            'links' => ['store' => route('annotations.notes.store', $website)],
+            'noteLinks' => ['store' => route('annotations.notes.store', $website)],
         ]);
     }
 

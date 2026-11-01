@@ -56,10 +56,10 @@ class ModuleAdminPageTest extends TestCase
         app(ModuleRegistry::class)->enable('alpha');
 
         $this->actingAs($this->admin())->get('/settings/modules')->assertInertia(fn (Assert $page) => $page
-            ->has('modules', 3)
-            ->where('modules.0', fn ($module) => $module['id'] === 'addon' && $module['enabled'] === false && $module['compatible'] === true && $module['missing_dependencies'] === [])
-            ->where('modules.1', fn ($module) => $module['id'] === 'alpha' && $module['enabled'] === true && $module['dependents'] === [] && $module['links']['disable'] === route('modules.disable', 'alpha'))
-            ->where('modules.2', fn ($module) => $module['id'] === 'future' && $module['compatible'] === false && $module['core'] === '9.0.0'));
+            ->has('installed', 3)
+            ->where('installed.0', fn ($module) => $module['id'] === 'addon' && $module['enabled'] === false && $module['compatible'] === true && $module['missing_dependencies'] === [])
+            ->where('installed.1', fn ($module) => $module['id'] === 'alpha' && $module['enabled'] === true && $module['dependents'] === [] && $module['links']['disable'] === route('modules.disable', 'alpha'))
+            ->where('installed.2', fn ($module) => $module['id'] === 'future' && $module['compatible'] === false && $module['core'] === '9.0.0'));
     }
 
     public function test_it_reports_missing_dependencies_and_rejected_directories(): void
@@ -69,7 +69,7 @@ class ModuleAdminPageTest extends TestCase
         file_put_contents($this->modulesPath.'/broken/module.json', '{nope');
 
         $this->actingAs($this->admin())->get('/settings/modules')->assertInertia(fn (Assert $page) => $page
-            ->where('modules.0.missing_dependencies', ['alpha'])
+            ->where('installed.0.missing_dependencies', ['alpha'])
             ->where('invalid', fn ($invalid) => count($invalid) === 1 && $invalid[0]['directory'] === 'broken'));
     }
 

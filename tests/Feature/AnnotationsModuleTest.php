@@ -62,6 +62,8 @@ class AnnotationsModuleTest extends TestCase
             ->where('screen', 'module:annotations')
             ->where('website.id', $this->site->id)
             ->where('canWrite', true)
+            ->where('noteLinks.store', url('/modules/annotations/sites/'.$this->site->id.'/notes'))
+            ->where('links.dashboard', route('dashboard'), 'the menu links of the application must survive on a module page')
             ->where('notes.0', fn ($note) => $note['body'] === 'Launched the new pricing page' && $note['noted_on'] === '2026-10-20' && $note['author'] === $this->owner->name));
     }
 

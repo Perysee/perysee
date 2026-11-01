@@ -36,7 +36,7 @@ const notes = [
     { id: 4, noted_on: "2026-10-04", body: "Pricing page live", author: "Ada" },
     { id: 3, noted_on: "2026-10-03", body: "Newsletter sent", author: null },
 ];
-const page = { website: { name: "Acme" }, notes, canWrite: true, links: { store: "/modules/annotations/sites/1/notes" }, errors: {} };
+const page = { website: { name: "Acme" }, notes, canWrite: true, noteLinks: { store: "/modules/annotations/sites/1/notes" }, errors: {} };
 
 test("the module registers a screen, a slot restricted to its own module and a settings page", () => {
     const host = load();

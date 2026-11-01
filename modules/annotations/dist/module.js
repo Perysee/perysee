@@ -9,20 +9,20 @@
     const NotesPage = {
         name: "AnnotationsPage",
         inheritAttrs: false,
-        props: ["website", "notes", "canWrite", "links", "errors"],
+        props: ["website", "notes", "canWrite", "noteLinks", "errors"],
         setup(props) {
             const form = reactive({ noted_on: today(), body: "" });
             const busy = ref(false);
             const add = (event) => {
                 event?.preventDefault();
                 busy.value = true;
-                router.post(props.links.store, { ...form }, {
+                router.post(props.noteLinks.store, { ...form }, {
                     preserveScroll: true,
                     onSuccess: () => (form.body = ""),
                     onFinish: () => (busy.value = false),
                 });
             };
-            const remove = (note) => router.delete(`${props.links.store}/${note.id}`, { preserveScroll: true });
+            const remove = (note) => router.delete(`${props.noteLinks.store}/${note.id}`, { preserveScroll: true });
 
             return () => {
                 const Card = resolveComponent("UCard");
