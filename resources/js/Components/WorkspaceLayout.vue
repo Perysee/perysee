@@ -36,7 +36,7 @@ const title = computed(
             funnels: "Funnels",
             "funnel.report": p.value.funnel?.name || "Funnel",
             journeys: "Journeys",
-            dashboard: "Dashboard",
+            dashboard: "Home",
             health: "Instance health",
             settings: "Instance settings",
             modules: "Modules",
@@ -58,13 +58,15 @@ const moduleItems = (zone) =>
         to: item.url,
         active: p.value.currentUrl === item.url,
     }));
+// The way back to the home page, offered everywhere, inside a site included.
+const homeItem = computed(() => ({
+    label: "Home",
+    icon: "i-tabler-home",
+    to: p.value.links.dashboard,
+    active: p.value.screen === "dashboard",
+}));
 const workspaceNav = computed(() => [
-    {
-        label: "Dashboard",
-        icon: "i-tabler-layout-dashboard",
-        to: p.value.links.dashboard,
-        active: p.value.screen === "dashboard",
-    },
+    homeItem.value,
     {
         label: "All sites",
         icon: "i-tabler-world",
@@ -122,7 +124,7 @@ const nav = computed(() => {
         for (const key of ["from", "to", "period"])
             if (params.has(key)) dates.set(key, params.get(key));
         const moduleEntries = moduleItems("site");
-        return [...groupedItems(({ key, label, icon, keywords }) => ({
+        return [homeItem.value, ...groupedItems(({ key, label, icon, keywords }) => ({
             label,
             icon,
             keywords,
@@ -195,9 +197,9 @@ const siteMenu = computed(() => [
     })),
     [
         {
-            label: "Dashboard",
+            label: "Home",
             to: p.value.links.dashboard,
-            icon: "i-tabler-layout-dashboard",
+            icon: "i-tabler-home",
         },
         {
             label: "All sites",
@@ -276,7 +278,7 @@ const paletteGroups = computed(() => {
             label: "Actions",
             items: [
                 ...(p.value.links?.dashboard
-                    ? [{ label: "Dashboard", icon: "i-tabler-layout-dashboard", keywords: ["home", "accueil"], to: p.value.links.dashboard, kbds: ["g", "d"], ...(p.value.screen === "dashboard" ? { active: true, suffix: "Current" } : {}) }]
+                    ? [{ label: "Home", icon: "i-tabler-home", keywords: ["dashboard", "accueil", "overview"], to: p.value.links.dashboard, kbds: ["g", "h"], ...(p.value.screen === "dashboard" ? { active: true, suffix: "Current" } : {}) }]
                     : []),
                 { label: "All sites", icon: "i-tabler-world", keywords: ["sites", "list"], to: p.value.links["sites.index"], kbds: ["g", "s"], ...(p.value.screen === "sites.index" ? { active: true, suffix: "Current" } : {}) },
                 { label: "Add site", icon: "i-tabler-plus", keywords: ["new", "create", "ajouter", "nouveau"], to: p.value.links["sites.create"] },
@@ -293,6 +295,7 @@ const togglePalette = () => (paletteOpen.value = !paletteOpen.value);
 defineShortcuts({
     meta_k: { usingInput: true, handler: togglePalette },
     ctrl_k: { usingInput: true, handler: togglePalette },
+    "g-h": () => p.value.auth && router.visit(p.value.links.dashboard),
     "g-d": () => p.value.auth && router.visit(p.value.links.dashboard),
     "g-s": () => p.value.auth && router.visit(p.value.links["sites.index"]),
 });

@@ -29,7 +29,11 @@ class WorkspaceController extends Controller
             }
         }
 
-        return Ui::render('dashboard', compact('sites', 'summaries', 'charts', 'sitePeriods', 'comparisons'));
+        $attention = $request->user()->is_admin
+            ? array_map(fn (array $item): array => $item + ['link' => route('health', [], false)], app(InstanceHealth::class)->attention())
+            : [];
+
+        return Ui::render('dashboard', compact('sites', 'summaries', 'charts', 'sitePeriods', 'comparisons', 'attention'));
     }
 
     public function pixels(): Response
