@@ -43,7 +43,7 @@ class ModuleController extends Controller
             $invalid[] = ['directory' => $directory, 'reason' => $reason];
         }
 
-        return Ui::render('modules', ['modules' => $modules, 'invalid' => $invalid, 'path' => config('perysee.modules_path')]);
+        return Ui::render('modules', ['installed' => $modules, 'invalid' => $invalid, 'path' => config('perysee.modules_path')]);
     }
 
     public function settings(Request $request, ModuleRegistry $registry, ModuleLoader $loader, ModuleScope $scope, string $module): Response
@@ -68,7 +68,7 @@ class ModuleController extends Controller
             ],
             'scope' => ['all' => $scope->coversAllSites($module), 'site_ids' => $shown, 'hidden' => count($selected) - count($shown)],
             'siteChoices' => $sites->map(fn ($site): array => ['id' => $site->id, 'name' => $site->name, 'domain' => $site->domain])->values()->all(),
-            'links' => ['save' => route('modules.scope', $module), 'back' => route('modules.index')],
+            'moduleLinks' => ['save' => route('modules.scope', $module), 'back' => route('modules.index')],
         ]);
     }
 

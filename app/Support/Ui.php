@@ -9,8 +9,18 @@ use Inertia\Response;
 
 class Ui
 {
+    /** Properties the application shares with every page. A page that sends one of them would replace it for the whole interface. */
+    private const SHARED = ['links', 'auth', 'branding', 'modules', 'assets', 'navigation', 'flash', 'currentUrl', 'docsUrl', 'errors'];
+
     public static function render(string $screen, array $data = []): Response
     {
+        if (str_starts_with($screen, 'module:') || str_starts_with($screen, 'modules')) {
+            foreach (self::SHARED as $key) {
+                if (array_key_exists($key, $data)) {
+                    throw new \LogicException("The page property \"{$key}\" is shared by the application and would replace it on screen \"{$screen}\". Use another name.");
+                }
+            }
+        }
         $site = $data['website'] ?? null;
         if ($site instanceof Website) {
             $data['canUpdate'] = $site->exists && Gate::allows('update', $site);

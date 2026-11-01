@@ -6,7 +6,7 @@ import { computed, ref } from "vue";
 import { router } from "@inertiajs/vue3";
 import { moduleHost } from "../module-runtime.js";
 import ModuleSlotBoundary from "./ModuleSlotBoundary.vue";
-const props = defineProps(["module", "scope", "siteChoices", "links"]);
+const props = defineProps(["module", "scope", "siteChoices", "moduleLinks"]);
 const mode = ref(props.scope.all ? "all" : "sites");
 const selected = ref([...props.scope.site_ids]);
 const saving = ref(false);
@@ -18,14 +18,14 @@ const items = [
 const siteItems = computed(() => props.siteChoices.map((site) => ({ value: site.id, label: site.name, description: site.domain })));
 const save = () => {
     saving.value = true;
-    router.post(props.links.save, { scope: mode.value, sites: mode.value === "sites" ? selected.value : [] }, { preserveScroll: true, onFinish: () => (saving.value = false) });
+    router.post(props.moduleLinks.save, { scope: mode.value, sites: mode.value === "sites" ? selected.value : [] }, { preserveScroll: true, onFinish: () => (saving.value = false) });
 };
 </script>
 <template>
     <div class="page-heading">
         <div>
             <UButton
-                :to="links.back"
+                :to="moduleLinks.back"
                 label="Modules"
                 icon="i-tabler-arrow-left"
                 color="neutral"
