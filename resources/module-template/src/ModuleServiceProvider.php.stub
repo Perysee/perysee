@@ -1,0 +1,24 @@
+<?php
+
+namespace Perysee\Modules\{{Studly}};
+
+use App\Modules\ModuleProvider;
+use Illuminate\Http\Request;
+
+class ModuleServiceProvider extends ModuleProvider
+{
+    public function boot(): void
+    {
+        // Routes are served under /modules/{{id}}, for signed-in users.
+        $this->loadModuleRoutes(__DIR__.'/../routes.php');
+
+        // Data for this module's screens, read in JavaScript as modules.data["{{id}}"].
+        $this->shareData(fn (Request $request): array => ['message' => 'Hello from {{name}}.']);
+
+        // Optional: add an entry to an existing navigation zone ("workspace" or "admin").
+        // $this->addNavigation('admin', '{{name}}', 'i-tabler-puzzle', '{{id}}.index');
+
+        // Optional: override the instance name, logo address and accent color.
+        // $this->brand(fn (): array => ['name' => '{{name}}']);
+    }
+}

@@ -1,0 +1,6 @@
+<?php
+
+use App\Support\Ui;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', fn () => Ui::render('module:{{id}}', ['greeting' => 'Hello from {{name}}.']))->name('index');

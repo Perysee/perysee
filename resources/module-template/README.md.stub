@@ -1,0 +1,30 @@
+# {{name}}
+
+Perysee module `{{id}}`.
+
+- `module.json`: identity, version, minimum Core version, dependencies and entitlement.
+- `src/ModuleServiceProvider.php`: what the module adds to Perysee (see the options below).
+- `routes.php`: the module's routes, served under `/modules/{{id}}`. Route names start with `{{id}}.`.
+- `dist/module.js`: the compiled UI. It reaches Vue and Inertia through `Perysee.Vue` and `Perysee.Inertia`.
+
+## Extending Perysee
+
+A module adds to what exists instead of getting its own corner:
+
+| In the provider | Effect |
+| --- | --- |
+| `loadModuleRoutes($file)` | Pages and actions for signed-in users |
+| `loadPublicRoutes($file)` | Routes without a session, under `/modules/{{id}}/public` |
+| `addNavigation($zone, $label, $icon, $route)` | An entry in the `workspace` or `admin` navigation |
+| `shareData($closure)` | Data for your screens, as `modules.data["{{id}}"]` |
+| `brand($closure)` | Instance name, logo address and accent color |
+
+| In `dist/module.js` | Effect |
+| --- | --- |
+| `Perysee.registerSettings("{{id}}", component)` | The module's settings page, under Settings > Modules |
+| `Perysee.registerSlot("site.report.after", component, { module: "{{id}}" })` | A block under a site report (also `dashboard.after`) |
+| `Perysee.registerScreen("module:{{id}}", component)` | A full page |
+
+Settings can be stored with `App\Modules\ModuleSettings` (`get`, `set`, `forget`, `all`).
+
+Enable it with `php artisan perysee:modules enable {{id}}`, or from Settings > Modules.

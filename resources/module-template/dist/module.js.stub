@@ -1,0 +1,38 @@
+// Compiled UI of the "{{id}}" module. Edit it directly, or build it with any bundler
+// that treats Perysee.Vue and Perysee.Inertia as globals.
+(function () {
+    const { h, computed, resolveComponent } = Perysee.Vue;
+
+    // The component shown on this module's settings page, under Settings > Modules.
+    Perysee.registerSettings("{{id}}", {
+        inheritAttrs: false,
+        props: ["modules"],
+        setup(props) {
+            const message = computed(() => props.modules?.data?.["{{id}}"]?.message);
+            return () =>
+                message.value
+                    ? h(resolveComponent("UCard"), { class: "mt-6" }, {
+                          default: () => [
+                              h("h2", { class: "text-base font-medium" }, "{{name}}"),
+                              h("p", { class: "text-sm text-muted mt-1" }, message.value),
+                          ],
+                      })
+                    : null;
+        },
+    });
+
+    // A page of its own, reached at /modules/{{id}}.
+    Perysee.registerScreen("module:{{id}}", {
+        inheritAttrs: false,
+        props: ["greeting"],
+        setup(props) {
+            return () =>
+                h(resolveComponent("UCard"), null, {
+                    default: () => [
+                        h("h1", { class: "text-lg font-medium" }, "{{name}}"),
+                        h("p", { class: "text-sm text-muted" }, props.greeting),
+                    ],
+                });
+        },
+    });
+})();

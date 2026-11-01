@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Modules\ModuleExtensions;
+use App\Modules\ModuleLoader;
+use App\Modules\ModuleRegistry;
+use App\Modules\ModuleScope;
+use App\Modules\ModuleSettings;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +16,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(ModuleRegistry::class);
+        $this->app->singleton(ModuleLoader::class);
+        $this->app->singleton(ModuleExtensions::class);
+        $this->app->singleton(ModuleSettings::class);
+        $this->app->singleton(ModuleScope::class);
     }
 
     /**
@@ -22,6 +31,10 @@ class AppServiceProvider extends ServiceProvider
         app()->setLocale('en');
         if (! app()->environment('local', 'testing')) {
             config(['session.secure' => true]);
+        }
+        if ($this->app->runningInConsole() || ! request()->is('up')) {
+            // Once the application has booted, a module provider is registered and booted inside the loader's own try/catch.
+            $this->app->booted(fn () => $this->app->make(ModuleLoader::class)->load());
         }
     }
 }
