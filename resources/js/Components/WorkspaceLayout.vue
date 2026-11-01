@@ -3,7 +3,7 @@ import { computed, ref, watch, onMounted, onBeforeUnmount } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
 import { useToast, defineShortcuts } from "@nuxt/ui/composables";
 import { queryUrl, reportFilters } from "../interface-query.mjs";
-import { createBusyTracker, networkErrorToast } from "../navigation-feedback.mjs";
+import { createBusyTracker, httpErrorToast, networkErrorToast } from "../navigation-feedback.mjs";
 import { remember, restore } from "../period-memory.mjs";
 import { groupedItems, limitSites } from "../navigation.mjs";
 import BrandLogo from "./BrandLogo.vue";
@@ -344,8 +344,16 @@ const stops = [
     }),
     router.on("start", tracker.start),
     router.on("finish", tracker.finish),
-    router.on("exception", () => toast.add(networkErrorToast())),
-    router.on("invalid", () => toast.add(networkErrorToast())),
+    // Inertia 3 fires these two. Without a handler it shows the raw error page in a modal; keep that
+    // modal while developing, where the exception page is useful.
+    router.on("httpException", (event) => {
+        if (!import.meta.env.DEV) event.preventDefault();
+        toast.add(httpErrorToast(event.detail.response?.status));
+    }),
+    router.on("networkError", (event) => {
+        event.preventDefault();
+        toast.add(networkErrorToast());
+    }),
 ];
 onMounted(syncPeriod);
 onBeforeUnmount(() => stops.forEach((stop) => stop()));
