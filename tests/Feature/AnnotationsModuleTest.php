@@ -181,7 +181,7 @@ class AnnotationsModuleTest extends TestCase
     public function test_it_ships_a_settings_page_and_a_block_under_the_site_reports(): void
     {
         $this->actingAs($this->owner)->get('/sites/'.$this->site->id)->assertInertia(fn (Assert $page) => $page
-            ->where('modules.scripts', [url('/modules/annotations/assets/module.js').'?v=1.0.0'])
+            ->where('modules.scripts', [url('/modules/annotations/assets/module.js').'?v=1.0.0-'.substr(md5_file(base_path('modules/annotations/dist/module.js')), 0, 8)])
             ->where('modules.active', ['annotations']));
     }
 }

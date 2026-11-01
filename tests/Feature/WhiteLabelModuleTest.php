@@ -169,7 +169,7 @@ class WhiteLabelModuleTest extends TestCase
     public function test_it_ships_its_screen_assets_and_adds_no_navigation_entry(): void
     {
         $this->actingAs($this->admin())->get('/sites')->assertInertia(fn (Assert $page) => $page
-            ->where('modules.scripts', [url('/modules/white-label/assets/module.js').'?v=1.0.0'])
+            ->where('modules.scripts', [url('/modules/white-label/assets/module.js').'?v=1.0.0-'.substr(md5_file(base_path('modules/white-label/dist/module.js')), 0, 8)])
             ->where('modules.navigation', ['workspace' => [], 'admin' => [], 'site' => []]));
     }
 }
