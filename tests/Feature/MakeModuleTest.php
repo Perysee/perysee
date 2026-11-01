@@ -64,7 +64,7 @@ class MakeModuleTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('screen', 'module:scaffold-live')
-                ->where('modules.scripts', [url('/modules/scaffold-live/assets/module.js').'?v=0.1.0'])
+                ->where('modules.scripts', [url('/modules/scaffold-live/assets/module.js').'?v=0.1.0-'.substr(md5_file($this->modulesPath.'/scaffold-live/dist/module.js'), 0, 8)])
                 ->where('modules.navigation', ['workspace' => [], 'admin' => [], 'site' => []]));
         $this->get('/settings/modules/scaffold-live')->assertInertia(fn (Assert $page) => $page
             ->where('modules.data.scaffold-live.message', 'Hello from Scaffold Live.'));

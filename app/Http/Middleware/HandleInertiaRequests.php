@@ -76,7 +76,8 @@ class HandleInertiaRequests extends Middleware
         $urls = [];
         foreach (app(ModuleRegistry::class)->enabled() as $id => $module) {
             if (! isset($failures[$id]) && is_file($module->path.'/dist/'.$file)) {
-                $urls[] = route('modules.assets', [$id, $file]).'?v='.$module->manifest->version;
+                // The content hash keeps the address in step with the file: the browser caches it for a year.
+                $urls[] = route('modules.assets', [$id, $file]).'?v='.$module->manifest->version.'-'.substr(md5_file($module->path.'/dist/'.$file), 0, 8);
             }
         }
 

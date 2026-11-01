@@ -84,7 +84,20 @@ class ModuleAssetTest extends TestCase
         $this->install('assets-props');
 
         $this->actingAs(User::factory()->create())->get('/sites')->assertInertia(fn (Assert $page) => $page
-            ->where('modules.scripts', [url('/modules/assets-props/assets/module.js').'?v=1.4.0'])
-            ->where('modules.styles', [url('/modules/assets-props/assets/module.css').'?v=1.4.0']));
+            ->where('modules.scripts', [url('/modules/assets-props/assets/module.js').'?v=1.4.0-'.substr(md5('export default 1;'), 0, 8)])
+            ->where('modules.styles', [url('/modules/assets-props/assets/module.css').'?v=1.4.0-'.substr(md5('.a{color:red}'), 0, 8)]));
+    }
+
+    public function test_the_file_address_changes_with_its_content_so_a_browser_never_keeps_a_stale_copy(): void
+    {
+        $this->install('assets-bust');
+        $this->actingAs(User::factory()->create());
+        $address = fn () => $this->get('/sites')->viewData('page')['props']['modules']['scripts'][0];
+        $before = $address();
+
+        file_put_contents($this->modulesPath.'/assets-bust/dist/module.js', 'export default 2;');
+
+        $this->assertNotSame($before, $address());
+        $this->assertStringContainsString('?v=1.4.0-', $address());
     }
 }
