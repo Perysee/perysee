@@ -548,19 +548,6 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                         >
                         <template #right
                             ><div class="flex items-center gap-2">
-                        <UButton
-                            color="neutral"
-                            variant="outline"
-                            size="sm"
-                            icon="i-tabler-search"
-                            aria-label="Open the command palette"
-                            aria-haspopup="dialog"
-                            aria-keyshortcuts="Meta+K Control+K"
-                            @click="paletteOpen = true"
-                            ><span class="hidden sm:inline">Search</span
-                            ><span class="hidden sm:inline-flex gap-0.5"
-                                ><UKbd value="meta" /><UKbd value="K" /></span
-                        ></UButton>
                         <ColorModeButton />
                         <UDropdownMenu :items="accountMenu"
                             ><UButton
