@@ -10,7 +10,8 @@
     @inertiaHead
 </head>
 <body class="antialiased">
-    @inertia
+    {{-- Nuxt UI needs an isolated root so its popovers, drawers and toasts stack above the page. --}}
+    <div class="isolate">@inertia</div>
     <noscript><p>Perysee's interface requires JavaScript. Your tracking and scheduled consolidation remain independent of this interface.</p></noscript>
 </body>
 </html>
