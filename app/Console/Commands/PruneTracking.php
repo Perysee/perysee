@@ -30,12 +30,16 @@ class PruneTracking extends Command
         try {
             $ids = DB::table('events')->whereNotNull('processed_at')->where('received_at', '<', now('UTC')->subDays($days))->orderBy('received_at')->orderBy('id')->limit($limit)->pluck('id');
             $deleted = DB::transaction(function () use ($ids): int {
-                foreach (DB::table('events')->whereIn('id', $ids)->lockForUpdate()->get() as $event) {
-                    $site = DB::table('websites')->where('id', $event->website_id)->first();
-                    if ($site && ! $site->deleting_at) {
-                        app(Segments::class)->ingest($event, $site);
+                $events = DB::table('events')->whereIn('id', $ids)->lockForUpdate()->get();
+                $sites = DB::table('websites')->whereIn('id', $events->pluck('website_id')->unique())->whereNull('deleting_at')->get()->keyBy('id');
+                $segments = app(Segments::class);
+                $segments->begin($events);
+                foreach ($events as $event) {
+                    if ($site = $sites->get($event->website_id)) {
+                        $segments->ingest($event, $site);
                     }
                 }
+                $segments->flush();
                 DB::table('segment_events')->whereIn('event_id', $ids)->delete();
 
                 return DB::table('events')->whereIn('id', $ids)->delete();
