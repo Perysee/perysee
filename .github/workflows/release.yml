@@ -1,28 +1,74 @@
-name: Build release
+name: Release
+
+# A release is made by merging a version bump. `Prepare release` opens that pull request; when it reaches main,
+# config/perysee.php names a version without a tag, and this workflow tests, builds, publishes the GitHub release
+# and creates its tag in one step. Instances read the same GitHub releases to offer updates, so a release only
+# exists once its archive and SHA256SUMS are attached.
 
 on:
   push:
-    tags: ['v[0-9]*']
+    branches: [main]
+    paths: [config/perysee.php]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Build-only version (vX.Y.Z); pushing a tag publishes a release'
-        required: true
-        default: v0.1.0
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      build: ${{ steps.version.outputs.build }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - id: version
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          version=$(sed -n "s/.*'version' => '\([^']*\)'.*/\1/p" config/perysee.php | head -n 1)
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error file=config/perysee.php::'version' must look like 1.2.3 or 1.2.3-beta.1 (found '$version')."
+            exit 1
+          fi
+          tag="v$version"
+          if git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/$tag" > /dev/null 2>&1; then
+            exists=true
+          else
+            exists=false
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" = push ] && [ "$exists" = true ]; then
+            echo "Tag $tag already exists: nothing to release."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = push ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Manual run: build and test only, nothing is published."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
   checks:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     uses: ./.github/workflows/ci.yml
 
   package:
-    needs: checks
+    needs: [plan, checks]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -45,15 +91,19 @@ jobs:
       - run: npm run build
       - name: Package ready-to-install assets
         env:
-          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          RELEASE_VERSION: ${{ needs.plan.outputs.tag }}
           RELEASE_REPOSITORY: ${{ github.repository }}
         run: php scripts/build-release.php --version "$RELEASE_VERSION" --repository "$RELEASE_REPOSITORY"
+      - name: Verify the checksums that will be published
+        run: cd dist && sha256sum --check SHA256SUMS
       - name: Smoke-test the actual production ZIP
         run: |
           php dist/install.php --archive dist/perysee.zip --checksums dist/SHA256SUMS --target "$RUNNER_TEMP/perysee-smoke" --url https://stats.example.com --yes
           cd "$RUNNER_TEMP/perysee-smoke"
           php artisan --version
           test ! -f .env
+          test "$(php -r 'echo json_decode(file_get_contents("release.json"))->version;')" = "${{ needs.plan.outputs.tag }}"
+          test "$(php -r 'echo (require "config/perysee.php")["version"];')" = "${{ needs.plan.outputs.version }}"
       - uses: actions/upload-artifact@v7
         with:
           name: perysee-release
@@ -65,10 +115,13 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    needs: package
+    name: Publish
+    if: needs.plan.outputs.publish == 'true'
+    needs: [plan, package]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Add required reviewers to the "release" environment (Settings > Environments) for a manual gate.
+    environment: release
     permissions:
       contents: write
     steps:
@@ -76,15 +129,16 @@ jobs:
         with:
           name: perysee-release
           path: dist
-      - name: Publish all release assets together
+      - name: Publish all release assets together, then create the tag
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: |
-          gh release create "$RELEASE_VERSION" --verify-tag --draft --title "Perysee $RELEASE_VERSION" --generate-notes dist/perysee.zip dist/install.php dist/install.sh dist/SHA256SUMS
-          if [[ "$RELEASE_VERSION" == *-* ]]; then
-            gh release edit "$RELEASE_VERSION" --prerelease --draft=false
+          (cd dist && sha256sum --check SHA256SUMS)
+          gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --draft --title "Perysee $RELEASE_TAG" --generate-notes dist/perysee.zip dist/install.php dist/install.sh dist/SHA256SUMS
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            gh release edit "$RELEASE_TAG" --prerelease --draft=false
           else
-            gh release edit "$RELEASE_VERSION" --draft=false --latest
+            gh release edit "$RELEASE_TAG" --draft=false --latest
           fi
