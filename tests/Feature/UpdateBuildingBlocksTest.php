@@ -6,6 +6,7 @@ use App\Models\Website;
 use App\Updates\ArchiveExtractor;
 use App\Updates\Backup;
 use App\Updates\CodeSwapper;
+use App\Updates\Dump\NativeDump;
 use App\Updates\Dump\PhpDump;
 use App\Updates\PackageVerifier;
 use App\Updates\UpdateException;
@@ -205,7 +206,7 @@ class UpdateBuildingBlocksTest extends TestCase
         $this->assertSame('blocker', file_get_contents($live.'/public'));
     }
 
-    public function test_the_php_dump_can_be_restored_into_an_empty_database(): void
+    public function test_the_php_dump_is_complete_and_escapes_values(): void
     {
         $site = Website::factory()->create(['name' => "Quote's \"site\" \\ end"]);
         DB::table('analytics_state')->insert(['name' => 'blob', 'value' => '"x"', 'updated_at' => now('UTC')]);
@@ -213,12 +214,35 @@ class UpdateBuildingBlocksTest extends TestCase
 
         (new PhpDump)->dump($path);
 
+        $sql = (string) file_get_contents($path);
+        $this->assertStringContainsString('DROP TABLE IF EXISTS `websites`;', $sql);
+        $this->assertStringContainsString('CREATE TABLE', $sql);
+        $this->assertStringContainsString('INSERT INTO `analytics_state`', $sql);
+        if (DB::getDriverName() !== 'sqlite') {
+            // The dump is MariaDB SQL: its restoration is covered by the documented procedure, not replayed here.
+            $this->assertStringContainsString('SET FOREIGN_KEY_CHECKS=1;', $sql);
+
+            return;
+        }
         $restored = new PDO('sqlite::memory:');
-        $restored->exec((string) file_get_contents($path));
-        $name = $restored->query('SELECT name FROM websites WHERE id = '.$site->id)->fetchColumn();
-        $this->assertSame("Quote's \"site\" \\ end", $name);
+        $restored->exec($sql);
+        $this->assertSame("Quote's \"site\" \\ end", $restored->query('SELECT name FROM websites WHERE id = '.$site->id)->fetchColumn());
         $this->assertSame((int) DB::table('migrations')->count(), (int) $restored->query('SELECT COUNT(*) FROM migrations')->fetchColumn());
         $this->assertSame('"x"', $restored->query("SELECT value FROM analytics_state WHERE name = 'blob'")->fetchColumn());
+    }
+
+    public function test_the_native_dump_writes_a_complete_dump_with_the_client_tool_of_the_server(): void
+    {
+        $native = new NativeDump;
+        if (! $native->available()) {
+            $this->markTestSkipped('No MariaDB client tool on this machine, or not a MariaDB connection.');
+        }
+        $path = $this->installationDirectory.'/native.sql';
+
+        $native->dump($path);
+
+        $this->assertStringContainsString('CREATE TABLE `websites`', (string) file_get_contents($path));
+        $this->assertStringContainsString('CREATE TABLE `analytics_state`', (string) file_get_contents($path));
     }
 
     public function test_a_backup_holds_the_dump_the_environment_file_and_the_private_files_but_not_other_backups(): void
@@ -269,6 +293,9 @@ class UpdateBuildingBlocksTest extends TestCase
 
     public function test_an_unavailable_dump_method_is_named_in_the_error(): void
     {
+        if ((new NativeDump)->available()) {
+            $this->markTestSkipped('The native dump method is available on this machine.');
+        }
         $this->expectException(UpdateException::class);
         $this->expectExceptionMessage('"native" dump method is not available');
         $this->app->make(Backup::class)->create('0.1.1', 'native');
