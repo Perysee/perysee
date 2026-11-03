@@ -3,6 +3,10 @@
 return [
     'version' => '0.1.1',
     'modules_path' => env('PERYSEE_MODULES_PATH', storage_path('app/modules')),
+    'update' => [
+        'check' => (bool) env('PERYSEE_UPDATE_CHECK', true),
+        'repository' => env('PERYSEE_UPDATE_REPOSITORY', 'Perysee/app'),
+    ],
     'module_uploads' => (bool) env('PERYSEE_MODULE_UPLOADS', true),
     'module_upload_max_kb' => (int) env('PERYSEE_MODULE_UPLOAD_MAX_KB', 20480),
     'geoip_path' => env('PERYSEE_GEOIP_PATH'),
