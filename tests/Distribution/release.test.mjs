@@ -23,6 +23,7 @@ function fixture(t) {
         mkdirSync(join(source, path, '..'), { recursive: true });
         writeFileSync(join(source, path), '<?php // fixture');
     }
+    writeFileSync(join(source, 'config/perysee.php'), "<?php return ['version' => '1.2.3'];");
     mkdirSync(join(source, 'resources/geoip'), {recursive:true});
     const db = Buffer.from('MMDB fixture');
     writeFileSync(join(source, 'resources/geoip/country.mmdb'), db);
@@ -44,6 +45,14 @@ function build(f) {
         '--version', 'v1.2.3', '--repository', 'example/perysee']);
     assert.equal(result.status, 0, result.stderr || result.stdout);
 }
+test('a release whose tag differs from the version in config/perysee.php is refused', t => {
+    const f = fixture(t);
+    writeFileSync(join(f.source, 'config/perysee.php'), "<?php return ['version' => '1.2.2'];");
+    const result = run(join(scripts, 'build-release.php'), ['--source', f.source, '--output', f.output, '--version', 'v1.2.3', '--repository', 'example/perysee']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr + result.stdout, /declares version 1\.2\.2 but the release is v1\.2\.3/);
+    assert.equal(existsSync(join(f.output, 'perysee.zip')), false);
+});
 function install(f, target, extra = []) {
     return run(join(f.output, 'install.php'), ['--archive', join(f.output, 'perysee.zip'),
         '--checksums', join(f.output, 'SHA256SUMS'), '--target', target,
