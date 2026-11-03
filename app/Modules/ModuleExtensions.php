@@ -32,6 +32,9 @@ final class ModuleExtensions
     /** @var array<string, Closure(): array<string, mixed>> */
     private array $branding = [];
 
+    /** @var array<string, Closure(): array<string, mixed>> */
+    private array $healthCards = [];
+
     public function addNavigation(string $module, string $zone, string $label, string $icon, string $route): void
     {
         if (! in_array($zone, self::ZONES, true)) {
@@ -54,6 +57,56 @@ final class ModuleExtensions
     public function brand(string $module, Closure $resolver): void
     {
         $this->branding[$module] = $resolver;
+    }
+
+    /**
+     * A status card on the instance health page, resolved each time an administrator opens it.
+     *
+     * @param  Closure(): array<string, mixed>  $resolver
+     */
+    public function healthCard(string $module, Closure $resolver): void
+    {
+        $this->healthCards[$module] = $resolver;
+    }
+
+    /**
+     * Each card is reduced to a title, a status and a short list of label/value lines of plain text, so a module
+     * can report a state but never inject markup. A card that fails or has no title is left out.
+     *
+     * @return list<array{module: string, title: string, status: string, items: list<array{label: string, value: string}>}>
+     */
+    public function healthCards(): array
+    {
+        $cards = [];
+        foreach ($this->healthCards as $module => $resolver) {
+            try {
+                $card = $resolver();
+            } catch (Throwable $exception) {
+                Log::warning("Module {$module} could not provide its health card.", ['exception' => $exception]);
+
+                continue;
+            }
+            $title = is_string($card['title'] ?? null) ? $this->plain($card['title'], 60) : '';
+            if ($title === '') {
+                continue;
+            }
+            $items = [];
+            foreach (is_array($card['items'] ?? null) ? $card['items'] : [] as $item) {
+                $value = is_array($item) ? ($item['value'] ?? null) : null;
+                if (! is_string($item['label'] ?? null) || ! (is_string($value) || is_int($value) || is_float($value))) {
+                    continue;
+                }
+                $items[] = ['label' => $this->plain($item['label'], 60), 'value' => $this->plain((string) $value, 200)];
+            }
+            $cards[] = ['module' => $module, 'title' => $title, 'status' => ($card['status'] ?? null) === 'ok' ? 'ok' : 'attention', 'items' => array_slice($items, 0, 12)];
+        }
+
+        return $cards;
+    }
+
+    private function plain(string $text, int $limit): string
+    {
+        return trim(mb_substr(preg_replace('/\p{Cc}+/u', ' ', $text) ?? '', 0, $limit));
     }
 
     /**
