@@ -61,11 +61,9 @@ class MaintainAnalytics extends Command
             $days = (int) $health->get('stats_retention_days', 1095);
             // Conservative UTC cutoff keeps every site's current local retention day intact.
             $cutoff = now('UTC')->subDays($days + 1)->toDateString();
-            foreach (['stats_daily', 'stats_hourly', 'stats_dimension_daily', 'stats_segment_daily', 'stats_segment_hourly'] as $table) {
-                // Pending work can still move session counters in historical buckets.
-                if (DB::table('events')->whereNull('processed_at')->where('received_at', '<', $cutoff)->exists()) {
-                    break;
-                }
+            // Pending work can still move session counters in historical buckets.
+            $statsLocked = DB::table('events')->whereNull('processed_at')->where('received_at', '<', $cutoff)->exists();
+            foreach ($statsLocked ? [] : ['stats_daily', 'stats_hourly', 'stats_dimension_daily', 'stats_segment_daily', 'stats_segment_hourly'] as $table) {
                 $keys = match ($table) {
                     'stats_segment_daily', 'stats_segment_hourly' => ['website_id', 'bucket_start', 'segment_hash'],
                     'stats_daily' => ['website_id', 'stat_date'], 'stats_hourly' => ['website_id', 'bucket_start'],

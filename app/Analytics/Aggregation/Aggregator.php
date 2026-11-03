@@ -4,6 +4,7 @@ namespace App\Analytics\Aggregation;
 
 use App\Analytics\InstanceHealth;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Throwable;
@@ -63,6 +64,12 @@ class Aggregator
         }
         $sites = DB::table('websites')->whereIn('id', $events->pluck('website_id')->unique())->get()->keyBy('id');
         $daily = $hourly = $dimensions = $sessionDeltas = [];
+        $segments = app(Segments::class);
+        $measured = $this->measuredSessions($events);
+        $touched = [];
+        $segments->begin($events, function (int $site, string $key) use (&$measured): ?string {
+            return isset($measured[$site.'|'.$key]) ? $measured[$site.'|'.$key]->first_seen_at : null;
+        });
         foreach ($events as $event) {
             $site = $sites->get($event->website_id);
             if (! $site) {
@@ -71,7 +78,7 @@ class Aggregator
             if ($site->deleting_at) {
                 continue;
             }
-            app(Segments::class)->ingest($event, $site);
+            $segments->ingest($event, $site);
             [$date, $hour] = $this->buckets($event->received_at, $site->timezone);
             $mode = $event->tracking_mode ?? ($event->session_key ? 'sessions' : 'unknown');
             $metrics = ['pageviews' => $event->event_type === 1 ? 1 : 0, 'custom_events' => $event->event_type === 2 ? 1 : 0,
@@ -107,34 +114,32 @@ class Aggregator
                 $dimensions[$key]['metric_count']++;
             }
             if ($event->event_type === 1 && $event->session_key) {
-                $query = DB::table('measured_sessions')->where('website_id', $site->id)->where('session_key', $event->session_key);
-                $session = (clone $query)->first();
+                $slot = $site->id.'|'.$event->session_key;
+                $session = $measured[$slot] ?? null;
                 if (! $session) {
-                    DB::table('measured_sessions')->insert(['website_id' => $site->id, 'session_key' => $event->session_key, 'first_seen_at' => $event->received_at, 'last_seen_at' => $event->received_at]);
+                    $measured[$slot] = (object) ['website_id' => $site->id, 'session_key' => $event->session_key, 'first_seen_at' => $event->received_at, 'last_seen_at' => $event->received_at];
+                    $touched[$slot] = true;
                     $this->sessionDelta($sessionDeltas, $site->id, $date, $hour, 1);
                 } else {
                     if (Carbon::parse($event->received_at)->lt(Carbon::parse($session->first_seen_at))) {
                         [$oldDate, $oldHour] = $this->buckets($session->first_seen_at, $site->timezone);
                         $this->sessionDelta($sessionDeltas, $site->id, $oldDate, $oldHour, -1);
                         $this->sessionDelta($sessionDeltas, $site->id, $date, $hour, 1);
-                        $query->update(['first_seen_at' => $event->received_at]);
+                        $session->first_seen_at = $event->received_at;
+                        $touched[$slot] = true;
                     }
                     if (Carbon::parse($event->received_at)->gt(Carbon::parse($session->last_seen_at))) {
-                        $query->update(['last_seen_at' => $event->received_at]);
+                        $session->last_seen_at = $event->received_at;
+                        $touched[$slot] = true;
                     }
                 }
             }
         }
+        $segments->flush();
+        $this->saveMeasuredSessions($measured, $touched);
         $this->upsertCounters('stats_daily', $daily, ['website_id', 'stat_date']);
         $this->upsertCounters('stats_hourly', $hourly, ['website_id', 'bucket_start']);
-        foreach ($dimensions as $row) {
-            $identity = array_intersect_key($row, array_flip(['website_id', 'stat_date', 'dimension_type', 'dimension_hash']));
-            DB::table('stats_dimension_daily')->insertOrIgnore(array_merge($row, ['metric_count' => 0]));
-            $updated = DB::table('stats_dimension_daily')->where($identity)->where('dimension_value', $row['dimension_value'])->increment('metric_count', $row['metric_count']);
-            if ($updated !== 1) {
-                throw new RuntimeException('Dimension identity collision.');
-            }
-        }
+        $this->upsertDimensions($dimensions);
         foreach ($sessionDeltas as $delta) {
             foreach (['stats_daily' => ['stat_date', $delta['date']], 'stats_hourly' => ['bucket_start', $delta['hour']]] as $table => [$column, $bucket]) {
                 $query = DB::table($table)->where('website_id', $delta['site'])->where($column, $bucket);
@@ -152,6 +157,61 @@ class Aggregator
         DB::table('events')->whereIn('id', $events->pluck('id'))->update(['processed_at' => now('UTC')->format('Y-m-d H:i:s.v')]);
 
         return $events->count();
+    }
+
+    /**
+     * @param  Collection<int, object>  $events
+     * @return array<string, object>
+     */
+    private function measuredSessions(Collection $events): array
+    {
+        $measured = [];
+        $sites = $events->pluck('website_id')->unique()->values();
+        foreach ($events->where('event_type', 1)->pluck('session_key')->filter()->unique()->chunk(500) as $keys) {
+            foreach (DB::table('measured_sessions')->whereIn('website_id', $sites)->whereIn('session_key', $keys->values())->get() as $row) {
+                $measured[$row->website_id.'|'.$row->session_key] = $row;
+            }
+        }
+
+        return $measured;
+    }
+
+    /**
+     * @param  array<string, object>  $measured
+     * @param  array<string, true>  $touched
+     */
+    private function saveMeasuredSessions(array $measured, array $touched): void
+    {
+        $rows = array_map(fn (string $slot): array => (array) $measured[$slot], array_keys($touched));
+        foreach (array_chunk($rows, 200) as $chunk) {
+            DB::table('measured_sessions')->upsert($chunk, ['website_id', 'session_key'], ['first_seen_at', 'last_seen_at']);
+        }
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $dimensions
+     */
+    private function upsertDimensions(array $dimensions): void
+    {
+        if ($dimensions === []) {
+            return;
+        }
+        $existing = [];
+        $sites = array_values(array_unique(array_column($dimensions, 'website_id')));
+        foreach (array_chunk(array_values(array_unique(array_column($dimensions, 'dimension_hash'))), 500) as $hashes) {
+            foreach (DB::table('stats_dimension_daily')->whereIn('website_id', $sites)->whereIn('dimension_hash', $hashes)->get() as $row) {
+                $existing[implode('|', [$row->website_id, $row->stat_date, $row->dimension_type, $row->dimension_hash])] = $row->dimension_value;
+            }
+        }
+        foreach ($dimensions as $key => $row) {
+            if (isset($existing[$key]) && $existing[$key] !== $row['dimension_value']) {
+                throw new RuntimeException('Dimension identity collision.');
+            }
+        }
+        $incoming = DB::getDriverName() === 'sqlite' ? 'excluded.metric_count' : 'VALUES(metric_count)';
+        foreach (array_chunk(array_values($dimensions), 200) as $chunk) {
+            DB::table('stats_dimension_daily')->upsert($chunk, ['website_id', 'stat_date', 'dimension_type', 'dimension_hash'], ['metric_count' => DB::raw('metric_count + '.$incoming)]);
+        }
     }
 
     private function buckets(string $timestamp, string $timezone): array

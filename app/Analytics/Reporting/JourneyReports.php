@@ -30,6 +30,11 @@ class JourneyReports
 
     public function tick(int $batch = 500, ?array $siteIds = null): bool
     {
+        $waiting = DB::table('journey_reports')->when($siteIds !== null, fn ($query) => $query->whereIn('website_id', $siteIds))->whereIn('status', ['scanning', 'reducing']);
+        if (! $waiting->exists()) {
+            return false;
+        }
+
         return DB::transaction(function () use ($batch, $siteIds): bool {
             $report = DB::table('journey_reports')->when($siteIds !== null, fn ($query) => $query->whereIn('website_id', $siteIds))->whereIn('status', ['scanning', 'reducing'])->orderBy('id')->lockForUpdate()->first();
             if (! $report) {
