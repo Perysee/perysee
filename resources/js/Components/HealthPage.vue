@@ -1,13 +1,33 @@
 <script setup>
 import { computed } from "vue";
-import { useForm, usePage } from "@inertiajs/vue3";
-const props = defineProps(["health", "geolocation", "cron", "moduleCards"]);
+import { router, useForm, usePage } from "@inertiajs/vue3";
+const props = defineProps(["health", "geolocation", "cron", "moduleCards", "softwareUpdate"]);
 const page = usePage();
 const retention = useForm({
     raw_retention_days: props.health.raw_retention_days,
     stats_retention_days: props.health.stats_retention_days,
 });
 const upload = useForm({ database: null });
+const updateRequest = useForm({ password: "", dump: "auto" });
+const updateCheck = useForm({});
+const updateBusy = computed(
+    () =>
+        props.softwareUpdate.status.state === "running" ||
+        props.softwareUpdate.requested !== null,
+);
+const updateStates = {
+    running: ["info", "Updating"],
+    succeeded: ["success", "Updated"],
+    failed: ["warning", "Failed, nothing lost"],
+    needs_attention: ["error", "Needs attention"],
+    rolled_back: ["neutral", "Rolled back"],
+};
+const dumpOptions = computed(() => [
+    { label: "Best available", value: "auto" },
+    ...props.softwareUpdate.methods
+        .filter((method) => method.available)
+        .map((method) => ({ label: method.label, value: method.name })),
+]);
 const cronLate = computed(
     () =>
         !props.health.heartbeat ||
@@ -133,6 +153,126 @@ const processing = computed(() =>
             </p></UCard
         >
     </div>
+    <UCard class="mb-6"
+        ><template #header
+            ><div class="flex items-center justify-between gap-3">
+                <h2 class="text-sm font-medium">Software update</h2>
+                <UBadge
+                    :color="softwareUpdate.available ? 'info' : 'success'"
+                    variant="subtle"
+                    >{{
+                        softwareUpdate.available
+                            ? "Version " +
+                              softwareUpdate.available.tag +
+                              " available"
+                            : "Up to date"
+                    }}</UBadge
+                >
+            </div></template
+        >
+        <dl class="space-y-2 text-sm mb-4">
+            <div class="flex justify-between gap-4">
+                <dt class="text-muted">Installed version</dt>
+                <dd>{{ softwareUpdate.current }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+                <dt class="text-muted">Last check (UTC)</dt>
+                <dd>{{ softwareUpdate.checked_at ?? "Never" }}</dd>
+            </div>
+        </dl>
+        <UAlert
+            v-if="softwareUpdate.error"
+            class="mb-4"
+            color="warning"
+            variant="subtle"
+            title="The last check failed"
+            :description="softwareUpdate.error"
+        />
+        <UAlert
+            v-if="softwareUpdate.status.state !== 'idle' && softwareUpdate.status.message"
+            class="mb-4"
+            :color="(updateStates[softwareUpdate.status.state] ?? ['neutral'])[0]"
+            variant="subtle"
+            :title="(updateStates[softwareUpdate.status.state] ?? [null, 'Last update'])[1]"
+            :description="softwareUpdate.status.message"
+        />
+        <UAlert
+            v-if="softwareUpdate.requested"
+            class="mb-4"
+            color="info"
+            variant="subtle"
+            icon="i-tabler-clock"
+            title="Update requested"
+            description="It starts within a minute. The site is unavailable while it runs."
+        />
+        <UAlert
+            v-if="updateCheck.errors.update || updateRequest.errors.update"
+            class="mb-4"
+            color="error"
+            variant="subtle"
+            :description="updateCheck.errors.update || updateRequest.errors.update"
+        />
+        <div class="flex flex-wrap gap-3 mb-4">
+            <UButton
+                label="Check for updates"
+                color="neutral"
+                variant="outline"
+                :disabled="!softwareUpdate.enabled || updateBusy"
+                :loading="updateCheck.processing"
+                @click="updateCheck.post(page.props.links['health.updates.check'], { preserveScroll: true })"
+            />
+            <UButton
+                v-if="softwareUpdate.requested"
+                label="Cancel the request"
+                color="neutral"
+                variant="outline"
+                @click="router.delete(page.props.links['health.updates.request'], { preserveScroll: true })"
+            />
+        </div>
+        <UForm
+            v-if="softwareUpdate.available && !updateBusy"
+            :state="updateRequest"
+            class="space-y-4"
+            @submit="updateRequest.post(page.props.links['health.updates.request'], { preserveScroll: true, onSuccess: () => updateRequest.reset('password') })"
+            ><div class="form-grid">
+                <UFormField
+                    label="Your password"
+                    name="password"
+                    :error="updateRequest.errors.password"
+                    ><UInput
+                        v-model="updateRequest.password"
+                        type="password"
+                        autocomplete="current-password"
+                        class="w-full" /></UFormField
+                ><UFormField
+                    label="Database backup"
+                    name="dump"
+                    :error="updateRequest.errors.dump"
+                    ><USelect
+                        v-model="updateRequest.dump"
+                        :items="dumpOptions"
+                        class="w-full"
+                /></UFormField>
+            </div>
+            <p class="data-note">
+                The database, the environment file and the private files are
+                saved first, the archive is verified against its published
+                SHA-256 checksum, and the previous files are restored if the
+                update fails. Collection answers 503 for the duration.
+            </p>
+            <UButton
+                type="submit"
+                :label="'Update to ' + softwareUpdate.available.tag"
+                :loading="updateRequest.processing"
+                :disabled="!updateRequest.password"
+            />
+        </UForm>
+        <p class="data-note mt-4">
+            Prefer a terminal? Run
+            <code>php artisan perysee:update</code>. A rollback is
+            <code>php artisan perysee:update:rollback</code>.
+        </p></UCard
+    >
     <div v-if="moduleCards?.length" class="grid lg:grid-cols-2 gap-6 mb-6">
         <UCard v-for="card in moduleCards" :key="card.module">
             <template #header>
