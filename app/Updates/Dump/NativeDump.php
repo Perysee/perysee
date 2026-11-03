@@ -60,7 +60,7 @@ final class NativeDump implements DumpMethod
         chmod($options, 0600);
         try {
             file_put_contents($options, $this->optionFile($config));
-            $command = [$binary, '--defaults-extra-file='.$options, '--single-transaction', '--quick', '--routines', '--triggers', '--default-character-set=utf8mb4', '--result-file='.$path, (string) $config['database']];
+            $command = [$binary, '--defaults-extra-file='.$options, '--single-transaction', '--quick', '--routines', '--triggers', '--default-character-set=utf8mb4', ...$this->compatibilityOptions($binary), '--result-file='.$path, (string) $config['database']];
             $process = new Process($command);
             $process->setTimeout(1800);
             $process->run();
@@ -70,6 +70,21 @@ final class NativeDump implements DumpMethod
         } finally {
             @unlink($options);
         }
+    }
+
+    /**
+     * The MySQL 8 client reads information_schema.COLUMN_STATISTICS, which MariaDB does not have, and fails
+     * unless told not to; MariaDB's own tool and older MySQL clients do not know that option and refuse it.
+     *
+     * @return list<string>
+     */
+    private function compatibilityOptions(string $binary): array
+    {
+        $version = new Process([$binary, '--version']);
+        $version->run();
+        $text = $version->getOutput();
+
+        return ! str_contains($text, 'MariaDB') && preg_match('/\bVer (\d+)\./', $text, $match) === 1 && (int) $match[1] >= 8 ? ['--column-statistics=0'] : [];
     }
 
     /**
