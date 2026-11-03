@@ -32,6 +32,8 @@ try {
     } else {
         $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
         $kernel = $app->make(Kernel::class);
+        // The application provider inspects the current request while booting, so one must exist before the manual bootstrap.
+        $app->instance('request', Request::create($mode, 'POST'));
         $kernel->bootstrap();
         config(['perysee.installation_path' => sys_get_temp_dir().'/perysee-benchmark-install', 'cache.default' => 'array']);
         if ($mode === '/minimal') {
