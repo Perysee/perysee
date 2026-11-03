@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Analytics\Ingestion\Geolocation;
 use App\Analytics\InstanceHealth;
+use App\Modules\ModuleExtensions;
 use App\Support\Ui;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,7 @@ class InstanceHealthController extends Controller
     {
         abort_unless($request->user()->is_admin, 403);
 
-        return Ui::render('health', ['health' => $health->snapshot(), 'geolocation' => app(Geolocation::class)->status(), 'cron' => '* * * * * cd '.escapeshellarg(base_path()).' && '.escapeshellarg(PHP_BINARY).' artisan schedule:run >> /dev/null 2>&1']);
+        return Ui::render('health', ['health' => $health->snapshot(), 'geolocation' => app(Geolocation::class)->status(), 'moduleCards' => app(ModuleExtensions::class)->healthCards(), 'cron' => '* * * * * cd '.escapeshellarg(base_path()).' && '.escapeshellarg(PHP_BINARY).' artisan schedule:run >> /dev/null 2>&1']);
     }
 
     public function api(Request $request, InstanceHealth $health): JsonResponse

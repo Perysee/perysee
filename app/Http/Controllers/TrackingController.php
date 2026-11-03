@@ -8,10 +8,10 @@ use App\Analytics\InstanceHealth;
 use App\Analytics\Privacy\NormalizePath;
 use App\Installation\InstallationState;
 use App\Models\Website;
+use App\Support\Coordination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\AcceptHeader;
 use Symfony\Component\HttpFoundation\Response;
@@ -68,8 +68,7 @@ class TrackingController extends Controller
                     abort_if(str_ends_with($rule, '*') ? str_starts_with($path, substr($rule, 0, -1)) : $path === $rule, 403);
                 }
                 $key = 'collect:'.$site->id.':'.hash_hmac('sha256', $request->ip() ?? '', config('app.key'));
-                abort_if(RateLimiter::tooManyAttempts($key, 120), 429);
-                RateLimiter::hit($key, 60);
+                abort_unless(app(Coordination::class)->throttle($key, 120, 60), 429);
                 $received = now('UTC')->format('Y-m-d H:i:s.v');
                 if (! $site->first_collected_at) {
                     DB::table('websites')->where('id', $site->id)->whereNull('first_collected_at')->update(['first_collected_at' => $received]);

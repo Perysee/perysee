@@ -3,8 +3,8 @@
 namespace App\Analytics;
 
 use App\Analytics\Ingestion\Geolocation;
+use App\Support\Coordination;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class InstanceHealth
@@ -24,8 +24,7 @@ class InstanceHealth
     public function failure(string $name): void
     {
         try {
-            Cache::add('analytics:'.$name, 0, now()->addDays(7));
-            Cache::increment('analytics:'.$name);
+            app(Coordination::class)->failure($name);
         } catch (\Throwable) {
             // A diagnostic must never replace the original collection failure.
         }
@@ -71,8 +70,8 @@ class InstanceHealth
             'heartbeat' => $this->get('heartbeat'), 'aggregate_success' => $this->get('aggregate_success'),
             'aggregate_error' => $this->get('aggregate_error'), 'backlog' => (clone $pending)->count(),
             'oldest_pending' => (clone $pending)->min('received_at'), 'database_bytes' => $size,
-            'collection_failures' => (int) Cache::get('analytics:collection_failures', 0),
-            'collection_rejections' => (int) Cache::get('analytics:collection_rejections', 0),
+            'collection_failures' => app(Coordination::class)->failures('collection_failures'),
+            'collection_rejections' => app(Coordination::class)->failures('collection_rejections'),
             'raw_retention_days' => (int) $this->get('raw_retention_days', config('perysee.raw_retention_days', 90)),
             'stats_retention_days' => (int) $this->get('stats_retention_days', 1095),
             'deleting_sites' => DB::table('websites')->whereNotNull('deleting_at')->count(),

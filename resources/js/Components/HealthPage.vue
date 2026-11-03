@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import { useForm, usePage } from "@inertiajs/vue3";
-const props = defineProps(["health", "geolocation", "cron"]);
+const props = defineProps(["health", "geolocation", "cron", "moduleCards"]);
 const page = usePage();
 const retention = useForm({
     raw_retention_days: props.health.raw_retention_days,
@@ -132,6 +132,32 @@ const processing = computed(() =>
                 Check that the heartbeat advances after saving your cron.
             </p></UCard
         >
+    </div>
+    <div v-if="moduleCards?.length" class="grid lg:grid-cols-2 gap-6 mb-6">
+        <UCard v-for="card in moduleCards" :key="card.module">
+            <template #header>
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-sm font-medium">{{ card.title }}</h2>
+                    <UBadge
+                        :color="card.status === 'ok' ? 'success' : 'warning'"
+                        variant="subtle"
+                        >{{
+                            card.status === "ok" ? "Working" : "Needs attention"
+                        }}</UBadge
+                    >
+                </div>
+            </template>
+            <dl class="space-y-2 text-sm">
+                <div
+                    v-for="item in card.items"
+                    :key="item.label"
+                    class="flex justify-between gap-4"
+                >
+                    <dt class="text-muted">{{ item.label }}</dt>
+                    <dd>{{ item.value }}</dd>
+                </div>
+            </dl>
+        </UCard>
     </div>
     <UCard class="mb-6"
         ><template #header

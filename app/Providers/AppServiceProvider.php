@@ -7,6 +7,8 @@ use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
 use App\Modules\ModuleScope;
 use App\Modules\ModuleSettings;
+use App\Support\CacheCoordination;
+use App\Support\Coordination;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ModuleExtensions::class);
         $this->app->singleton(ModuleSettings::class);
         $this->app->singleton(ModuleScope::class);
+        // A module may rebind this before its first use; the default keeps the state in the application cache.
+        $this->app->singleton(Coordination::class, CacheCoordination::class);
     }
 
     /**

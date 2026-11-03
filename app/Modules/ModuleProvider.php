@@ -87,4 +87,15 @@ abstract class ModuleProvider extends ServiceProvider
     {
         $this->app->make(ModuleExtensions::class)->brand($this->module->manifest->id, $resolver);
     }
+
+    /**
+     * Adds a status card to the instance health page, for administrators: a title, a status ("ok" or
+     * "attention") and a few label/value lines. Return plain text only.
+     *
+     * @param  Closure(): array<string, mixed>  $resolver
+     */
+    protected function healthCard(Closure $resolver): void
+    {
+        $this->app->make(ModuleExtensions::class)->healthCard($this->module->manifest->id, $resolver);
+    }
 }
