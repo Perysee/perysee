@@ -110,7 +110,7 @@ class IdleSchedulerCostTest extends TestCase
         app(Segments::class)->rebuild(500);
 
         $seen = $this->observe(function (): void {
-            foreach (['perysee:aggregate --batch=500 --budget-seconds=15', 'perysee:maintenance --limit=1000', 'perysee:rebuild-segments --batch=500', 'perysee:journey-reports --batch=500 --budget=10'] as $command) {
+            foreach (['perysee:aggregate --batch=500 --budget-seconds=15', 'perysee:maintenance --limit=1000', 'perysee:rebuild-segments --batch=500', 'perysee:journey-reports --batch=500 --budget=10', 'perysee:update --requested --yes'] as $command) {
                 $this->artisan($command)->assertSuccessful();
             }
         });
