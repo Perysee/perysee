@@ -15,6 +15,10 @@ function buildRelease(array $options): void
     if (! class_exists(ZipArchive::class)) {
         throw new RuntimeException('The build requires the PHP zip extension.');
     }
+    $configured = is_file($source.'/config/perysee.php') && preg_match("/'version'\\s*=>\\s*'([^']+)'/", file_get_contents($source.'/config/perysee.php'), $match) ? $match[1] : null;
+    if ($configured !== ltrim($version, 'v')) {
+        throw new RuntimeException('config/perysee.php declares version '.($configured ?? '(none)').' but the release is '.$version.'. Bump the version in config/perysee.php first: the application compares it with published releases.');
+    }
     $installed = json_decode(file_get_contents($source.'/vendor/composer/installed.json'), true, flags: JSON_THROW_ON_ERROR);
     if (($installed['dev'] ?? true) !== false) {
         throw new RuntimeException('Install production dependencies with composer install --no-dev first.');

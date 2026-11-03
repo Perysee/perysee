@@ -7,6 +7,7 @@ use App\Http\Controllers\FunnelController;
 use App\Http\Controllers\GuideController;
 use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\InstanceHealthController;
+use App\Http\Controllers\InstanceUpdateController;
 use App\Http\Controllers\ModuleAssetController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\SiteFaviconController;
@@ -34,6 +35,9 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::put('/health', [InstanceHealthController::class, 'update'])->name('health.update');
         Route::get('/api/instance/health', [InstanceHealthController::class, 'api'])->name('health.api');
         Route::post('/health/geolocation', [InstanceHealthController::class, 'importGeolocation'])->name('health.geolocation');
+        Route::post('/health/updates/check', [InstanceUpdateController::class, 'check'])->middleware('throttle:6,1')->name('health.updates.check');
+        Route::post('/health/updates', [InstanceUpdateController::class, 'request'])->middleware('throttle:6,1')->name('health.updates.request');
+        Route::delete('/health/updates', [InstanceUpdateController::class, 'cancel'])->name('health.updates.cancel');
         Route::get('/api/sites/{website}/filter-options', [AnalyticsController::class, 'filterOptions'])->name('sites.filter-options');
         Route::get('/api/sites/{website}/events/recent', [AnalyticsController::class, 'api'])->defaults('report', 'recent')->name('sites.api.recent');
         Route::get('/api/sites/{website}/{report}', [AnalyticsController::class, 'api'])->whereIn('report', ['overview', 'timeseries', 'dimensions', 'recent'])->name('sites.api');

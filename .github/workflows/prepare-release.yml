@@ -1,0 +1,71 @@
+name: Prepare release
+
+# Opens the pull request that bumps config/perysee.php. Reviewing and merging it is the approval: the Release
+# workflow then builds, publishes and tags the version on main.
+# Needs Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests".
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without the v prefix (1.2.3, or 1.2.3-beta.1 for a prerelease)'
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Validate the version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$VERSION' must look like 1.2.3 or 1.2.3-beta.1 (no v prefix)."
+            exit 1
+          fi
+          current=$(sed -n "s/.*'version' => '\([^']*\)'.*/\1/p" config/perysee.php | head -n 1)
+          newest=$(printf '%s\n%s\n' "$current" "$VERSION" | sort -V | tail -n 1)
+          if [ "$VERSION" = "$current" ] || [ "$newest" != "$VERSION" ]; then
+            echo "::error::$VERSION is not newer than the current version $current."
+            exit 1
+          fi
+          if git rev-parse --verify --quiet "refs/tags/v$VERSION" > /dev/null; then
+            echo "::error::Tag v$VERSION already exists."
+            exit 1
+          fi
+      - name: Bump the version and open the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          branch="release/v$VERSION"
+          sed -i "s/'version' => '[^']*'/'version' => '$VERSION'/" config/perysee.php
+          git diff --quiet && { echo "::error::config/perysee.php was not changed."; exit 1; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "chore(release): v$VERSION"
+          git push origin "$branch"
+          last=$(git describe --tags --abbrev=0 2> /dev/null || true)
+          {
+            echo "Releasing **v$VERSION**. Merging this pull request builds, publishes and tags the release; instances then offer the update."
+            echo
+            echo "Before merging: the checks are green, \`docs/SUIVI-FONCTIONNALITES.md\` is up to date, and any migration is additive (instances cannot roll the database back)."
+            echo
+            echo "### Changes since ${last:-the beginning}"
+            git log --no-merges --pretty='- %s' ${last:+"$last"..HEAD~1} | head -n 100
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --head "$branch" --title "chore(release): v$VERSION" --body-file "$RUNNER_TEMP/body.md"

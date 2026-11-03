@@ -49,14 +49,20 @@ npm run test:distribution
 
 Les tests de distribution couvrent les ZIP propres, les collisions de destination, les checksums, les chemins dangereux et liens symboliques, le script shell, les téléchargements interrompus et le parcours interactif réellement lancé via un pipe dans un pseudo-terminal. Les tests PHP du relais et ses tests HTTP couvrent les fichiers autorisés, les redirections, le cache, HEAD et la protection du jeton.
 
-Le workflow `Application checks` couvre PHP 8.3/8.5, SQLite, une MariaDB 11.4.8 dédiée, le tracker et la distribution. `Build release` appelle ces contrôles, fabrique les assets en production et teste le vrai ZIP. Il publie ensuite les quatre fichiers ensemble pour un tag poussé. Un lancement manuel ne publie pas de release.
+Le workflow `Application checks` couvre PHP 8.3/8.5, SQLite, une MariaDB 11.4.8 dédiée, le tracker et la distribution.
 
-```sh
-git tag v0.1.1
-git push origin v0.1.1
-```
+## Publier une release
 
-Utiliser un nouveau tag pour chaque release. Les versions avec suffixe, par exemple `v0.2.0-beta.1`, sont marquées comme préversions et ne deviennent pas la dernière version stable. Ne pas remplacer les assets d’un tag déjà publié : le relais met les URLs versionnées en cache.
+La version de référence est `'version'` dans `config/perysee.php` (sans préfixe `v`). Le tag Git est `v` + cette valeur. `scripts/build-release.php` refuse de construire si le tag demandé et la configuration divergent : l'application compare cette valeur aux releases publiées pour proposer ses mises à jour.
+
+1. Lancer le workflow **Prepare release** (Actions, `workflow_dispatch`) avec la version, par exemple `0.2.0` ou `0.2.0-beta.1`. Il vérifie que la version est plus récente et que le tag n'existe pas, change `config/perysee.php`, pousse `release/v0.2.0` et ouvre la pull request avec la liste des changements. Réglage requis une fois : Settings > Actions > General > « Allow GitHub Actions to create and approve pull requests ».
+2. **Relire et fusionner cette pull request est l'approbation de la release.** Les contrôles de la PR ne se lancent pas pour une PR ouverte par le jeton du workflow ; `Release` les rejoue de toute façon avant de publier.
+3. À la fusion sur `main`, le workflow **Release** lit la version dans `config/perysee.php`. Si le tag n'existe pas, il exécute `Application checks`, fabrique les assets, vérifie `SHA256SUMS`, installe le vrai ZIP, puis (job `Publish`, environnement `release`) crée la release GitHub avec `perysee.zip`, `install.php`, `install.sh` et `SHA256SUMS` en brouillon, la publie, et c'est cette publication qui crée le tag `vX.Y.Z` sur le commit fusionné. Pour une validation manuelle supplémentaire, ajouter des relecteurs obligatoires à l'environnement `release`.
+4. Les instances installées lisent ces mêmes releases GitHub (`/releases/latest`, qui exclut brouillons et préversions) et proposent la mise à jour. Une release n'existe pour elles que lorsque l'archive **et** `SHA256SUMS` sont attachés.
+
+Un push sur `main` qui touche `config/perysee.php` sans changer la version est sans effet : le tag existe déjà. Un lancement manuel de `Release` construit et teste sans rien publier. Les versions avec suffixe, par exemple `v0.2.0-beta.1`, sont des préversions et ne deviennent pas la dernière version stable. Ne pas remplacer les assets d'un tag déjà publié : le relais met les URLs versionnées en cache et les instances ont pu les télécharger.
+
+Les instances lisent l'API publique de GitHub sans jeton. Tant que le dépôt est privé, le contrôle de mise à jour échoue avec un message explicite (HTTP 404/403) : l'ouverture du code (LIC-01) ou un autre point de publication public est un préalable pour que les clients voient les mises à jour. `PERYSEE_UPDATE_REPOSITORY` change le dépôt interrogé, `PERYSEE_UPDATE_CHECK=false` désactive le contrôle.
 
 ## Relais PHP cPanel : get.perysee.com
 
@@ -279,12 +285,58 @@ Le workflow manuel `Internal performance laboratory` reproduit ces profils et co
 
 ## Mise à jour, sauvegarde et retour arrière
 
-Avant remplacement : sauvegarder la base avec un dump cohérent, `.env` (incluant APP_KEY), `storage/app/private` et les fichiers applicatifs de la version courante, hors docroot. Tester la restauration dans une base isolée avant une diffusion publique. Conserver le ZIP compatible et son SHA-256.
+### Ce que fait la mise à jour assistée
 
-Pendant la mise à jour : fenêtre de maintenance, arrêt du cron, conservation de `.env`/`storage`, remplacement complet des fichiers de version et de `vendor`, `optimize:clear`, `migrate --force`, contrôle de connexion et de comptes/sites, reprise du cron et vérification du heartbeat/consolidation. Sans terminal, faire exécuter les commandes par le support ou un cron temporaire surveillé, puis retirer celui-ci. Ne pas ouvrir d'endpoint public exécutant arbitrairement les migrations.
+`php artisan perysee:update` (ou le bouton de la page Santé, qui ne fait que demander la mise à jour au planificateur : un cron d'une minute la lance en ligne de commande, sous les limites du CLI) enchaîne :
 
-En retour arrière : restaurer ensemble la version applicative et sa sauvegarde SQL cohérente avant de rouvrir la collecte. Ne pas utiliser `migrate:rollback` sur une instance contenant des rapports à conserver : les migrations down sont destinées aux tests et retirent les synthèses. Ne jamais générer une nouvelle APP_KEY pour une instance existante. La validation locale de migration n'est pas une qualification de restauration cPanel/Apache/LiteSpeed ; ces parcours et l'impact sur un WordPress voisin nécessitent un vrai compte mutualisé.
+1. récupération de la release GitHub (`perysee.zip` et `SHA256SUMS`, HTTPS uniquement) ou d'une archive fournie avec `--archive` et `--sha256` ;
+2. contrôle du SHA-256, puis extraction dans un dossier de travail (chemins, liens, doublons, état local, fichiers indispensables, `release.json`) ;
+3. contrôles préalables : version plus récente, PHP minimal de la release (`platform_check.php`), espace disque, `.env` présent, base joignable, dossiers inscriptibles et même système de fichiers ;
+4. sauvegarde dans `storage/app/private/updates/backups/AAAAMMJJ-HHMMSS-vX.Y.Z/` : dump SQL (`database.sql.gz`), `env` (avec `APP_KEY`), `private-files/` ; les trois dernières sauvegardes sont conservées ;
+5. mode maintenance (la collecte répond 503 pendant la fenêtre : les événements envoyés pendant ce temps ne sont pas enregistrés), puis remplacement unité par unité des fichiers (`app`, `bootstrap` hors `cache`, `config`, `database/migrations`, `public/*` livrés, `resources`, `routes`, `vendor`, `artisan`, `composer.*`, `release.json`) ; `.env`, `storage/` et `modules/` ne sont jamais touchés ; les anciens fichiers vont dans `…/previous/` ;
+6. `php artisan perysee:update:finalize` dans un **nouveau processus** (code de la nouvelle version) : `migrate --force`, `optimize:clear`, sortie de maintenance.
 
+Les migrations des releases doivent rester additives (expand/contract) : le retour arrière automatique ne concerne que les fichiers.
+
+### Échec et retour arrière
+
+- Avant le remplacement des fichiers : rien n'a changé, le site est rouvert.
+- Après : les fichiers précédents sont remis. Si aucune migration n'avait été appliquée, le site est rouvert. Sinon il **reste en maintenance** (état `needs_attention` sur la page Santé) tant que la base n'est pas restaurée avec sa sauvegarde.
+- Manuel : `php artisan perysee:update:rollback` remet les fichiers de la dernière mise à jour (`--up` rouvre ensuite le site). Restaurer le dump **avant** si des migrations ont été appliquées. Ne pas utiliser `migrate:rollback` : les `down()` servent aux tests et retirent les synthèses. Ne jamais générer une nouvelle `APP_KEY`.
+
+### Sauvegarder la base : méthodes
+
+`--dump=auto` (défaut) prend la première méthode disponible. La page Santé liste celles du serveur.
+
+| Option | Méthode | Quand |
+| --- | --- | --- |
+| `native` | `mariadb-dump` (ou `mysqldump`), mot de passe via un fichier d'options 0600, `--single-transaction` | Outil présent : le plus rapide et le plus fidèle (routines, déclencheurs) |
+| `php` | Dump par la connexion de l'application (tables et lignes, `DROP`/`CREATE`/`INSERT`) | Mutualisé sans client SQL ; sans vues ni routines, que l'application n'utilise pas |
+| `external` | Dump fait à la main, indiqué avec `--dump-file=CHEMIN` ; son SHA-256 est enregistré | Terminal ou phpMyAdmin/cPanel « Sauvegarde » |
+
+Faire le dump soi-même en ligne de commande, avant `perysee:update --dump=external --dump-file=...` :
+
+```sh
+# Lire DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME dans .env ; le mot de passe est demandé (-p) et n'apparaît pas dans l'historique.
+mariadb-dump -h 127.0.0.1 -P 3306 -u perysee -p --single-transaction --quick --routines --triggers --default-character-set=utf8mb4 perysee | gzip > ~/perysee-avant-maj.sql.gz
+# mysqldump accepte les mêmes options si mariadb-dump n'existe pas.
+```
+
+Restaurer (base vide ou existante, les tables sont recréées) :
+
+```sh
+gunzip -c ~/perysee-avant-maj.sql.gz | mariadb -h 127.0.0.1 -P 3306 -u perysee -p perysee
+# Dump produit par la méthode php : même commande ; le fichier est du SQL standard.
+php artisan up
+```
+
+Sans terminal : cPanel > phpMyAdmin > Exporter (méthode personnalisée, SQL, avec DROP TABLE) ou l'outil « Sauvegarde » de cPanel, puis `--dump=external` ; la restauration passe par phpMyAdmin > Importer (limite d'envoi de l'hébergeur : le gz du dump `php` se décompresse d'abord).
+
+### Sans terminal
+
+Le bouton de la page Santé (mot de passe demandé) n'agit que si le cron de l'instance tourne : il dépose une demande, le planificateur la prend dans la minute. Sans cron, aucune mise à jour assistée n'est possible. La mise à jour manuelle reste décrite par `perysee:update --archive perysee.zip --sha256 …` exécutée par le support ou un cron temporaire surveillé. Aucun endpoint public ne lance de migration.
+
+La mise à jour assistée est validée localement (tests PHP sur un arbre temporaire, sans toucher au dépôt) ; elle n'est pas qualifiée sur cPanel/Apache/LiteSpeed réels.
 
 ## Batch attribution, carte et démonstrations
 
