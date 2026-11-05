@@ -43,3 +43,6 @@ Thumbs.db
 /AGENTS.md
 /boost.json
 /.ai
+
+# Official modules live in Perysee/perysee-modules; link a checkout here (see DEVELOPMENT.md).
+/modules

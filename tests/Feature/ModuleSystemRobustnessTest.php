@@ -95,6 +95,9 @@ class ModuleSystemRobustnessTest extends TestCase
         };
         $baseline = $queries();
 
+        if (! is_dir(base_path('modules/white-label'))) {
+            $this->markTestSkipped('The official modules live in Perysee/perysee-modules; they are not checked out here.');
+        }
         config(['perysee.modules_path' => base_path('modules')]);
         app()->forgetInstance(ModuleRegistry::class);
         app()->forgetInstance(ModuleLoader::class);
