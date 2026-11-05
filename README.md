@@ -16,7 +16,7 @@ L’installateur vérifie PHP, télécharge les fichiers prêts à utiliser, dem
 
 Sans terminal, le ZIP est proposé à `https://get.perysee.com/perysee.zip`. Extraire son dossier `perysee/` hors de la racine web, puis faire pointer le domaine sur `perysee/public/`. Terminer avec l’assistant web décrit ci-dessous.
 
-Les instructions de fabrication, les tests privés et le déploiement du relais PHP sur cPanel sont dans [DEVELOPMENT.md](DEVELOPMENT.md), réservé aux mainteneurs et exclu du ZIP et de la documentation web.
+Le développement local, les tests et la mise à jour assistée sont décrits dans [DEVELOPMENT.md](DEVELOPMENT.md), exclu du ZIP. La fabrication des releases et le déploiement de `get.perysee.com` sont gérés par les mainteneurs hors de ce dépôt.
 
 ## Fonctionnalités disponibles
 
@@ -125,7 +125,7 @@ En local, relier un module maison au dossier des modules : `ln -s ../../../modul
 
 Les guides sont maintenus dans le site documentaire `perysee-web/apps/docs/`, séparé du dépôt et de la distribution Laravel. En local, lancer `npm run dev:docs` depuis `perysee-web/` pour ouvrir [la documentation](http://localhost:3001). Les liens ci-dessous utilisent cette adresse locale ; en production, définir `PERYSEE_DOCS_URL` avec l’origine réelle du site documentaire pour les liens de l’application.
 
-- [Développement local et tests — documentation interne](DEVELOPMENT.md).
+- [Développement local et tests](DEVELOPMENT.md).
 - [Installation sur un hébergement](http://localhost:3001/getting-started/shared-hosting).
 
 ## Suivi et données de démonstration
@@ -158,3 +158,7 @@ php artisan perysee:demo-reset --seed=73421
 ```
 
 Le reset génère 30 jours de trafic synthétique avec horaires, volumes, sources et chemins variés. La démo avec sessions reçoit trois funnels préconfigurés (inscription, téléchargement, contact), leurs résultats sur sept jours et un parcours automatique déjà calculé. Les comptes, sites réels et définitions de funnels existantes sont conservés. Le mode sans identifiant conserve ses limites : aucun parcours ne peut y être reconstruit. La commande est atomique et refusée en production.
+
+## Licence
+
+Perysee Core est publié sous licence **GNU AGPL v3.0 uniquement**, avec l’exception de modules de Perysee ([LICENSE](LICENSE), [MODULE-EXCEPTION.md](MODULE-EXCEPTION.md), [LICENSING.md](LICENSING.md)). Le nom et le logo Perysee ne sont pas concédés ([TRADEMARKS.md](TRADEMARKS.md)). Contributions : [CONTRIBUTING.md](CONTRIBUTING.md) et [CLA.md](CLA.md).
