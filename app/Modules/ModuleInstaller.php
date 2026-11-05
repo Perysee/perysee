@@ -52,6 +52,22 @@ final class ModuleInstaller
         return $this->unpack($archive, update: true, expectedId: $expectedId);
     }
 
+    /**
+     * Reads and validates an archive's manifest without writing anything.
+     */
+    public function inspect(string $archive): Manifest
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($archive, ZipArchive::RDONLY) !== true) {
+            throw new InvalidModuleBundle('This file is not a valid ZIP archive.');
+        }
+        try {
+            return $this->manifest($zip, $this->root(array_keys($this->entries($zip))));
+        } finally {
+            $zip->close();
+        }
+    }
+
     private function unpack(string $archive, bool $update, ?string $expectedId = null): Manifest
     {
         if (($reason = self::unavailableReason()) !== null) {
