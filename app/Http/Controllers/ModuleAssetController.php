@@ -20,7 +20,7 @@ class ModuleAssetController extends Controller
      */
     public function __invoke(ModuleRegistry $registry, string $module, string $file): BinaryFileResponse
     {
-        $installed = $registry->enabled()[$module] ?? null;
+        $installed = config('perysee.modules_enabled') ? ($registry->enabled()[$module] ?? null) : null;
         $extension = pathinfo($file, PATHINFO_EXTENSION);
         abort_unless($installed && isset(self::TYPES[$extension]) && preg_match('/^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/D', $file) && ! str_contains($file, '..'), 404);
         $path = $installed->path.'/dist/'.$file;

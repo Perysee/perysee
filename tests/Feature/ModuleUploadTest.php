@@ -180,6 +180,17 @@ class ModuleUploadTest extends TestCase
         $this->assertSame([], $this->leftovers());
     }
 
+    public function test_an_archive_for_an_unsupported_module_api_is_refused_and_leaves_nothing_behind(): void
+    {
+        $this->actingAs($this->admin());
+
+        $this->upload($this->bundle(['module.json' => $this->manifest(['api' => 99])]))
+            ->assertRedirect(route('modules.index'))
+            ->assertSessionHas('error', fn (string $message) => str_contains($message, 'module API 99'));
+
+        $this->assertSame([], $this->leftovers());
+    }
+
     public function test_a_module_that_is_already_installed_is_never_overwritten(): void
     {
         $this->actingAs($this->admin());

@@ -40,6 +40,28 @@ class ModuleCommandTest extends TestCase
         $this->assertDatabaseHas('modules', ['id' => 'cmd-mod', 'enabled' => false]);
     }
 
+    public function test_an_experimental_module_needs_the_accept_risk_option(): void
+    {
+        File::ensureDirectoryExists($this->modulesPath.'/lab');
+        file_put_contents($this->modulesPath.'/lab/module.json', json_encode(['id' => 'lab', 'name' => 'Lab', 'version' => '0.1.0', 'core' => '0.1.0', 'stability' => 'experimental']));
+        app(ModuleRegistry::class)->refresh();
+
+        $this->artisan('perysee:modules', ['action' => 'enable', 'module' => 'lab'])
+            ->expectsOutputToContain('experimental')
+            ->assertFailed();
+        $this->assertDatabaseMissing('modules', ['id' => 'lab']);
+
+        $this->artisan('perysee:modules', ['action' => 'enable', 'module' => 'lab', '--accept-risk' => true])->assertSuccessful();
+        $this->assertDatabaseHas('modules', ['id' => 'lab', 'enabled' => true]);
+    }
+
+    public function test_list_shows_the_stability_of_each_module(): void
+    {
+        $this->artisan('perysee:modules', ['action' => 'list'])
+            ->expectsOutputToContain('cmd-mod 2.0.0 disabled beta')
+            ->assertSuccessful();
+    }
+
     public function test_registry_errors_are_reported_as_failures(): void
     {
         $this->artisan('perysee:modules', ['action' => 'enable', 'module' => 'ghost'])

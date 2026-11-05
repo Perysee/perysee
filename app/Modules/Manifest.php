@@ -12,6 +12,11 @@ final readonly class Manifest
 
     private const VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/D';
 
+    /** How much a module can be relied on. A module that does not declare it is treated as beta, never as stable. */
+    public const STABILITY_LEVELS = ['stable', 'beta', 'experimental'];
+
+    public const DEFAULT_STABILITY = 'beta';
+
     /**
      * @param  list<string>  $requires
      */
@@ -23,6 +28,8 @@ final readonly class Manifest
         public array $requires = [],
         public string $entitlement = '',
         public string $description = '',
+        public string $stability = self::DEFAULT_STABILITY,
+        public int $api = ModuleApi::VERSION,
     ) {}
 
     /**
@@ -48,6 +55,15 @@ final readonly class Manifest
             throw new InvalidManifest('Module manifest field "requires" must list module ids.');
         }
 
+        $api = $data['api'] ?? ModuleApi::VERSION;
+        if (! is_int($api) || $api < 1) {
+            throw new InvalidManifest('Module manifest field "api" must be a whole number such as 1.');
+        }
+        $stability = $data['stability'] ?? self::DEFAULT_STABILITY;
+        if (! is_string($stability) || ! in_array($stability, self::STABILITY_LEVELS, true)) {
+            throw new InvalidManifest('Module manifest field "stability" must be one of: '.implode(', ', self::STABILITY_LEVELS).'.');
+        }
+
         return new self(
             id: $data['id'],
             name: $data['name'],
@@ -56,6 +72,8 @@ final readonly class Manifest
             requires: array_values($requires),
             entitlement: is_string($data['entitlement'] ?? null) && $data['entitlement'] !== '' ? $data['entitlement'] : $data['id'],
             description: is_string($data['description'] ?? null) ? $data['description'] : '',
+            stability: $stability,
+            api: $api,
         );
     }
 
@@ -73,6 +91,11 @@ final readonly class Manifest
     public function namespaceSegment(): string
     {
         return Str::studly($this->id);
+    }
+
+    public function supportsCurrentApi(): bool
+    {
+        return $this->api === ModuleApi::VERSION;
     }
 
     public function isCompatibleWith(string $coreVersion): bool

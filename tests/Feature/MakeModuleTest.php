@@ -35,6 +35,8 @@ class MakeModuleTest extends TestCase
         $manifest = Manifest::fromFile($this->modulesPath.'/scaffold-files/module.json');
         $this->assertSame('Scaffold files', $manifest->name);
         $this->assertSame(config('perysee.version'), $manifest->core);
+        $declared = json_decode(file_get_contents($this->modulesPath.'/scaffold-files/module.json'), true);
+        $this->assertSame('beta', $declared['stability'], 'A new module states its stability so that its author sees the field.');
         foreach (['src/ModuleServiceProvider.php', 'routes.php', 'dist/module.js', 'README.md'] as $file) {
             $this->assertFileExists($this->modulesPath.'/scaffold-files/'.$file);
         }

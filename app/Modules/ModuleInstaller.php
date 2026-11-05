@@ -39,6 +39,21 @@ final class ModuleInstaller
 
     public function install(string $archive): Manifest
     {
+        return $this->unpack($archive, update: false);
+    }
+
+    /**
+     * Replaces an installed, disabled module with a strictly newer version of itself. The previous folder is kept in
+     * the backup folder (the three latest per module). The database is not touched here: the new migrations run when
+     * the module is enabled again, and a failing one leaves it disabled.
+     */
+    public function update(string $archive, ?string $expectedId = null): Manifest
+    {
+        return $this->unpack($archive, update: true, expectedId: $expectedId);
+    }
+
+    private function unpack(string $archive, bool $update, ?string $expectedId = null): Manifest
+    {
         if (($reason = self::unavailableReason()) !== null) {
             throw new InvalidModuleBundle($reason);
         }
@@ -46,28 +61,69 @@ final class ModuleInstaller
         if ($zip->open($archive, ZipArchive::RDONLY) !== true) {
             throw new InvalidModuleBundle('This file is not a valid ZIP archive.');
         }
+        $backup = null;
         try {
             $entries = $this->entries($zip);
             $prefix = $this->root(array_keys($entries));
             $manifest = $this->manifest($zip, $prefix);
+            if ($expectedId !== null && $manifest->id !== $expectedId) {
+                throw new InvalidModuleBundle("This archive is for module {$manifest->id}, not {$expectedId}.");
+            }
             if (! $manifest->isCompatibleWith(config('perysee.version'))) {
                 throw new InvalidModuleBundle("Module {$manifest->id} requires Perysee {$manifest->core} or later.");
+            }
+            if (! $manifest->supportsCurrentApi()) {
+                throw new InvalidModuleBundle("Module {$manifest->id} was written for module API {$manifest->api}, but this Perysee supports module API ".ModuleApi::VERSION.'.');
             }
             $base = rtrim((string) config('perysee.modules_path'), '/');
             File::ensureDirectoryExists($base, 0755);
             $destination = $base.'/'.$manifest->id;
-            if (file_exists($destination)) {
-                throw new InvalidModuleBundle("Module {$manifest->id} is already installed. Remove its folder first to install another version.");
+            if ($update) {
+                $backup = $this->backupFolder($manifest);
+            } elseif (file_exists($destination)) {
+                throw new InvalidModuleBundle("Module {$manifest->id} is already installed. Remove its folder first, or update it with a newer version.");
             }
             $files = array_filter($entries, fn (array $entry, string $name): bool => str_starts_with($name, $prefix), ARRAY_FILTER_USE_BOTH);
             $this->checkTypes(array_keys($files), $prefix);
-            $this->extract($zip, $files, $prefix, $base, $destination);
+            $this->extract($zip, $files, $prefix, $base, $destination, $backup);
         } finally {
             $zip->close();
+        }
+        if ($backup !== null) {
+            $this->pruneBackups($manifest->id);
         }
         $this->registry->refresh();
 
         return $manifest;
+    }
+
+    /**
+     * Checks that the archive can replace the installed module and returns where the old folder will be kept.
+     */
+    private function backupFolder(Manifest $manifest): string
+    {
+        $installed = $this->registry->all()[$manifest->id] ?? throw new InvalidModuleBundle("Module {$manifest->id} is not installed. Install it first.");
+        if ($installed->enabled) {
+            throw new InvalidModuleBundle("Module {$manifest->id} is enabled. Disable it before updating, then enable it again.");
+        }
+        if (! version_compare($manifest->version, $installed->manifest->version, '>')) {
+            throw new InvalidModuleBundle("Module {$manifest->id} {$installed->manifest->version} is installed; the archive holds {$manifest->version}. Only a newer version can replace it.");
+        }
+        $root = rtrim((string) config('perysee.modules_backup_path'), '/');
+        File::ensureDirectoryExists($root, 0755);
+
+        return $root.'/'.$manifest->id.'-'.$installed->manifest->version.'-'.now('UTC')->format('YmdHis');
+    }
+
+    private function pruneBackups(string $id): void
+    {
+        $root = rtrim((string) config('perysee.modules_backup_path'), '/');
+        $folders = glob($root.'/'.$id.'-*', GLOB_ONLYDIR) ?: [];
+        $versionOf = fn (string $folder): string => substr(basename($folder), strlen($id) + 1, -15);
+        usort($folders, fn (string $a, string $b): int => version_compare($versionOf($b), $versionOf($a)));
+        foreach (array_slice($folders, 3) as $old) {
+            File::deleteDirectory($old);
+        }
     }
 
     /**
@@ -152,7 +208,7 @@ final class ModuleInstaller
     /**
      * @param  array<string, array{index: int, size: int}>  $files
      */
-    private function extract(ZipArchive $zip, array $files, string $prefix, string $base, string $destination): void
+    private function extract(ZipArchive $zip, array $files, string $prefix, string $base, string $destination, ?string $backup = null): void
     {
         $temporary = $base.'/.installing-'.bin2hex(random_bytes(6));
         File::ensureDirectoryExists($temporary, 0755);
@@ -173,7 +229,13 @@ final class ModuleInstaller
                     throw new InvalidModuleBundle("The archive is corrupt ({$name}).");
                 }
             }
+            if ($backup !== null && ! rename($destination, $backup)) {
+                throw new InvalidModuleBundle('Could not keep a backup of the installed module.');
+            }
             if (! rename($temporary, $destination)) {
+                if ($backup !== null) {
+                    rename($backup, $destination);
+                }
                 throw new InvalidModuleBundle('Could not move the module into place.');
             }
         } finally {
