@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Website;
+use App\Modules\Catalog\CatalogException;
+use App\Modules\Catalog\CatalogInstaller;
+use App\Modules\Catalog\ModuleCatalog;
 use App\Modules\InvalidModuleBundle;
 use App\Modules\Module;
 use App\Modules\ModuleApi;
@@ -58,6 +61,7 @@ class ModuleController extends Controller
             'path' => config('perysee.modules_path'),
             'modulesEnabled' => (bool) config('perysee.modules_enabled'),
             'moduleApi' => ModuleApi::VERSION,
+            'catalog' => $this->catalog(),
             'installer' => [
                 'available' => ModuleInstaller::unavailableReason() === null,
                 'reason' => ModuleInstaller::unavailableReason(),
@@ -130,6 +134,76 @@ class ModuleController extends Controller
         Log::info('A module was installed from an archive.', ['module' => $manifest->id, 'version' => $manifest->version, 'user' => $request->user()->id]);
 
         return redirect()->route('modules.index')->with('status', "Module {$manifest->name} installed. Enable it to start using it.");
+    }
+
+    public function installFromCatalog(Request $request, CatalogInstaller $installer, string $module): RedirectResponse
+    {
+        $this->authorizeAdministrator($request);
+        abort_unless(config('perysee.module_uploads'), 403, 'Installing modules is turned off on this instance.');
+        try {
+            $manifest = $installer->install($module);
+        } catch (CatalogException $exception) {
+            return redirect()->route('modules.index')->with('error', $exception->getMessage());
+        }
+        Log::info('A module was installed from the catalog.', ['module' => $manifest->id, 'version' => $manifest->version, 'user' => $request->user()->id]);
+
+        return redirect()->route('modules.index')->with('status', "Module {$manifest->name} {$manifest->version} installed. Enable it to start using it.");
+    }
+
+    public function refreshCatalog(Request $request, ModuleCatalog $catalog): RedirectResponse
+    {
+        $this->authorizeAdministrator($request);
+        if (! $catalog->enabled()) {
+            return redirect()->route('modules.index')->with('error', 'The module catalog is turned off on this instance (PERYSEE_MODULE_CATALOG).');
+        }
+        $state = $catalog->refresh();
+
+        return redirect()->route('modules.index')->with($state['error'] === null ? 'status' : 'error', $state['error'] ?? 'Catalog checked.');
+    }
+
+    /**
+     * What the catalog offers, with the state of each module on this instance and the reason when it cannot be installed.
+     *
+     * @return array{enabled: bool, checked_at: ?string, error: ?string, links: array{refresh: string}, entries: list<array<string, mixed>>}
+     */
+    private function catalog(): array
+    {
+        $catalog = app(ModuleCatalog::class);
+        $installer = app(CatalogInstaller::class);
+        $registry = app(ModuleRegistry::class);
+        $state = $catalog->enabled() ? $catalog->stored() : ['checked_at' => null, 'error' => null];
+        $entries = [];
+        foreach ($catalog->enabled() ? $catalog->entries() : [] as $entry) {
+            $installed = $registry->all()[$entry->slug] ?? null;
+            $refusal = $installer->refusal($entry);
+            $current = $installed !== null && version_compare($installed->manifest->version, $entry->version, '>=');
+            $name = match (true) {
+                $current => 'installed',
+                $refusal !== null => 'unavailable',
+                $installed !== null => 'update',
+                default => 'available',
+            };
+            $entries[] = [
+                'slug' => $entry->slug,
+                'name' => $entry->name,
+                'description' => $entry->description,
+                'version' => $entry->version,
+                'stability' => $entry->stability,
+                'tier' => $entry->tier,
+                'state' => $name,
+                'installed' => $installed?->manifest->version,
+                'reason' => $name === 'unavailable' ? $refusal : ($name === 'update' && $installed->enabled ? 'Disable it first, then update.' : null),
+                'link' => route('modules.catalog.install', $entry->slug, false),
+            ];
+        }
+
+        return [
+            'enabled' => $catalog->enabled(),
+            'checked_at' => $state['checked_at'],
+            'error' => $state['error'],
+            'links' => ['refresh' => route('modules.catalog.refresh', [], false)],
+            'entries' => $entries,
+        ];
     }
 
     public function update(Request $request, ModuleInstaller $installer, string $module): RedirectResponse
