@@ -36,3 +36,10 @@ Thumbs.db
 /storage/app/private/installation/
 
 /.nuxt-ui/
+
+# Fichiers internes et outillage IA (suivis dans le dépôt privé interne)
+/docs/STATE.md
+/CLAUDE.md
+/AGENTS.md
+/boost.json
+/.ai

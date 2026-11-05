@@ -63,7 +63,7 @@ jobs:
           {
             echo "Releasing **v$VERSION**. Merging this pull request builds, publishes and tags the release; instances then offer the update."
             echo
-            echo "Before merging: the checks are green, \`docs/SUIVI-FONCTIONNALITES.md\` is up to date, and any migration is additive (instances cannot roll the database back)."
+            echo "Before merging: the checks are green, the maintainers' feature register is up to date, and any migration is additive (instances cannot roll the database back)."
             echo
             echo "### Changes since ${last:-the beginning}"
             git log --no-merges --pretty='- %s' ${last:+"$last"..HEAD~1} | head -n 100

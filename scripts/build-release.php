@@ -23,7 +23,7 @@ function buildRelease(array $options): void
     if (($installed['dev'] ?? true) !== false) {
         throw new RuntimeException('Install production dependencies with composer install --no-dev first.');
     }
-    foreach (['vendor/autoload.php', 'vendor/composer/platform_check.php', 'public/index.php', 'public/.htaccess', 'public/build/manifest.json', 'public/tracker/lueur.v1.js', 'public/tracker/lueur.v1.js.gz'] as $file) {
+    foreach (['LICENSE', 'LICENSING.md', 'MODULE-EXCEPTION.md', 'vendor/autoload.php', 'vendor/composer/platform_check.php', 'public/index.php', 'public/.htaccess', 'public/build/manifest.json', 'public/tracker/lueur.v1.js', 'public/tracker/lueur.v1.js.gz'] as $file) {
         if (! is_file($source.'/'.$file)) {
             throw new RuntimeException('Missing release file or asset: '.$file);
         }
@@ -69,7 +69,7 @@ function buildRelease(array $options): void
                 }
             }
         }
-        foreach (['artisan', 'composer.json', 'composer.lock', 'README.md', 'public/index.php', 'public/.htaccess', 'public/favicon.ico', 'public/robots.txt', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/site-icon.svg'] as $file) {
+        foreach (['artisan', 'composer.json', 'composer.lock', 'README.md', 'LICENSE', 'LICENSING.md', 'MODULE-EXCEPTION.md', 'public/index.php', 'public/.htaccess', 'public/favicon.ico', 'public/robots.txt', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/site-icon.svg'] as $file) {
             if (is_file($source.'/'.$file) && ! is_link($source.'/'.$file)) {
                 $zip->addFile($source.'/'.$file, 'perysee/'.$file);
             }

@@ -17,7 +17,7 @@ function fixture(t) {
     const source = join(root, 'source');
     const output = join(root, 'output');
     for (const path of ['app/Example.php', 'bootstrap/app.php', 'config/app.php', 'database/migrations/example.php',
-        'resources/views/example.blade.php', 'routes/web.php', 'artisan', 'composer.json', 'composer.lock', 'README.md',
+        'resources/views/example.blade.php', 'routes/web.php', 'artisan', 'composer.json', 'composer.lock', 'README.md', 'LICENSE', 'LICENSING.md', 'MODULE-EXCEPTION.md',
         'public/index.php', 'public/.htaccess', 'public/site-icon.svg', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/fonts/geist.woff2', 'public/tracker/lueur.v1.js',
         'public/brands/chatgpt.svg', 'public/brands/LICENSE', 'public/maps/world.json', 'public/tracker/lueur.v1.js.gz', 'vendor/autoload.php', 'vendor/composer/platform_check.php']) {
         mkdirSync(join(source, path, '..'), { recursive: true });
@@ -66,7 +66,7 @@ test('production ZIP installs offline without exposing local secrets or generate
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /chosen folder\/public/);
     assert.match(result.stdout, /https:\/\/stats.example.com\/install/);
-    for (const path of ['resources/geoip/country.mmdb', 'resources/geoip/manifest.json', 'public/brands/chatgpt.svg', 'public/maps/world.json', 'README.md', 'vendor/autoload.php', 'public/build/manifest.json', 'public/.htaccess', 'public/site-icon.svg', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/tracker/lueur.v1.js.gz',
+    for (const path of ['resources/geoip/country.mmdb', 'resources/geoip/manifest.json', 'public/brands/chatgpt.svg', 'public/maps/world.json', 'README.md', 'LICENSE', 'LICENSING.md', 'MODULE-EXCEPTION.md', 'vendor/autoload.php', 'public/build/manifest.json', 'public/.htaccess', 'public/site-icon.svg', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/tracker/lueur.v1.js.gz',
         'storage/framework/sessions', 'storage/framework/cache/data', 'storage/framework/cache/locks', 'storage/framework/views', 'bootstrap/cache']) {
         assert.ok(existsSync(join(target, path)), path);
     }
