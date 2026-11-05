@@ -34,6 +34,9 @@ class InternalLinksTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        if (! is_dir(base_path('modules/white-label'))) {
+            $this->markTestSkipped('The official modules live in Perysee/perysee-modules; they are not checked out here.');
+        }
         app(InstallationState::class)->exclusive(fn () => app(InstallationState::class)->complete());
         config(['perysee.modules_path' => base_path('modules')]);
         app()->forgetInstance(ModuleRegistry::class);

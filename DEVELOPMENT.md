@@ -2,6 +2,17 @@
 
 Guide de développement local, de test et d’exploitation de Perysee Core. Les procédures de release et de distribution sont maintenues par l’équipe dans un dépôt privé.
 
+## Publier un module gratuit dans le catalogue
+
+Le catalogue public est celui de l'API (`GET /api/v1/catalog/modules`, dépôt `Perysee/web`). Les modules officiels vivent dans le dépôt privé `Perysee/perysee-modules` (dossier `perysee-modules/` de l'espace de travail), gratuits comme payants. L'API distribue leurs archives : elle lit la release privée avec un jeton en lecture seule et renvoie au Core une adresse GitHub temporaire, sans rien stocker. Chaque entrée porte une signature Ed25519 faite **hors serveur** ; l'adresse signée est celle de l'API (`/api/v1/modules/<id>/download`), donc stable. Un module payant exige un jeton dont la licence le couvre.
+
+1. **Clés (une seule fois).** `node scripts/sign-module.mjs keygen --out ~/.perysee/module-signing.key` dans `apps/api` crée la clé privée (jamais dans un dépôt, ni sur un serveur) et affiche la clé publique. Renseigner celle-ci dans `MODULE_SIGNING_PUBLIC_KEYS` de l'API (`{"k1":"<clé>"}`) et dans `resources/module-keys.json` du Core (`{"keys":{"k1":"<clé>"}}`). Pour une rotation, ajouter la nouvelle clé aux deux listes avant de signer avec elle ; retirer l'ancienne une fois les instances mises à jour.
+2. **Archives.** Dans `perysee-modules`, monter la `version` de `modules/<id>/module.json`, puis pousser le tag `<id>-v<version>` : le workflow `Release module` vérifie le tag, fabrique `<id>-<version>.zip` et `MODULES-SHA256SUMS` (`scripts/build-modules.php`) et crée la release privée.
+3. **Signature.** Pour chaque module : `node scripts/sign-module.mjs sign --key <clé> --key-id k1 --slug <id> --version <x.y.z> --archive <zip de la release> --url https://api.perysee.com/api/v1/modules/<id>/download --core <Perysee minimal> --stability <niveau>`. La sortie JSON se publie avec `PATCH /api/v1/modules/:id` (permission `modules.manage`) ; l'API refuse tout ensemble qui ne vérifie pas.
+4. **Contrôle.** Sur une instance de test : `PERYSEE_MODULE_CATALOG_URL=<api> php artisan perysee:modules catalog`, puis `install-from-catalog <id>`.
+
+Les assets d'une release publiée ne se remplacent jamais : l'empreinte est dans l'entrée signée. Corriger un module = nouvelle version, nouvelle release, nouvelle signature.
+
 ## Interface : navigation Inertia et Nuxt UI
 
 - **Liens internes = chemins.** Nuxt UI rend en simple `<a>` (donc recharge tout le document) tout lien qui porte un protocole. Les adresses envoyées à l'interface sont donc des chemins : `Ui::relativize` s'en charge pour les données de page et les propriétés partagées, et `queryUrl` garde un chemin comme chemin. `InternalLinksTest` échoue si un écran envoie un lien interne absolu. Un lien vers un autre site (`docsUrl`) reste absolu et doit porter `external: true`.
