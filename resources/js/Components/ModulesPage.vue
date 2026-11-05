@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { router } from "@inertiajs/vue3";
-const props = defineProps(["installed", "invalid", "path", "installer", "modulesEnabled", "moduleApi"]);
+const props = defineProps(["installed", "invalid", "path", "installer", "modulesEnabled", "moduleApi", "catalog"]);
 const busy = ref("");
 const installing = ref(false);
 const updating = ref(null);
@@ -26,6 +26,16 @@ const send = () => {
         onSuccess: () => { installing.value = false; updating.value = null; bundle.value = null; },
         onFinish: () => (sending.value = false),
     });
+};
+const catalogBusy = ref("");
+const checking = ref(false);
+const installFromCatalog = (entry) => {
+    catalogBusy.value = entry.slug;
+    router.post(entry.link, {}, { preserveScroll: true, onFinish: () => (catalogBusy.value = "") });
+};
+const checkCatalog = () => {
+    checking.value = true;
+    router.post(props.catalog.links.refresh, {}, { preserveScroll: true, onFinish: () => (checking.value = false) });
 };
 const confirming = ref(null);
 const accepted = ref(false);
@@ -112,7 +122,7 @@ const enabledCount = computed(() => props.installed.filter((module) => module.en
                 variant="soft"
                 icon="i-tabler-alert-triangle"
                 title="Only install code you trust"
-                description="A module is PHP code that runs with the same access as Perysee, including your database and files. Archives are not signed yet."
+                description="A module is PHP code that runs with the same access as Perysee, including your database and files. An archive you upload yourself is not signed: only modules installed from the catalog are checked."
                 class="mb-5"
             />
             <input
@@ -230,6 +240,73 @@ const enabledCount = computed(() => props.installed.filter((module) => module.en
                     />
                     </div>
                     <p v-if="blockedReason(module)" class="text-xs text-muted">{{ blockedReason(module) }}</p>
+                </div>
+            </li>
+        </ul>
+    </UCard>
+    <UCard v-if="catalog.enabled" class="mt-6">
+        <template #header>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-medium">Available modules</h2>
+                    <p class="text-xs text-muted">
+                        Free modules published by Perysee. Each one is checked against Perysee's signature before it is installed. Perysee sends nothing about your instance to look them up.
+                    </p>
+                </div>
+                <UButton
+                    label="Check the catalog"
+                    icon="i-tabler-refresh"
+                    color="neutral"
+                    variant="outline"
+                    :loading="checking"
+                    @click="checkCatalog"
+                />
+            </div>
+        </template>
+        <UAlert
+            v-if="catalog.error"
+            color="warning"
+            variant="soft"
+            icon="i-tabler-cloud-off"
+            title="The catalog could not be checked"
+            :description="catalog.error"
+            class="mb-4"
+        />
+        <p v-if="!catalog.entries.length && !catalog.error" class="text-sm text-muted">
+            {{ catalog.checked_at ? "The catalog lists no module yet." : "The catalog has not been checked yet. Use Check the catalog." }}
+        </p>
+        <ul v-else class="divide-y divide-default">
+            <li v-for="entry in catalog.entries" :key="entry.slug" class="py-4 first:pt-0 last:pb-0 flex flex-wrap items-start justify-between gap-4">
+                <div class="min-w-0 flex-1 basis-72">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="font-medium">{{ entry.name }}</h3>
+                        <span class="text-xs text-muted">v{{ entry.version }}</span>
+                        <UBadge label="Official" color="primary" variant="subtle" size="sm" />
+                        <UBadge v-bind="stabilityOf(entry)" variant="outline" size="sm" />
+                    </div>
+                    <p v-if="entry.description" class="text-sm text-muted mt-1">{{ entry.description }}</p>
+                    <p v-if="stabilityNote(entry)" class="text-xs text-muted mt-1">{{ stabilityNote(entry) }}</p>
+                    <p v-if="entry.reason" class="text-xs text-dimmed mt-1">{{ entry.reason }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span v-if="entry.state === 'installed'" class="text-xs text-muted">Installed v{{ entry.installed }}</span>
+                    <UButton
+                        v-else-if="entry.state === 'update'"
+                        :label="`Update from v${entry.installed}`"
+                        icon="i-tabler-upload"
+                        :disabled="!!entry.reason || !installer.available"
+                        :loading="catalogBusy === entry.slug"
+                        @click="installFromCatalog(entry)"
+                    />
+                    <UButton
+                        v-else-if="entry.state === 'available'"
+                        label="Install"
+                        icon="i-tabler-download"
+                        :disabled="!installer.available"
+                        :loading="catalogBusy === entry.slug"
+                        @click="installFromCatalog(entry)"
+                    />
+                    <UBadge v-else label="Not available" color="neutral" variant="subtle" size="sm" />
                 </div>
             </li>
         </ul>

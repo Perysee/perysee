@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Modules\Catalog\CatalogSignature;
+use App\Modules\Catalog\ModuleCatalog;
 use App\Modules\ModuleExtensions;
 use App\Modules\ModuleFailures;
 use App\Modules\ModuleLoader;
@@ -22,6 +24,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ModuleRegistry::class);
         $this->app->singleton(ModuleLoader::class);
         $this->app->singleton(ModuleFailures::class);
+        $this->app->singleton(ModuleCatalog::class);
+        $this->app->singleton(CatalogSignature::class, fn (): CatalogSignature => CatalogSignature::fromFile((string) config('perysee.module_catalog.keys_path')));
         $this->app->singleton(ModuleExtensions::class);
         $this->app->singleton(ModuleSettings::class);
         $this->app->singleton(ModuleScope::class);
