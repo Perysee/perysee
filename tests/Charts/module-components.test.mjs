@@ -13,7 +13,8 @@ const registered = () => {
 };
 
 const used = () => {
-    const sources = readdirSync(new URL("modules/", root), { withFileTypes: true })
+    // The official modules live in Perysee/perysee-modules and are only present when checked out here.
+    const sources = (existsSync(new URL("modules/", root)) ? readdirSync(new URL("modules/", root), { withFileTypes: true }) : [])
         .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
         .map((entry) => `modules/${entry.name}/dist/module.js`)
         .filter((path) => existsSync(new URL(path, root)));
