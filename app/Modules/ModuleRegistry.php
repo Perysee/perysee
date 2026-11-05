@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Throwable;
 
+/**
+ * @internal Not part of the module API: modules must not call it, and it may change in any release.
+ */
 final class ModuleRegistry
 {
     /** @var array<string, Module>|null */
@@ -72,21 +75,30 @@ final class ModuleRegistry
         return $this->invalid;
     }
 
-    public function enable(string $id): void
+    /**
+     * @param  bool  $acceptRisk  Confirms that the administrator knows an experimental module may break or lose data.
+     */
+    public function enable(string $id, bool $acceptRisk = false): void
     {
         $module = $this->installed($id);
+        if ($module->manifest->stability === 'experimental' && ! $acceptRisk) {
+            throw new RuntimeException("Module {$id} is experimental and may break or lose data. Back up first, then confirm that you accept the risk to enable it.");
+        }
         if (! $module->manifest->isCompatibleWith(config('perysee.version'))) {
             throw new RuntimeException("Module {$id} requires Perysee {$module->manifest->core} or later.");
+        }
+        if (! $module->manifest->supportsCurrentApi()) {
+            throw new RuntimeException("Module {$id} was written for module API {$module->manifest->api}, but this Perysee supports module API ".ModuleApi::VERSION.'.');
         }
         foreach ($module->manifest->requires as $dependency) {
             if (! ($this->all()[$dependency]->enabled ?? false)) {
                 throw new RuntimeException("Module {$id} requires {$dependency} to be enabled first.");
             }
         }
-        if (! $module->installed) {
-            $this->migrate($module);
-        }
+        // Pending migrations run every time: the first enable installs the module, a later one applies those of an updated version.
+        $this->migrate($module);
         $this->store($module, true);
+        app(ModuleFailures::class)->release($id);
     }
 
     public function disable(string $id): void

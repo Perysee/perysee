@@ -114,12 +114,14 @@ Un module est un dossier (`module.json`, `src/`, `routes.php`, `database/migrati
 ```sh
 php artisan perysee:modules list
 php artisan perysee:modules enable annotations
+php artisan perysee:modules update annotations --archive=annotations-1.1.0.zip   # le module doit être désactivé
+php artisan perysee:modules enable lab --accept-risk       # requis pour un module « experimental »
 php artisan perysee:modules disable annotations
 php artisan perysee:modules uninstall annotations --force   # supprime tables et réglages
 php artisan perysee:make-module pdf-export --name="PDF export"
 ```
 
-En local, relier un module maison au dossier des modules : `ln -s ../../../modules/example storage/app/modules/example`. Le guide d'écriture est dans la documentation (`Modules > Build a module`) et l'architecture dans `docs/planning/02-ARCHITECTURE-TECHNIQUE.md` (section 11). Les droits par module et le téléchargement de bundles signés ne sont pas implémentés.
+En local, relier un module maison au dossier des modules : `ln -s ../../../modules/example storage/app/modules/example`. Le guide d'écriture est dans la documentation (`Modules > Build a module`) et l'architecture dans `docs/planning/02-ARCHITECTURE-TECHNIQUE.md` (section 11). Chaque module déclare sa stabilité dans `module.json` (`stable`, `beta` ou `experimental`, `beta` par défaut) : l’interface l’affiche, et un module expérimental ne s’active qu’après confirmation (`--accept-risk` en terminal). Un module qui échoue de façon répétée (chargement, données de page, marque, carte Santé, exceptions levées par ses fichiers) est mis en quarantaine : désactivé avec ses dépendants, données conservées, motif affiché sur la page Modules et la page Santé ; réactivez-le une fois corrigé. Seuils dans `config/perysee.php` (`module_failures`). Un module se met à jour depuis la page Modules ou en terminal avec une archive de version strictement supérieure : l’ancien dossier est conservé dans `storage/app/modules-backup` (trois versions), et les migrations de la nouvelle version s’appliquent à la prochaine activation. `module.json` déclare aussi `api` (version du contrat entre le Core et les modules, 1 aujourd’hui) : un module écrit pour une autre version est refusé. Si un module empêche l’instance de fonctionner, `PERYSEE_MODULES=false` dans `.env` démarre Perysee sans charger aucun module (ni leurs scripts) ; leur état est conservé et la page Modules l’indique. Les droits par module et le téléchargement de bundles signés ne sont pas implémentés.
 
 ## Documentation du produit
 

@@ -5,5 +5,6 @@
     "core": "0.1.1",
     "requires": [],
     "entitlement": "annotations",
+    "stability": "stable",
     "description": "Dated notes on a site, such as a launch or an incident, shown under its reports."
 }

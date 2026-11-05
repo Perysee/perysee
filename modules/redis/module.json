@@ -5,5 +5,6 @@
     "core": "0.1.1",
     "requires": [],
     "entitlement": "redis",
+    "stability": "beta",
     "description": "Optional Redis accelerator: collection rate limit and failure counters, with an automatic fallback to the application cache."
 }

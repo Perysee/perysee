@@ -41,6 +41,43 @@ class ModuleAdminPageTest extends TestCase
         return User::factory()->create(['is_admin' => true]);
     }
 
+    public function test_the_list_exposes_each_stability_level_and_defaults_to_beta(): void
+    {
+        $this->install('alpha', ['stability' => 'stable']);
+        $this->install('beta-one');
+        $this->install('lab', ['stability' => 'experimental']);
+
+        $this->actingAs($this->admin())->get('/settings/modules')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('installed.0.stability', 'stable')
+            ->where('installed.1.stability', 'beta')
+            ->where('installed.2.stability', 'experimental'));
+    }
+
+    public function test_an_experimental_module_is_enabled_only_after_the_risk_is_accepted(): void
+    {
+        $this->install('lab', ['stability' => 'experimental']);
+        $this->actingAs($this->admin());
+
+        $this->post('/settings/modules/lab/enable')->assertRedirect(route('modules.index'))->assertSessionHas('error');
+        $this->assertDatabaseMissing('modules', ['id' => 'lab']);
+
+        $this->post('/settings/modules/lab/enable', ['accept_risk' => '1'])->assertRedirect(route('modules.index'))->assertSessionHas('status');
+        $this->assertDatabaseHas('modules', ['id' => 'lab', 'enabled' => true]);
+    }
+
+    public function test_the_page_says_when_modules_are_switched_off(): void
+    {
+        $this->install('alpha');
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->get('/settings/modules')->assertInertia(fn (Assert $page) => $page->where('modulesEnabled', true));
+
+        config(['perysee.modules_enabled' => false]);
+        $this->actingAs($admin)->get('/settings/modules')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('modulesEnabled', false)
+            ->where('installed.0.id', 'alpha'));
+    }
+
     public function test_only_administrators_can_open_the_page(): void
     {
         $this->get('/settings/modules')->assertRedirect('/login');

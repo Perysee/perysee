@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Key-value settings owned by a module. Values are stored as JSON, so any scalar or array round-trips.
+ *
+ * @api Part of module API 1.
  */
 final class ModuleSettings
 {

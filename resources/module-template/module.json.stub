@@ -5,5 +5,7 @@
     "core": "{{core}}",
     "requires": [],
     "entitlement": "{{id}}",
+    "api": 1,
+    "stability": "beta",
     "description": "{{name}} module for Perysee."
 }

@@ -57,6 +57,56 @@ class ModuleRegistryTest extends TestCase
         $this->assertEqualsCanonicalizing(['broken', 'other'], array_keys($this->registry()->invalid()));
     }
 
+    public function test_a_module_written_for_an_unsupported_api_is_refused_with_its_reason(): void
+    {
+        $this->makeModule('future-api', ['api' => 2]);
+
+        try {
+            $this->registry()->enable('future-api');
+            $this->fail('A module for another module API must not be enabled.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('module API 2', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('modules', ['id' => 'future-api']);
+    }
+
+    public function test_an_experimental_module_is_not_enabled_without_an_explicit_acceptance(): void
+    {
+        $this->makeModule('lab', ['stability' => 'experimental']);
+
+        try {
+            $this->registry()->enable('lab');
+            $this->fail('An experimental module must not be enabled without acceptance.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('experimental', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('modules', ['id' => 'lab']);
+        $this->assertFalse($this->registry()->all()['lab']->enabled);
+    }
+
+    public function test_an_experimental_module_is_enabled_once_the_risk_is_accepted(): void
+    {
+        $this->makeModule('lab', ['stability' => 'experimental']);
+
+        $this->registry()->enable('lab', acceptRisk: true);
+
+        $this->assertDatabaseHas('modules', ['id' => 'lab', 'enabled' => true]);
+    }
+
+    public function test_stable_beta_and_undeclared_modules_need_no_acceptance(): void
+    {
+        $this->makeModule('solid', ['stability' => 'stable']);
+        $this->makeModule('early', ['stability' => 'beta']);
+        $this->makeModule('unlabelled');
+
+        foreach (['solid', 'early', 'unlabelled'] as $id) {
+            $this->registry()->enable($id);
+            $this->assertDatabaseHas('modules', ['id' => $id, 'enabled' => true]);
+        }
+    }
+
     public function test_enabling_persists_the_state_and_installed_version(): void
     {
         $this->makeModule('pdf-export');

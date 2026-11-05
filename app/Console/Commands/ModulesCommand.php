@@ -2,13 +2,15 @@
 
 namespace App\Console\Commands;
 
+use App\Modules\InvalidModuleBundle;
+use App\Modules\ModuleInstaller;
 use App\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
 use RuntimeException;
 
 class ModulesCommand extends Command
 {
-    protected $signature = 'perysee:modules {action : list, enable, disable or uninstall} {module? : Module id for enable, disable and uninstall} {--force : Confirm that uninstall deletes the tables and settings of the module}';
+    protected $signature = 'perysee:modules {action : list, enable, disable, update or uninstall} {module? : Module id for enable, disable and uninstall} {--archive= : ZIP archive of the newer version, for update} {--accept-risk : Confirm that you accept enabling an experimental module} {--force : Confirm that uninstall deletes the tables and settings of the module}';
 
     protected $description = 'List installed modules, or enable, disable or uninstall one';
 
@@ -17,7 +19,7 @@ class ModulesCommand extends Command
         $action = $this->argument('action');
         if ($action === 'list') {
             foreach ($registry->all() as $module) {
-                $this->line("{$module->manifest->id} {$module->manifest->version} ".($module->enabled ? 'enabled' : 'disabled'));
+                $this->line("{$module->manifest->id} {$module->manifest->version} ".($module->enabled ? 'enabled' : 'disabled')." {$module->manifest->stability}");
             }
             foreach ($registry->invalid() as $directory => $reason) {
                 $this->warn("Ignored {$directory}: {$reason}");
@@ -26,8 +28,8 @@ class ModulesCommand extends Command
             return self::SUCCESS;
         }
         $id = $this->argument('module');
-        if (! in_array($action, ['enable', 'disable', 'uninstall'], true) || ! $id) {
-            $this->error('Usage: perysee:modules list | enable <module> | disable <module> | uninstall <module> --force');
+        if (! in_array($action, ['enable', 'disable', 'update', 'uninstall'], true) || ! $id) {
+            $this->error('Usage: perysee:modules list | enable <module> | disable <module> | update <module> --archive=<file.zip> | uninstall <module> --force');
 
             return self::FAILURE;
         }
@@ -36,9 +38,12 @@ class ModulesCommand extends Command
 
             return self::FAILURE;
         }
+        if ($action === 'update') {
+            return $this->update($id);
+        }
         try {
             match ($action) {
-                'enable' => $registry->enable($id),
+                'enable' => $registry->enable($id, (bool) $this->option('accept-risk')),
                 'disable' => $registry->disable($id),
                 'uninstall' => $registry->uninstall($id),
             };
@@ -48,6 +53,26 @@ class ModulesCommand extends Command
             return self::FAILURE;
         }
         $this->info("Module {$id} ".($action === 'uninstall' ? 'uninstalled' : $action.'d').'.');
+
+        return self::SUCCESS;
+    }
+
+    private function update(string $id): int
+    {
+        $archive = (string) $this->option('archive');
+        if ($archive === '' || ! is_file($archive)) {
+            $this->error('Give the ZIP archive of the newer version with --archive=<file.zip>.');
+
+            return self::FAILURE;
+        }
+        try {
+            $manifest = app(ModuleInstaller::class)->update($archive, $id);
+        } catch (InvalidModuleBundle $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
+        $this->info("Module {$id} updated to {$manifest->version}. Enable it to apply its database changes.");
 
         return self::SUCCESS;
     }

@@ -59,6 +59,18 @@ class ModuleAssetTest extends TestCase
         $this->get('/modules/assets-auth/assets/module.js')->assertRedirect('/login');
     }
 
+    public function test_no_module_script_or_style_is_shared_when_modules_are_switched_off(): void
+    {
+        $this->install('assets-paused');
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->has('modules.scripts', 1)->has('modules.styles', 1));
+
+        config(['perysee.modules_enabled' => false]);
+        $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->has('modules.scripts', 0)->has('modules.styles', 0));
+        $this->get('/modules/assets-paused/assets/module.js')->assertNotFound();
+    }
+
     public function test_disabled_or_unknown_modules_serve_nothing(): void
     {
         $this->install('assets-off', enabled: false);

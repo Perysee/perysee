@@ -73,6 +73,9 @@ class HandleInertiaRequests extends Middleware
      */
     private function moduleAssets(string $file): array
     {
+        if (! config('perysee.modules_enabled')) {
+            return [];
+        }
         $failures = app(ModuleLoader::class)->failures();
         $urls = [];
         foreach (app(ModuleRegistry::class)->enabled() as $id => $module) {

@@ -1,31 +1,71 @@
 <script setup>
 import { computed, ref } from "vue";
 import { router } from "@inertiajs/vue3";
-const props = defineProps(["installed", "invalid", "path", "installer"]);
+const props = defineProps(["installed", "invalid", "path", "installer", "modulesEnabled", "moduleApi"]);
 const busy = ref("");
 const installing = ref(false);
+const updating = ref(null);
 const sending = ref(false);
 const bundle = ref(null);
+const startUpdate = (module) => {
+    updating.value = module;
+    bundle.value = null;
+    installing.value = true;
+};
+const closeUpload = (open) => {
+    if (!open) {
+        updating.value = null;
+    }
+};
 const send = () => {
     if (!bundle.value) return;
     sending.value = true;
-    router.post(props.installer.link, { bundle: bundle.value }, {
+    const target = updating.value ? updating.value.links.update : props.installer.link;
+    router.post(target, { bundle: bundle.value }, {
         forceFormData: true,
-        onSuccess: () => { installing.value = false; bundle.value = null; },
+        onSuccess: () => { installing.value = false; updating.value = null; bundle.value = null; },
         onFinish: () => (sending.value = false),
     });
 };
-const change = (module, action) => {
+const confirming = ref(null);
+const accepted = ref(false);
+const change = (module, action, data = {}) => {
     busy.value = module.id;
-    router.post(module.links[action], {}, { preserveScroll: true, onFinish: () => (busy.value = "") });
+    router.post(module.links[action], data, { preserveScroll: true, onFinish: () => (busy.value = "") });
+};
+const enable = (module) => {
+    if (module.stability === "experimental") {
+        accepted.value = false;
+        confirming.value = module;
+        return;
+    }
+    change(module, "enable");
+};
+const confirmEnable = () => {
+    const module = confirming.value;
+    confirming.value = null;
+    change(module, "enable", { accept_risk: true });
+};
+const stabilityOf = (module) => {
+    if (module.stability === "experimental") return { label: "Experimental", color: "error" };
+    if (module.stability === "beta") return { label: "Beta", color: "warning" };
+    return { label: "Stable", color: "neutral" };
+};
+const stabilityNote = (module) => {
+    if (module.stability === "experimental") return "Experimental: it may break or lose data, and it can change without notice.";
+    if (module.stability === "beta") return "Beta: it is still being tested and may change between versions.";
+    return "";
 };
 const stateOf = (module) => {
+    if (module.quarantine) return { label: "In quarantine", color: "error" };
     if (module.failure) return { label: "Failed to load", color: "error" };
+    if (module.api !== props.moduleApi) return { label: "Other module API", color: "warning" };
     if (!module.compatible) return { label: "Needs a newer Perysee", color: "warning" };
     return module.enabled ? { label: "Enabled", color: "success" } : { label: "Disabled", color: "neutral" };
 };
 const blockedReason = (module) => {
     if (module.enabled && module.dependents.length) return `Required by ${module.dependents.join(", ")}`;
+    if (!module.enabled && module.api !== props.moduleApi) return `Written for module API ${module.api}; this Perysee supports ${props.moduleApi}`;
     if (!module.enabled && !module.compatible) return `Requires Perysee ${module.core} or later`;
     if (!module.enabled && module.missing_dependencies.length) return `Enable ${module.missing_dependencies.join(", ")} first`;
     return "";
@@ -51,10 +91,20 @@ const enabledCount = computed(() => props.installed.filter((module) => module.en
             <p v-if="!installer.available" class="text-xs text-muted max-w-64 text-right">{{ installer.reason }}</p>
         </div>
     </div>
+    <UAlert
+        v-if="!modulesEnabled"
+        color="warning"
+        variant="soft"
+        icon="i-tabler-puzzle-off"
+        title="Modules are switched off"
+        description="PERYSEE_MODULES is set to false in the environment file, so no module is loaded and none can run. Enabled modules keep their state. Remove the setting and reload to use them again."
+        class="mb-6"
+    />
     <UModal
         v-model:open="installing"
-        title="Install a module"
-        description="Upload the ZIP archive of a module. It is unpacked but not run: you enable it afterwards."
+        :title="updating ? `Update ${updating.name}` : 'Install a module'"
+        :description="updating ? `Upload the ZIP archive of a newer version of ${updating.name}. The current version is kept as a backup; enabling the module applies the database changes of the new one.` : 'Upload the ZIP archive of a module. It is unpacked but not run: you enable it afterwards.'"
+        @update:open="closeUpload"
     >
         <template #body>
             <UAlert
@@ -77,7 +127,31 @@ const enabledCount = computed(() => props.installed.filter((module) => module.en
         <template #footer>
             <div class="flex justify-end gap-3 w-full">
                 <UButton label="Cancel" color="neutral" variant="ghost" @click="installing = false" />
-                <UButton label="Install" icon="i-tabler-upload" :disabled="!bundle" :loading="sending" @click="send" />
+                <UButton :label="updating ? 'Update' : 'Install'" icon="i-tabler-upload" :disabled="!bundle" :loading="sending" @click="send" />
+            </div>
+        </template>
+    </UModal>
+    <UModal
+        :open="confirming !== null"
+        title="Enable an experimental module"
+        :description="confirming ? `${confirming.name} is experimental.` : ''"
+        @update:open="confirming = null"
+    >
+        <template #body>
+            <UAlert
+                color="error"
+                variant="soft"
+                icon="i-tabler-alert-triangle"
+                title="It may break or lose data"
+                description="An experimental module can fail, change without notice or damage the data it stores. Back up your database before you enable it."
+                class="mb-5"
+            />
+            <UCheckbox v-model="accepted" label="I have a backup and I accept the risk" />
+        </template>
+        <template #footer>
+            <div class="flex justify-end gap-3 w-full">
+                <UButton label="Cancel" color="neutral" variant="ghost" @click="confirming = null" />
+                <UButton label="Enable" color="error" :disabled="!accepted" @click="confirmEnable" />
             </div>
         </template>
     </UModal>
@@ -95,6 +169,7 @@ const enabledCount = computed(() => props.installed.filter((module) => module.en
                         <h2 class="font-medium">{{ module.name }}</h2>
                         <span class="text-xs text-muted">v{{ module.version }}</span>
                         <UBadge v-bind="stateOf(module)" variant="subtle" size="sm" />
+                        <UBadge v-bind="stabilityOf(module)" variant="outline" size="sm" />
                         <UBadge
                             v-if="module.enabled && !module.scope.all"
                             :label="module.scope.count === 1 ? '1 site' : `${module.scope.count} sites`"
@@ -104,8 +179,18 @@ const enabledCount = computed(() => props.installed.filter((module) => module.en
                         />
                     </div>
                     <p v-if="module.description" class="text-sm text-muted mt-1">{{ module.description }}</p>
+                    <p v-if="stabilityNote(module)" class="text-xs text-muted mt-1">{{ stabilityNote(module) }}</p>
                     <p v-if="module.requires.length" class="text-xs text-dimmed mt-1">Requires {{ module.requires.join(", ") }}</p>
                     <p v-if="!module.installed" class="text-xs text-dimmed mt-1">Enabling it for the first time installs it, including its database changes.</p>
+                    <UAlert
+                        v-if="module.quarantine"
+                        color="error"
+                        variant="soft"
+                        icon="i-tabler-shield-off"
+                        title="Disabled automatically after repeated failures"
+                        :description="`${module.quarantine.reason}. Its data is kept. Enable it again once it is fixed or replaced.`"
+                        class="mt-3"
+                    />
                     <UAlert
                         v-if="module.failure"
                         color="error"
@@ -129,11 +214,19 @@ const enabledCount = computed(() => props.installed.filter((module) => module.en
                         @click="change(module, 'disable')"
                     />
                     <UButton
-                        v-else
+                        v-if="!module.enabled && installer.available"
+                        label="Update"
+                        color="neutral"
+                        variant="ghost"
+                        icon="i-tabler-upload"
+                        @click="startUpdate(module)"
+                    />
+                    <UButton
+                        v-if="!module.enabled"
                         label="Enable"
                         :loading="busy === module.id"
                         :disabled="!module.compatible || module.missing_dependencies.length > 0"
-                        @click="change(module, 'enable')"
+                        @click="enable(module)"
                     />
                     </div>
                     <p v-if="blockedReason(module)" class="text-xs text-muted">{{ blockedReason(module) }}</p>

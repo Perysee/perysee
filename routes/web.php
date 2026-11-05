@@ -55,6 +55,7 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/settings', [WorkspaceController::class, 'settings'])->name('settings');
         Route::get('/settings/modules', [ModuleController::class, 'index'])->name('modules.index');
         Route::post('/settings/modules/install', [ModuleController::class, 'install'])->name('modules.install');
+        Route::post('/settings/modules/{module}/update', [ModuleController::class, 'update'])->name('modules.update');
         Route::get('/settings/modules/{module}', [ModuleController::class, 'settings'])->name('modules.settings');
         Route::post('/settings/modules/{module}/scope', [ModuleController::class, 'updateScope'])->name('modules.scope');
         Route::post('/settings/modules/{module}/enable', [ModuleController::class, 'enable'])->name('modules.enable');

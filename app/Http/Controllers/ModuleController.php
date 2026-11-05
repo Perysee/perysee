@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Website;
 use App\Modules\InvalidModuleBundle;
 use App\Modules\Module;
+use App\Modules\ModuleApi;
+use App\Modules\ModuleFailures;
 use App\Modules\ModuleInstaller;
 use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
@@ -20,10 +22,11 @@ use RuntimeException;
 
 class ModuleController extends Controller
 {
-    public function index(Request $request, ModuleRegistry $registry, ModuleLoader $loader, ModuleScope $scope): Response
+    public function index(Request $request, ModuleRegistry $registry, ModuleLoader $loader, ModuleScope $scope, ModuleFailures $failures): Response
     {
         $this->authorizeAdministrator($request);
-        $failures = $loader->failures();
+        $quarantined = $failures->quarantined();
+        $loadFailures = $loader->failures();
         $enabled = $registry->enabled();
         $modules = array_map(fn (Module $module): array => [
             'id' => $module->manifest->id,
@@ -31,15 +34,18 @@ class ModuleController extends Controller
             'version' => $module->manifest->version,
             'description' => $module->manifest->description,
             'core' => $module->manifest->core,
+            'stability' => $module->manifest->stability,
             'enabled' => $module->enabled,
-            'compatible' => $module->manifest->isCompatibleWith(config('perysee.version')),
+            'compatible' => $module->manifest->isCompatibleWith(config('perysee.version')) && $module->manifest->supportsCurrentApi(),
+            'api' => $module->manifest->api,
             'requires' => $module->manifest->requires,
             'missing_dependencies' => array_values(array_filter($module->manifest->requires, fn (string $id): bool => ! isset($enabled[$id]))),
             'dependents' => array_values(array_keys(array_filter($enabled, fn (Module $other): bool => in_array($module->manifest->id, $other->manifest->requires, true)))),
-            'failure' => $failures[$module->manifest->id] ?? null,
+            'failure' => $loadFailures[$module->manifest->id] ?? null,
+            'quarantine' => $quarantined[$module->manifest->id] ?? null,
             'installed' => $module->installed,
             'scope' => ['all' => $scope->coversAllSites($module->manifest->id), 'count' => count($scope->siteIds($module->manifest->id))],
-            'links' => ['enable' => route('modules.enable', $module->manifest->id), 'disable' => route('modules.disable', $module->manifest->id), 'settings' => route('modules.settings', $module->manifest->id)],
+            'links' => ['update' => route('modules.update', $module->manifest->id, false), 'enable' => route('modules.enable', $module->manifest->id), 'disable' => route('modules.disable', $module->manifest->id), 'settings' => route('modules.settings', $module->manifest->id)],
         ], array_values($registry->all()));
         $invalid = [];
         foreach ($registry->invalid() as $directory => $reason) {
@@ -50,6 +56,8 @@ class ModuleController extends Controller
             'installed' => $modules,
             'invalid' => $invalid,
             'path' => config('perysee.modules_path'),
+            'modulesEnabled' => (bool) config('perysee.modules_enabled'),
+            'moduleApi' => ModuleApi::VERSION,
             'installer' => [
                 'available' => ModuleInstaller::unavailableReason() === null,
                 'reason' => ModuleInstaller::unavailableReason(),
@@ -73,6 +81,7 @@ class ModuleController extends Controller
                 'id' => $installed->manifest->id,
                 'name' => $installed->manifest->name,
                 'version' => $installed->manifest->version,
+                'stability' => $installed->manifest->stability,
                 'description' => $installed->manifest->description,
                 'enabled' => $installed->enabled,
                 'installed' => $installed->installed,
@@ -123,9 +132,24 @@ class ModuleController extends Controller
         return redirect()->route('modules.index')->with('status', "Module {$manifest->name} installed. Enable it to start using it.");
     }
 
+    public function update(Request $request, ModuleInstaller $installer, string $module): RedirectResponse
+    {
+        $this->authorizeAdministrator($request);
+        abort_unless(config('perysee.module_uploads'), 403, 'Uploading modules is turned off on this instance.');
+        $request->validate(['bundle' => ['required', 'file', 'mimes:zip', 'max:'.(int) config('perysee.module_upload_max_kb')]]);
+        try {
+            $manifest = $installer->update($request->file('bundle')->getRealPath(), $module);
+        } catch (InvalidModuleBundle $exception) {
+            return redirect()->route('modules.index')->with('error', $exception->getMessage());
+        }
+        Log::info('A module was updated from an archive.', ['module' => $manifest->id, 'version' => $manifest->version, 'user' => $request->user()->id]);
+
+        return redirect()->route('modules.index')->with('status', "Module {$manifest->name} updated to {$manifest->version}. Enable it to apply its database changes and start it.");
+    }
+
     public function enable(Request $request, ModuleRegistry $registry, string $module): RedirectResponse
     {
-        return $this->change($request, fn () => $registry->enable($module), "Module {$module} enabled.");
+        return $this->change($request, fn () => $registry->enable($module, $request->boolean('accept_risk')), "Module {$module} enabled.");
     }
 
     public function disable(Request $request, ModuleRegistry $registry, string $module): RedirectResponse

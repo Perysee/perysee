@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Modules\InvalidManifest;
 use App\Modules\Manifest;
+use App\Modules\ModuleApi;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -46,6 +47,71 @@ class ModuleManifestTest extends TestCase
 
         $this->assertSame([], $manifest->requires);
         $this->assertSame('pdf-export', $manifest->entitlement);
+    }
+
+    public function test_the_module_api_defaults_to_the_current_one_and_is_supported(): void
+    {
+        $manifest = Manifest::fromArray($this->valid());
+
+        $this->assertSame(ModuleApi::VERSION, $manifest->api);
+        $this->assertTrue($manifest->supportsCurrentApi());
+    }
+
+    public function test_a_module_written_for_another_api_version_is_not_supported(): void
+    {
+        $manifest = Manifest::fromArray($this->valid(['api' => ModuleApi::VERSION + 1]));
+
+        $this->assertSame(ModuleApi::VERSION + 1, $manifest->api);
+        $this->assertFalse($manifest->supportsCurrentApi());
+    }
+
+    #[DataProvider('invalidApis')]
+    public function test_an_invalid_api_version_is_rejected(mixed $api): void
+    {
+        $this->expectException(InvalidManifest::class);
+        Manifest::fromArray($this->valid(['api' => $api]));
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function invalidApis(): array
+    {
+        return ['zero' => [0], 'negative' => [-1], 'text' => ['1'], 'decimal' => [1.5], 'list' => [[1]]];
+    }
+
+    public function test_stability_defaults_to_beta_so_an_undeclared_module_never_looks_stable(): void
+    {
+        $this->assertSame('beta', Manifest::fromArray($this->valid())->stability);
+    }
+
+    #[DataProvider('stabilityLevels')]
+    public function test_a_declared_stability_level_is_kept(string $level): void
+    {
+        $this->assertSame($level, Manifest::fromArray($this->valid(['stability' => $level]))->stability);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function stabilityLevels(): array
+    {
+        return ['stable' => ['stable'], 'beta' => ['beta'], 'experimental' => ['experimental']];
+    }
+
+    #[DataProvider('invalidStabilities')]
+    public function test_an_unknown_stability_level_is_rejected(mixed $level): void
+    {
+        $this->expectException(InvalidManifest::class);
+        Manifest::fromArray($this->valid(['stability' => $level]));
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function invalidStabilities(): array
+    {
+        return ['unknown word' => ['rock-solid'], 'wrong case' => ['Stable'], 'empty' => [''], 'number' => [1], 'list' => [['stable']]];
     }
 
     #[DataProvider('missingFields')]
