@@ -5,7 +5,7 @@ return [
     'modules_path' => env('PERYSEE_MODULES_PATH', storage_path('app/modules')),
     'update' => [
         'check' => (bool) env('PERYSEE_UPDATE_CHECK', true),
-        'repository' => env('PERYSEE_UPDATE_REPOSITORY', 'Perysee/app'),
+        'repository' => env('PERYSEE_UPDATE_REPOSITORY', 'Perysee/perysee'),
     ],
     'module_uploads' => (bool) env('PERYSEE_MODULE_UPLOADS', true),
     'module_upload_max_kb' => (int) env('PERYSEE_MODULE_UPLOAD_MAX_KB', 20480),

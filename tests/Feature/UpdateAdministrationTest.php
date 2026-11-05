@@ -21,9 +21,9 @@ class UpdateAdministrationTest extends TestCase
 
     private function release(string $tag = 'v9.9.9', bool $draft = false): array
     {
-        return ['tag_name' => $tag, 'draft' => $draft, 'published_at' => '2026-11-04T10:00:00Z', 'html_url' => "https://github.com/Perysee/app/releases/tag/{$tag}", 'assets' => [
-            ['name' => 'perysee.zip', 'browser_download_url' => 'https://github.com/Perysee/app/releases/download/'.$tag.'/perysee.zip'],
-            ['name' => 'SHA256SUMS', 'browser_download_url' => 'https://github.com/Perysee/app/releases/download/'.$tag.'/SHA256SUMS'],
+        return ['tag_name' => $tag, 'draft' => $draft, 'published_at' => '2026-11-04T10:00:00Z', 'html_url' => "https://github.com/Perysee/perysee/releases/tag/{$tag}", 'assets' => [
+            ['name' => 'perysee.zip', 'browser_download_url' => 'https://github.com/Perysee/perysee/releases/download/'.$tag.'/perysee.zip'],
+            ['name' => 'SHA256SUMS', 'browser_download_url' => 'https://github.com/Perysee/perysee/releases/download/'.$tag.'/SHA256SUMS'],
         ]];
     }
 
@@ -66,7 +66,7 @@ class UpdateAdministrationTest extends TestCase
         $this->assertSame('9.9.9', $feed->available()?->version());
         config(['perysee.version' => '9.9.9']);
         $this->assertNull($feed->available());
-        Http::assertSent(fn ($request) => $request->url() === 'https://api.github.com/repos/Perysee/app/releases/latest' && str_starts_with($request->header('User-Agent')[0], 'Perysee/'));
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.github.com/repos/Perysee/perysee/releases/latest' && str_starts_with($request->header('User-Agent')[0], 'Perysee/'));
     }
 
     public function test_a_release_without_its_archive_and_checksums_does_not_exist_for_instances(): void
