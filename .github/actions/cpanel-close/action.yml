@@ -1,0 +1,27 @@
+name: Close cPanel access
+description: Removes the runner from the cPanel SSH whitelist and deletes the ephemeral SSH key. Never fails the job.
+
+inputs:
+  host:
+    description: Direct o2switch host name
+    required: true
+  user:
+    description: cPanel user
+    required: true
+  api-token:
+    description: cPanel API token allowed to manage the SSH whitelist
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Remove the runner from the whitelist and delete credentials
+      shell: bash
+      env:
+        CPANEL_HOST: ${{ inputs.host }}
+        CPANEL_USER: ${{ inputs.user }}
+        CPANEL_API_TOKEN: ${{ inputs.api-token }}
+      run: |
+        curl -sS --max-time 45 -H "Authorization: cpanel $CPANEL_USER:$CPANEL_API_TOKEN" \
+          "https://$CPANEL_HOST:2083/execute/SshWhitelist/remove_all" > /dev/null || true
+        rm -rf "$RUNNER_TEMP/cpanel-ssh" "$RUNNER_TEMP"/*.env
