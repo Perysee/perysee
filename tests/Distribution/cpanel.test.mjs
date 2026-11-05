@@ -24,7 +24,7 @@ async function fixture(t) {
     mkdirSync(join(cache, 'releases/v1.2.3'), { recursive: true });
     copyFileSync(resolve('infra/downloads/Gateway.php'), join(directory, 'Gateway.php'));
     copyFileSync(resolve('infra/downloads/public/index.php'), join(publicRoot, 'index.php'));
-    writeFileSync(join(directory, 'config.php'), `<?php return ['origin' => 'https://get.perysee.com', 'repository' => 'Perysee/app', 'token' => 'private-http-test-token', 'cache_path' => __DIR__.'/private-cache'];`);
+    writeFileSync(join(directory, 'config.php'), `<?php return ['origin' => 'https://get.perysee.com', 'repository' => 'Perysee/perysee', 'token' => 'private-http-test-token', 'cache_path' => __DIR__.'/private-cache'];`);
     writeFileSync(join(cache, 'latest.json'), JSON.stringify({ version: 'v1.2.3', at: Math.floor(Date.now() / 1000) }));
     writeFileSync(join(cache, 'releases/v1.2.3/install.sh'), '#!/bin/bash\necho installer\n');
     writeFileSync(join(cache, 'releases/v1.2.3/install.php'), '<?php echo "MUST_NOT_EXECUTE";');

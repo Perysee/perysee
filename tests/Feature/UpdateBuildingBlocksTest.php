@@ -54,7 +54,7 @@ class UpdateBuildingBlocksTest extends TestCase
             'perysee/artisan' => '<?php // artisan', 'perysee/config/perysee.php' => "<?php return ['version' => '0.2.0'];",
             'perysee/public/index.php' => '<?php // front', 'perysee/public/build/manifest.json' => '{}',
             'perysee/vendor/autoload.php' => '<?php', 'perysee/vendor/composer/platform_check.php' => '<?php if (!(PHP_VERSION_ID >= 80300)) {}',
-            'perysee/release.json' => json_encode(['version' => $version, 'repository' => 'Perysee/app']),
+            'perysee/release.json' => json_encode(['version' => $version, 'repository' => 'Perysee/perysee']),
         ];
     }
 

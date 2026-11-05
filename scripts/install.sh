@@ -2,7 +2,7 @@
 set -euo pipefail
 
 main() {
-    local release_base='https://github.com/Perysee/app/releases/latest/download'
+    local release_base='https://github.com/Perysee/perysee/releases/latest/download'
     local download_base="${PERYSEE_DOWNLOAD_URL:-$release_base}"
     local php_binary="${PERYSEE_PHP:-php}"
 

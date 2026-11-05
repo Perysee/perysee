@@ -59,7 +59,7 @@ class UpdateRunnerTest extends TestCase
             'artisan' => $this->fakeArtisan('new', $finalize), 'app/Marker.php' => 'new', 'config/perysee.php' => "<?php return ['version' => '{$version}'];",
             'public/index.php' => '<?php // front', 'public/build/manifest.json' => '{}', 'vendor/autoload.php' => '<?php',
             'vendor/composer/platform_check.php' => '<?php if (!(PHP_VERSION_ID >= 80300)) {}',
-            'release.json' => json_encode(['version' => "v{$version}", 'repository' => 'Perysee/app']),
+            'release.json' => json_encode(['version' => "v{$version}", 'repository' => 'Perysee/perysee']),
         ] as $name => $contents) {
             $zip->addFromString('perysee/'.$name, $contents);
         }
@@ -72,7 +72,7 @@ class UpdateRunnerTest extends TestCase
     {
         $sha256 ??= hash_file('sha256', $archive);
         Http::fake([
-            'api.github.com/repos/Perysee/app/releases/*' => Http::response(['tag_name' => 'v9.9.9', 'draft' => false, 'published_at' => '2026-11-04T10:00:00Z', 'html_url' => 'https://github.com/Perysee/app/releases/tag/v9.9.9', 'assets' => [
+            'api.github.com/repos/Perysee/perysee/releases/*' => Http::response(['tag_name' => 'v9.9.9', 'draft' => false, 'published_at' => '2026-11-04T10:00:00Z', 'html_url' => 'https://github.com/Perysee/perysee/releases/tag/v9.9.9', 'assets' => [
                 ['name' => 'perysee.zip', 'browser_download_url' => self::ARCHIVE_URL],
                 ['name' => 'SHA256SUMS', 'browser_download_url' => 'https://downloads.test/SHA256SUMS'],
             ]]),
