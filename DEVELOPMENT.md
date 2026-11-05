@@ -35,7 +35,7 @@ php scripts/build-release.php --version v0.1.1 --repository Perysee/app
 - `install.sh` : point d’entrée shell, lié à cette version.
 - `SHA256SUMS` : empreintes des trois fichiers précédents.
 
-Le script shell publié utilise par défaut `https://get.perysee.com/releases/VERSION` : son exécution directe ne nécessite aucun identifiant GitHub côté client. La racine du relais fixe également cette adresse pour chaque installation.
+Le script shell publié utilise par défaut `https://get.perysee.com/releases/VERSION` : son exécution directe ne nécessite aucun identifiant GitHub côté client. La redirection de la racine de `get.perysee.com` sert le script de la release, qui fixe lui-même cette adresse pour chaque installation.
 
 Le packager utilise une liste explicite de chemins. Il ne distribue ni `.env`, ni secrets/verrous d’installation locaux, ni sessions, logs, caches PHP générés, tests, infrastructure, `node_modules/` ou ce fichier `DEVELOPMENT.md`. Les procédures Markdown internes ne sont pas incluses ; les guides publics sont servis par le site documentaire Nuxt.
 
@@ -47,7 +47,7 @@ Avec les dépendances de développement installées :
 npm run test:distribution
 ```
 
-Les tests de distribution couvrent les ZIP propres, les collisions de destination, les checksums, les chemins dangereux et liens symboliques, le script shell, les téléchargements interrompus et le parcours interactif réellement lancé via un pipe dans un pseudo-terminal. Les tests PHP du relais et ses tests HTTP couvrent les fichiers autorisés, les redirections, le cache, HEAD et la protection du jeton.
+Les tests de distribution couvrent les ZIP propres, les collisions de destination, les checksums, les chemins dangereux et liens symboliques, le script shell, les téléchargements interrompus et le parcours interactif réellement lancé via un pipe dans un pseudo-terminal. Les tests PHP de l’ancien relais et ses tests HTTP couvrent les fichiers autorisés, les redirections, le cache, HEAD et la protection du jeton ; `tests/Distribution/get.test.mjs` couvre les redirections actuelles de `get.perysee.com`.
 
 Le workflow `Application checks` couvre PHP 8.3/8.5, SQLite, une MariaDB 11.4.8 dédiée, le tracker et la distribution.
 
@@ -60,68 +60,36 @@ La version de référence est `'version'` dans `config/perysee.php` (sans préfi
 3. À la fusion sur `main`, le workflow **Release** lit la version dans `config/perysee.php`. Si le tag n'existe pas, il exécute `Application checks`, fabrique les assets, vérifie `SHA256SUMS`, installe le vrai ZIP, puis (job `Publish`, environnement `release`) crée la release GitHub avec `perysee.zip`, `install.php`, `install.sh` et `SHA256SUMS` en brouillon, la publie, et c'est cette publication qui crée le tag `vX.Y.Z` sur le commit fusionné. Pour une validation manuelle supplémentaire, ajouter des relecteurs obligatoires à l'environnement `release`.
 4. Les instances installées lisent ces mêmes releases GitHub (`/releases/latest`, qui exclut brouillons et préversions) et proposent la mise à jour. Une release n'existe pour elles que lorsque l'archive **et** `SHA256SUMS` sont attachés.
 
-Un push sur `main` qui touche `config/perysee.php` sans changer la version est sans effet : le tag existe déjà. Un lancement manuel de `Release` construit et teste sans rien publier. Les versions avec suffixe, par exemple `v0.2.0-beta.1`, sont des préversions et ne deviennent pas la dernière version stable. Ne pas remplacer les assets d'un tag déjà publié : le relais met les URLs versionnées en cache et les instances ont pu les télécharger.
+Un push sur `main` qui touche `config/perysee.php` sans changer la version est sans effet : le tag existe déjà. Un lancement manuel de `Release` construit et teste sans rien publier. Les versions avec suffixe, par exemple `v0.2.0-beta.1`, sont des préversions et ne deviennent pas la dernière version stable. Ne pas remplacer les assets d'un tag déjà publié : les instances ont pu les télécharger et vérifier leur somme de contrôle.
 
 Les instances lisent l'API publique de GitHub sans jeton. Tant que le dépôt est privé, le contrôle de mise à jour échoue avec un message explicite (HTTP 404/403) : l'ouverture du code (LIC-01) ou un autre point de publication public est un préalable pour que les clients voient les mises à jour. `PERYSEE_UPDATE_REPOSITORY` change le dépôt interrogé, `PERYSEE_UPDATE_CHECK=false` désactive le contrôle.
 
-## Relais PHP cPanel : get.perysee.com
+## get.perysee.com : redirections vers les releases GitHub
 
-Le relais autonome est dans `infra/downloads/`. Il nécessite PHP **8.3+**, les extensions cURL/JSON/hash, HTTPS sortant vers GitHub, et un espace disque privé accessible en écriture. Aucun Laravel, Composer, Node ni accès SQL n’est nécessaire sur ce sous-domaine. GitHub Actions continue à fabriquer et publier les releases privées ; le relais les découvre automatiquement.
+`get.perysee.com` ne stocke ni ne sert aucun fichier : le seul contenu de sa racine web est `infra/get/.htaccess`, qui redirige (302) vers les assets des releases publiques de `Perysee/app`. Aucun PHP, jeton, cache ni espace disque n’est nécessaire.
 
-**État de mise en service :** implémenté et testé localement, pas encore déployé sur un compte cPanel réel. Ne pas annoncer la commande comme opérationnelle avant le test HTTPS complet. Les domaines de la landing, des docs et des téléchargements peuvent partager le même hébergement avec trois racines web séparées.
+**Prérequis : le dépôt `Perysee/app` doit être public.** Tant qu’il est privé, GitHub répond 404 aux téléchargements sans jeton, et la commande publique comme la détection de mise à jour des instances échouent. L’ancien relais PHP (`infra/downloads/`, jeton fin et cache privé) reste dans le dépôt pour un éventuel retour en arrière ; il n’est plus déployé.
 
-### Déployer sur le compte cPanel
+Routes (tout le reste renvoie 404, les méthodes autres que GET/HEAD renvoient 405, HTTP est redirigé vers HTTPS) :
 
-Organisation recommandée (remplacer `CPANEL_USER` par le compte réel) :
+- `/` redirige vers `releases/latest/download/install.sh` : c’est la commande `curl -fsSL https://get.perysee.com | bash`. Ce script est celui de la release : `scripts/build-release.php` y fixe `https://get.perysee.com/releases/vX.Y.Z`, donc une installation ne mélange jamais deux versions même si la stable change en cours de route.
+- `/perysee.zip`, `/install.php`, `/install.sh` et `/SHA256SUMS` redirigent vers la dernière stable (`releases/latest/download/`, qui exclut brouillons et préversions).
+- `/releases/vX.Y.Z/NOM` redirige vers `releases/download/vX.Y.Z/NOM` pour ces quatre assets uniquement ; une préversion reste accessible par son tag explicite.
+- Ne jamais remplacer les assets d’un tag publié : des instances ont pu les télécharger et vérifier leur somme de contrôle.
 
-```text
-/home/CPANEL_USER/
-  public_html/                         landing : export Nuxt statique
-  perysee-docs/                        documentation : export Nuxt statique
-  perysee-downloads/
-    Gateway.php
-    config.php                        privé, permissions 0600
-    public/                           racine web de get.perysee.com
-      index.php
-      .htaccess
-  perysee-download-cache/              privé, permissions 0700
-```
+Le workflow `deploy-get.yml` (environnement `production-get`, secrets cPanel du dépôt) publie le `.htaccess` dans `/home/CPANEL_USER/perysee/get/public/`, racine web de `get.perysee.com`, puis vérifie les redirections. Dans cPanel, le sous-domaine doit utiliser cette racine, avec HTTPS (AutoSSL) et des réécritures autorisées (`AllowOverride FileInfo Options`). Si le DNS de `perysee.com` est géré par Cloudflare, des règles de redirection Cloudflare équivalentes évitent d’héberger ce fichier ; elles ne sont pas testées ici.
 
-1. Copier `Gateway.php` et `public/` depuis `infra/downloads/` vers `perysee-downloads/`. Conserver le fichier caché `.htaccess`.
-2. Dans cPanel, configurer **get.perysee.com** avec la racine `/home/CPANEL_USER/perysee-downloads/public`, activer HTTPS et PHP 8.3 ou supérieur avec cURL. Apache/LiteSpeed doit autoriser les règles de réécriture et `Options -Indexes -MultiViews`. Ne jamais utiliser le dossier parent comme racine web.
-3. Copier `config.example.php` vers `perysee-downloads/config.php`. Configurer `origin`, `repository`, `token` et le chemin absolu `cache_path`. L’origine doit être `https://get.perysee.com`, sans barre finale ; elle est indépendante du header Host reçu.
-4. Créer un jeton GitHub finement limité au dépôt `Perysee/app`, avec **Contents: read** (le propriétaire de la ressource est l'organisation `Perysee`, qui doit autoriser les jetons à granularité fine), et l’enregistrer uniquement dans ce fichier privé. Le jeton n’est ni un paramètre d’URL ni une valeur à mettre dans le frontend, les logs ou le dépôt. Renouveler le jeton avant son expiration.
-5. Créer le dossier du cache hors de **toutes** les racines web et alias de ce compte. Le relais refuse un cache situé sous sa propre racine web ; l’exploitant doit aussi vérifier les racines de la landing, des docs et des autres domaines. Autoriser uniquement le compte PHP à écrire ; ne pas utiliser 0777.
-6. Publier une release complète puis ouvrir les quatre URLs versionnées et la racine pour préparer le cache. Le premier accès télécharge et vérifie les quatre fichiers avant de rendre la version disponible. Vérifier le temps de réponse à froid et les limites PHP/LiteSpeed ; le relais demande un budget PHP de 300 secondes, qui ne remplace pas les limites de l’hébergeur.
-
-La landing et les docs sont générées dans `perysee-web/` par `npm ci`, `npm run typecheck` puis `npm run generate`. Déployer `apps/landing/.output/public/` et `apps/docs/.output/public/` sur leurs racines respectives, après configuration de leurs URL publiques. Elles ne nécessitent aucun processus Node sur cPanel.
-
-### Routes, cache et erreurs
-
-- `GET /` sert le script shell en fixant `PERYSEE_DOWNLOAD_URL` sur **une version précise**. Un changement de stable pendant une installation ne mélange pas ses fichiers.
-- `/perysee.zip`, `/install.php`, `/install.sh` et `/SHA256SUMS` redirigent vers la dernière stable.
-- `/releases/vX.Y.Z/NOM` sert uniquement ces quatre assets ; une préversion est accessible explicitement par son tag sans devenir la stable.
-- Les autres chemins, y compris les URLs avec paramètres, renvoient 404 ; les méthodes autres que GET/HEAD renvoient 405. `install.php` est téléchargé comme données, jamais exécuté par le relais.
-- Les métadonnées de stable sont actualisées toutes les 60 secondes. Les versions vérifiées sont mises en cache sur disque et servies avec un cache HTTP immuable d’un an. Ne jamais remplacer les assets d’un tag publié.
-- Le relais vérifie SHA-256 pour le ZIP et les deux installateurs, puis publie le dossier de cache par renommage atomique. Une empreinte incorrecte ne laisse aucune version partielle accessible. Le prochain essai reprend aussi un téléchargement interrompu en nettoyant son dossier temporaire sous verrou.
-- Un seul processus prépare une version à la fois. Les requêtes concurrentes à froid reçoivent temporairement 503 avec `Retry-After: 60`. Les fichiers déjà prêts sont lus directement depuis le disque, sans charger le ZIP complet en mémoire.
-- Le jeton est envoyé uniquement à `api.github.com`. Les redirections d’assets sont limitées à HTTPS sur les sous-domaines `githubusercontent.com`, puis suivies sans le jeton. Toute autre redirection est refusée.
-- Une panne GitHub produit une erreur générique ; les versions en cache restent accessibles et la dernière stable déjà préparée reste proposée. Une version non téléchargée ne devient pas disponible artificiellement.
-
-Chaque transfert a une limite de 120 secondes, avec connexion limitée à 10 secondes. Les métadonnées et petits assets sont limités à 1 Mio chacun ; le ZIP à 512 Mio. Prévoir l’espace pour toutes les versions conservées et une copie temporaire de la version en cours de préparation. Surveiller ce stockage ; aucun nettoyage automatique des versions immuables n’est effectué. Supprimer une ancienne version du cache impose son retéléchargement depuis GitHub au prochain accès.
-
-### Vérifier la mise en service
-
-Depuis une machine cliente sans identifiants GitHub :
+Vérifier la mise en service depuis une machine sans identifiants GitHub :
 
 ```sh
+curl -sI https://get.perysee.com | grep -i '^location'
 curl -fsSL https://get.perysee.com -o /tmp/perysee-install.sh
 bash /tmp/perysee-install.sh
 ```
 
-Utiliser une destination neuve. Vérifier les questions interactives, le document root affiché et le lien `/install`. Tester également le téléchargement ZIP manuel, HEAD, les chemins privés refusés et une nouvelle installation pendant un changement de stable. Vérifier qu’une préversion explicite reste disponible et que la stable ne la sélectionne pas.
+Utiliser une destination neuve et vérifier les questions interactives, le document root affiché et le lien `/install`. Les règles sont testées par `tests/Distribution/get.test.mjs` (évaluation des `RewriteRule`) ; seule la qualification sur Apache/LiteSpeed réel couvre la sémantique du serveur.
 
-Les tests automatiques du service sont dans `tests/Unit/DownloadGatewayTest.php` ; les contrôles HTTP du vrai point d’entrée PHP sont dans `tests/Distribution/cpanel.test.mjs`. Ces derniers démarrent un serveur local temporaire. Ils ne remplacent pas la qualification des réécritures Apache/LiteSpeed, des permissions et des limites sur le compte réel.
+La landing, les docs, l’API et la plateforme sont déployées depuis le dépôt `Perysee/web` (voir `docs/DEPLOIEMENT.md` de ce dépôt).
 
 ## Interface : navigation Inertia et Nuxt UI
 
@@ -152,7 +120,7 @@ php dist/install.php --archive dist/perysee.zip --checksums dist/SHA256SUMS \
   --url https://stats.example.com --yes
 ```
 
-Pour tester un autre miroir HTTPS sans modifier le script, exporter `PERYSEE_DOWNLOAD_URL` avant de lancer `bash install.sh`. Cette option est interne : le relais public fixe automatiquement sa propre URL versionnée.
+Pour tester un autre miroir HTTPS sans modifier le script, exporter `PERYSEE_DOWNLOAD_URL` avant de lancer `bash install.sh`. Cette option est interne : le script de la release fixe automatiquement l’URL versionnée de `get.perysee.com`.
 
 L’installateur PHP conserve la prise en charge interne de `GH_TOKEN` ou `GITHUB_TOKEN` pour télécharger une release privée directement. Pour tester ce chemin, télécharger `scripts/install.php` via un compte autorisé, exporter le jeton en mémoire puis lancer le fichier avec PHP. Ne pas mettre ces instructions dans Nuxt Content. Ne jamais passer le jeton dans une URL ou un argument de l’installateur.
 

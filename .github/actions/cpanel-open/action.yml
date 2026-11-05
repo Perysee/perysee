@@ -1,0 +1,64 @@
+name: Open cPanel access
+description: >
+  Whitelists the runner's IPv4 address on the cPanel SSH firewall and installs an ephemeral SSH key.
+  Pair it with cpanel-close in a step that runs with `if: always()`.
+
+inputs:
+  host:
+    description: Direct o2switch host name, without scheme and never behind a proxy
+    required: true
+  user:
+    description: cPanel user
+    required: true
+  api-token:
+    description: cPanel API token allowed to manage the SSH whitelist
+    required: true
+  ssh-private-key:
+    description: Private key dedicated to this deployment
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Get the runner public IPv4
+      id: runner-ip
+      shell: bash
+      run: |
+        set -euo pipefail
+        ipv4=$(curl -4fsS --retry 5 --connect-timeout 10 https://api.ipify.org)
+        [[ "$ipv4" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
+        echo "ipv4=$ipv4" >> "$GITHUB_OUTPUT"
+
+    - name: Whitelist the runner on cPanel
+      shell: bash
+      env:
+        CPANEL_HOST: ${{ inputs.host }}
+        CPANEL_USER: ${{ inputs.user }}
+        CPANEL_API_TOKEN: ${{ inputs.api-token }}
+        RUNNER_IPV4: ${{ steps.runner-ip.outputs.ipv4 }}
+      run: |
+        set -euo pipefail
+        auth="Authorization: cpanel $CPANEL_USER:$CPANEL_API_TOKEN"
+        base="https://$CPANEL_HOST:2083/execute/SshWhitelist"
+        # cPanel limits the SSH whitelist to 5 entries: clear every stale one first.
+        curl -fsS --max-time 45 -H "$auth" "$base/remove_all" > /dev/null
+        curl -fsS --max-time 45 -H "$auth" "$base/add?address=$RUNNER_IPV4&port=22" > /dev/null
+
+    - name: Install the SSH key and trust the host
+      shell: bash
+      env:
+        CPANEL_HOST: ${{ inputs.host }}
+        CPANEL_SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+      run: |
+        set -euo pipefail
+        directory="$RUNNER_TEMP/cpanel-ssh"
+        rm -rf "$directory"
+        mkdir -m 700 "$directory"
+        printf '%s\n' "$CPANEL_SSH_PRIVATE_KEY" > "$directory/id"
+        chmod 0400 "$directory/id"
+        ssh-keyscan -T 15 -t ed25519,rsa "$CPANEL_HOST" > "$directory/known_hosts" 2> /dev/null
+        test -s "$directory/known_hosts"
+        {
+          echo "CPANEL_SSH_DIR=$directory"
+          echo "CPANEL_SSH_OPTIONS=-i $directory/id -o IdentitiesOnly=yes -o UserKnownHostsFile=$directory/known_hosts -o StrictHostKeyChecking=yes -o ConnectTimeout=20"
+        } >> "$GITHUB_ENV"

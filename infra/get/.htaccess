@@ -1,0 +1,33 @@
+# get.perysee.com: install.sh, install.php, perysee.zip and SHA256SUMS are served by the public GitHub
+# releases of Perysee/app. This file only redirects; nothing is stored or proxied here.
+# Deployed by .github/workflows/deploy-get.yml to the document root of get.perysee.com.
+Options -Indexes -MultiViews
+ServerSignature Off
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# HTTPS only.
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Read-only service.
+RewriteCond %{REQUEST_METHOD} !^(GET|HEAD)$
+RewriteRule ^ - [R=405,L]
+
+# AutoSSL domain validation.
+RewriteRule ^\.well-known/ - [L]
+
+# The bare domain is the command `curl -fsSL https://get.perysee.com | bash`.
+RewriteRule ^$ https://github.com/Perysee/app/releases/latest/download/install.sh [R=302,QSD,L]
+
+# Latest stable release.
+RewriteRule ^(perysee\.zip|install\.php|install\.sh|SHA256SUMS)$ https://github.com/Perysee/app/releases/latest/download/$1 [R=302,QSD,L]
+
+# A precise version, which the generated install.sh uses so that one installation never mixes two releases.
+RewriteRule ^releases/(v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?)/(perysee\.zip|install\.php|install\.sh|SHA256SUMS)$ https://github.com/Perysee/app/releases/download/$1/$2 [R=302,QSD,L]
+
+# Everything else does not exist.
+RewriteRule ^ - [R=404,L]
+</IfModule>
