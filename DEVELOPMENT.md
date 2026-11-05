@@ -1,95 +1,6 @@
-# Distribution et exploitation — documentation interne
+# Développement
 
-Ce fichier est réservé aux mainteneurs. Il reste dans le dépôt privé et n’est ni importé par le site documentaire public, ni inclus dans le ZIP distribué.
-
-## Parcours public
-
-La seule commande montrée aux utilisateurs est :
-
-```sh
-curl -fsSL https://get.perysee.com | bash
-```
-
-Le script contrôle PHP CLI, télécharge les assets, vérifie le SHA-256 de l’installateur PHP avant de l’exécuter, puis lui transmet le ZIP et ses sommes de contrôle. L’installateur PHP vérifie à son tour le ZIP, demande le dossier et l’URL HTTPS, extrait dans un dossier temporaire, refuse toute destination non vide et affiche le document root et le lien `/install`.
-
-Les questions passent par `/dev/tty` lorsque le script est lancé via un pipe : le code téléchargé et les réponses de l’utilisateur ne partagent pas la même entrée. Sans terminal interactif, utiliser `bash install.sh --target /chemin/perysee --url https://stats.example.com --yes`.
-
-## Construire une distribution
-
-Le dépôt GitHub `Perysee/app` contient directement le contenu de `perysee/`. Les sites Nuxt dans `perysee-web/` restent séparés.
-
-Dans un checkout neuf, avec PHP 8.3+, PHP Zip, Composer 2 et la version Node de `.nvmrc` :
-
-```sh
-composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
-composer check-platform-reqs --no-dev
-npm ci
-npm run build
-php scripts/build-release.php --version v0.1.1 --repository Perysee/app
-```
-
-`dist/` reçoit quatre fichiers :
-
-- `perysee.zip` : application de production, dépendances, assets, polices, tracker.
-- `install.php` : installateur autonome lié à cette version.
-- `install.sh` : point d’entrée shell, lié à cette version.
-- `SHA256SUMS` : empreintes des trois fichiers précédents.
-
-Le script shell publié utilise par défaut `https://get.perysee.com/releases/VERSION` : son exécution directe ne nécessite aucun identifiant GitHub côté client. La redirection de la racine de `get.perysee.com` sert le script de la release, qui fixe lui-même cette adresse pour chaque installation.
-
-Le packager utilise une liste explicite de chemins. Il ne distribue ni `.env`, ni secrets/verrous d’installation locaux, ni sessions, logs, caches PHP générés, tests, infrastructure, `node_modules/` ou ce fichier `DEVELOPMENT.md`. Les procédures Markdown internes ne sont pas incluses ; les guides publics sont servis par le site documentaire Nuxt.
-
-## Tests et workflows
-
-Avec les dépendances de développement installées :
-
-```sh
-npm run test:distribution
-```
-
-Les tests de distribution couvrent les ZIP propres, les collisions de destination, les checksums, les chemins dangereux et liens symboliques, le script shell, les téléchargements interrompus et le parcours interactif réellement lancé via un pipe dans un pseudo-terminal. Les tests PHP de l’ancien relais et ses tests HTTP couvrent les fichiers autorisés, les redirections, le cache, HEAD et la protection du jeton ; `tests/Distribution/get.test.mjs` couvre les redirections actuelles de `get.perysee.com`.
-
-Le workflow `Application checks` couvre PHP 8.3/8.5, SQLite, une MariaDB 11.4.8 dédiée, le tracker et la distribution.
-
-## Publier une release
-
-La version de référence est `'version'` dans `config/perysee.php` (sans préfixe `v`). Le tag Git est `v` + cette valeur. `scripts/build-release.php` refuse de construire si le tag demandé et la configuration divergent : l'application compare cette valeur aux releases publiées pour proposer ses mises à jour.
-
-1. Lancer le workflow **Prepare release** (Actions, `workflow_dispatch`) avec la version, par exemple `0.2.0` ou `0.2.0-beta.1`. Il vérifie que la version est plus récente et que le tag n'existe pas, change `config/perysee.php`, pousse `release/v0.2.0` et ouvre la pull request avec la liste des changements. Réglage requis une fois : Settings > Actions > General > « Allow GitHub Actions to create and approve pull requests ».
-2. **Relire et fusionner cette pull request est l'approbation de la release.** Les contrôles de la PR ne se lancent pas pour une PR ouverte par le jeton du workflow ; `Release` les rejoue de toute façon avant de publier.
-3. À la fusion sur `main`, le workflow **Release** lit la version dans `config/perysee.php`. Si le tag n'existe pas, il exécute `Application checks`, fabrique les assets, vérifie `SHA256SUMS`, installe le vrai ZIP, puis (job `Publish`, environnement `release`) crée la release GitHub avec `perysee.zip`, `install.php`, `install.sh` et `SHA256SUMS` en brouillon, la publie, et c'est cette publication qui crée le tag `vX.Y.Z` sur le commit fusionné. Pour une validation manuelle supplémentaire, ajouter des relecteurs obligatoires à l'environnement `release`.
-4. Les instances installées lisent ces mêmes releases GitHub (`/releases/latest`, qui exclut brouillons et préversions) et proposent la mise à jour. Une release n'existe pour elles que lorsque l'archive **et** `SHA256SUMS` sont attachés.
-
-Un push sur `main` qui touche `config/perysee.php` sans changer la version est sans effet : le tag existe déjà. Un lancement manuel de `Release` construit et teste sans rien publier. Les versions avec suffixe, par exemple `v0.2.0-beta.1`, sont des préversions et ne deviennent pas la dernière version stable. Ne pas remplacer les assets d'un tag déjà publié : les instances ont pu les télécharger et vérifier leur somme de contrôle.
-
-Les instances lisent l'API publique de GitHub sans jeton. Tant que le dépôt est privé, le contrôle de mise à jour échoue avec un message explicite (HTTP 404/403) : l'ouverture du code (LIC-01) ou un autre point de publication public est un préalable pour que les clients voient les mises à jour. `PERYSEE_UPDATE_REPOSITORY` change le dépôt interrogé, `PERYSEE_UPDATE_CHECK=false` désactive le contrôle.
-
-## get.perysee.com : redirections vers les releases GitHub
-
-`get.perysee.com` ne stocke ni ne sert aucun fichier : le seul contenu de sa racine web est `infra/get/.htaccess`, qui redirige (302) vers les assets des releases publiques de `Perysee/app`. Aucun PHP, jeton, cache ni espace disque n’est nécessaire.
-
-**Prérequis : le dépôt `Perysee/app` doit être public.** Tant qu’il est privé, GitHub répond 404 aux téléchargements sans jeton, et la commande publique comme la détection de mise à jour des instances échouent. L’ancien relais PHP (`infra/downloads/`, jeton fin et cache privé) reste dans le dépôt pour un éventuel retour en arrière ; il n’est plus déployé.
-
-Routes (tout le reste renvoie 404, les méthodes autres que GET/HEAD renvoient 405, HTTP est redirigé vers HTTPS) :
-
-- `/` redirige vers `releases/latest/download/install.sh` : c’est la commande `curl -fsSL https://get.perysee.com | bash`. Ce script est celui de la release : `scripts/build-release.php` y fixe `https://get.perysee.com/releases/vX.Y.Z`, donc une installation ne mélange jamais deux versions même si la stable change en cours de route.
-- `/perysee.zip`, `/install.php`, `/install.sh` et `/SHA256SUMS` redirigent vers la dernière stable (`releases/latest/download/`, qui exclut brouillons et préversions).
-- `/releases/vX.Y.Z/NOM` redirige vers `releases/download/vX.Y.Z/NOM` pour ces quatre assets uniquement ; une préversion reste accessible par son tag explicite.
-- Ne jamais remplacer les assets d’un tag publié : des instances ont pu les télécharger et vérifier leur somme de contrôle.
-
-Le workflow `deploy-get.yml` (environnement `production-get`, secrets cPanel du dépôt) publie le `.htaccess` dans `/home/CPANEL_USER/perysee/get/public/`, racine web de `get.perysee.com`, puis vérifie les redirections. Dans cPanel, le sous-domaine doit utiliser cette racine, avec HTTPS (AutoSSL) et des réécritures autorisées (`AllowOverride FileInfo Options`). Si le DNS de `perysee.com` est géré par Cloudflare, des règles de redirection Cloudflare équivalentes évitent d’héberger ce fichier ; elles ne sont pas testées ici.
-
-Vérifier la mise en service depuis une machine sans identifiants GitHub :
-
-```sh
-curl -sI https://get.perysee.com | grep -i '^location'
-curl -fsSL https://get.perysee.com -o /tmp/perysee-install.sh
-bash /tmp/perysee-install.sh
-```
-
-Utiliser une destination neuve et vérifier les questions interactives, le document root affiché et le lien `/install`. Les règles sont testées par `tests/Distribution/get.test.mjs` (évaluation des `RewriteRule`) ; seule la qualification sur Apache/LiteSpeed réel couvre la sémantique du serveur.
-
-La landing, les docs, l’API et la plateforme sont déployées depuis le dépôt `Perysee/web` (voir `docs/DEPLOIEMENT.md` de ce dépôt).
+Guide de développement local, de test et d’exploitation de Perysee Core. Les procédures de release et de distribution sont maintenues par l’équipe dans un dépôt privé.
 
 ## Interface : navigation Inertia et Nuxt UI
 
@@ -101,7 +12,7 @@ La landing, les docs, l’API et la plateforme sont déployées depuis le dépô
 
 ## Modules
 
-Les fonctionnalités optionnelles sont des modules (architecture : `docs/planning/02-ARCHITECTURE-TECHNIQUE.md`, section 11 ; guide public : documentation, `Modules > Build a module`).
+Les fonctionnalités optionnelles sont des modules (guide : documentation, `Modules > Build a module`).
 
 - **Sources** : les modules maison sont dans `modules/<id>/` (White label, Annotations, Example). Ils sont versionnés avec le Core mais **absents du ZIP** : `scripts/build-release.php` n'embarque que sa liste explicite de chemins, et `storage/` n'en fait pas partie. `resources/module-template/` (gabarit de `perysee:make-module`) est en revanche distribué.
 - **En local** : relier un module au dossier chargé par l'application, par exemple `ln -s ../../../modules/annotations storage/app/modules/annotations`, puis `php artisan perysee:modules enable annotations`. L'activation écrit en base ; la première installe aussi les migrations du module.
@@ -109,20 +20,6 @@ Les fonctionnalités optionnelles sont des modules (architecture : `docs/plannin
 - **Tests** : `php artisan test --compact --filter=Module` (registre, chargeur, installation, périmètre, extensions, pages d'administration, robustesse), `AnnotationsModuleTest`, `WhiteLabelModuleTest`, `ExampleModuleTest`, `MakeModuleTest`, et `npm run test:charts` (hôte JavaScript, rendu des modules). Un module qui s'appuie sur un autre sujet de test charge `base_path('modules')` via `perysee.modules_path`.
 - **Avant de livrer un module** : activation sans erreur de chargement, refus des rôles insuffisants, absence hors du périmètre choisi, activation répétée sans seconde migration, désinstallation limitée à ses tables. Le guide public donne la même liste.
 - **Limites actuelles** : pas de téléchargement, de signature ni de droits par module. La suite MariaDB (`composer test:mariadb`) n'a pas encore été lancée sur ces migrations.
-
-## Tests privés avant activation du domaine
-
-Le test hors réseau d’un ZIP reste disponible :
-
-```sh
-php dist/install.php --archive dist/perysee.zip --checksums dist/SHA256SUMS \
-  --target /chemin/parent-existant/perysee-test \
-  --url https://stats.example.com --yes
-```
-
-Pour tester un autre miroir HTTPS sans modifier le script, exporter `PERYSEE_DOWNLOAD_URL` avant de lancer `bash install.sh`. Cette option est interne : le script de la release fixe automatiquement l’URL versionnée de `get.perysee.com`.
-
-L’installateur PHP conserve la prise en charge interne de `GH_TOKEN` ou `GITHUB_TOKEN` pour télécharger une release privée directement. Pour tester ce chemin, télécharger `scripts/install.php` via un compte autorisé, exporter le jeton en mémoire puis lancer le fichier avec PHP. Ne pas mettre ces instructions dans Nuxt Content. Ne jamais passer le jeton dans une URL ou un argument de l’installateur.
 
 ## Développement local — environnement et démonstrations
 
@@ -308,7 +205,7 @@ La mise à jour assistée est validée localement (tests PHP sur un arbre tempor
 
 ## Batch attribution, carte et démonstrations
 
-Le suivi courant est [docs/SUIVI-FONCTIONNALITES.md](docs/SUIVI-FONCTIONNALITES.md). Le mettre à jour à chaque batch ; ne pas transformer une implémentation locale en qualification d'hébergement.
+Le registre des fonctionnalités est tenu par l'équipe dans un dépôt privé. Le mettre à jour à chaque batch ; ne pas transformer une implémentation locale en qualification d'hébergement.
 
 Après migration additive, les nouveaux événements stockent leur source UTM-first et l'état de leur référent. Les alias IA historiques connus sont regroupés à la lecture, avant top 100 ; aucun ancien Direct n'est réattribué. `source_group=ai` et `provider=chatgpt|claude|perplexity|gemini|copilot|grok` concernent seulement les rapports/CSV Sources. `dimension=country` étend les endpoints existants.
 
