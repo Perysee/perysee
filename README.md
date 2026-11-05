@@ -16,7 +16,7 @@ L’installateur vérifie PHP, télécharge les fichiers prêts à utiliser, dem
 
 Sans terminal, le ZIP est proposé à `https://get.perysee.com/perysee.zip`. Extraire son dossier `perysee/` hors de la racine web, puis faire pointer le domaine sur `perysee/public/`. Terminer avec l’assistant web décrit ci-dessous.
 
-Les instructions de fabrication, les tests privés et le déploiement du relais PHP sur cPanel sont dans [DEVELOPMENT.md](DEVELOPMENT.md), réservé aux mainteneurs et exclu du ZIP et de la documentation web.
+Les instructions de fabrication, les tests privés et les redirections de `get.perysee.com` sont dans [DEVELOPMENT.md](DEVELOPMENT.md), réservé aux mainteneurs et exclu du ZIP et de la documentation web.
 
 ## Fonctionnalités disponibles
 
@@ -158,3 +158,7 @@ php artisan perysee:demo-reset --seed=73421
 ```
 
 Le reset génère 30 jours de trafic synthétique avec horaires, volumes, sources et chemins variés. La démo avec sessions reçoit trois funnels préconfigurés (inscription, téléchargement, contact), leurs résultats sur sept jours et un parcours automatique déjà calculé. Les comptes, sites réels et définitions de funnels existantes sont conservés. Le mode sans identifiant conserve ses limites : aucun parcours ne peut y être reconstruit. La commande est atomique et refusée en production.
+
+## Licence
+
+Perysee Core est publié sous licence **GNU AGPL v3.0 uniquement**, avec l’exception de modules de Perysee ([LICENSE](LICENSE), [MODULE-EXCEPTION.md](MODULE-EXCEPTION.md), [LICENSING.md](LICENSING.md)). Le nom et le logo Perysee ne sont pas concédés ([TRADEMARKS.md](TRADEMARKS.md)). Contributions : [CONTRIBUTING.md](CONTRIBUTING.md) et [CLA.md](CLA.md).
