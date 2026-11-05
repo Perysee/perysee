@@ -3,6 +3,7 @@
     "name": "perysee/application",
     "type": "project",
     "description": "Perysee — self-hosted web analytics for PHP and MariaDB.",
+    "license": "AGPL-3.0-only",
     "keywords": [
         "perysee",
         "analytics",
