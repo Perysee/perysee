@@ -35,7 +35,7 @@ const save = () => {
             />
             <h1>{{ module.name }}</h1>
             <p class="text-sm text-muted">
-                v{{ module.version }}<span v-if="module.description"> · {{ module.description }}</span>
+                v{{ module.version }} · {{ module.stability }}<span v-if="module.description"> · {{ module.description }}</span>
             </p>
         </div>
         <UBadge :label="module.enabled ? 'Enabled' : 'Disabled'" :color="module.enabled ? 'success' : 'neutral'" variant="subtle" />

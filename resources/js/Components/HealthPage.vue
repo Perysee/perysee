@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import { router, useForm, usePage } from "@inertiajs/vue3";
-const props = defineProps(["health", "geolocation", "cron", "moduleCards", "softwareUpdate"]);
+const props = defineProps(["health", "geolocation", "cron", "moduleCards", "moduleFailures", "softwareUpdate"]);
 const page = usePage();
 const retention = useForm({
     raw_retention_days: props.health.raw_retention_days,
@@ -273,6 +273,41 @@ const processing = computed(() =>
             <code>php artisan perysee:update:rollback</code>.
         </p></UCard
     >
+    <UCard v-if="moduleFailures?.length" class="mb-6">
+        <template #header>
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-sm font-medium">Module failures</h2>
+                <UBadge
+                    :color="moduleFailures.some((module) => module.quarantined) ? 'error' : 'warning'"
+                    variant="subtle"
+                    >{{
+                        moduleFailures.some((module) => module.quarantined)
+                            ? "In quarantine"
+                            : "Needs attention"
+                    }}</UBadge
+                >
+            </div>
+        </template>
+        <ul class="space-y-3 text-sm">
+            <li
+                v-for="module in moduleFailures"
+                :key="module.id"
+                class="flex flex-wrap items-start justify-between gap-2"
+            >
+                <div>
+                    <span class="font-medium">{{ module.name }}</span>
+                    <p v-if="module.quarantined" class="text-xs text-muted">
+                        Disabled automatically: {{ module.reason }}
+                    </p>
+                </div>
+                <span class="text-muted">{{ module.failures }} failures recorded</span>
+            </li>
+        </ul>
+        <p class="data-note mt-4">
+            A module that keeps failing is disabled so that it cannot slow down your
+            site. Its data is kept. Enable it again from the Modules page once it is fixed.
+        </p>
+    </UCard>
     <div v-if="moduleCards?.length" class="grid lg:grid-cols-2 gap-6 mb-6">
         <UCard v-for="card in moduleCards" :key="card.module">
             <template #header>

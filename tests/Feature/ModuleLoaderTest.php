@@ -82,6 +82,20 @@ class ModuleLoaderTest extends TestCase
         $this->assertFalse(class_exists('Perysee\\Modules\\LoaderOff\\ModuleServiceProvider', false));
     }
 
+    public function test_the_modules_switch_loads_no_module_even_when_some_are_enabled(): void
+    {
+        $this->makeModule('loader-paused', "app()->instance('loader-paused.booted', true);");
+        app(ModuleRegistry::class)->enable('loader-paused');
+        config(['perysee.modules_enabled' => false]);
+
+        app(ModuleLoader::class)->load();
+
+        $this->assertFalse(app()->bound('loader-paused.booted'));
+        $this->assertFalse(class_exists('Perysee\\Modules\\LoaderPaused\\ModuleServiceProvider', false));
+        $this->assertSame([], app(ModuleLoader::class)->failures());
+        $this->assertDatabaseHas('modules', ['id' => 'loader-paused', 'enabled' => true]);
+    }
+
     public function test_a_failing_module_is_isolated_and_reported(): void
     {
         $this->makeModule('loader-bad', "throw new \\RuntimeException('boom');");

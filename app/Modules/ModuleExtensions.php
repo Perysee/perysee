@@ -83,6 +83,7 @@ final class ModuleExtensions
                 $card = $resolver();
             } catch (Throwable $exception) {
                 Log::warning("Module {$module} could not provide its health card.", ['exception' => $exception]);
+                app(ModuleFailures::class)->report($module, $exception, 'health card');
 
                 continue;
             }
@@ -147,6 +148,7 @@ final class ModuleExtensions
                 $shared[$module] = $resolver($request);
             } catch (Throwable $exception) {
                 Log::warning("Module {$module} could not provide its page data.", ['exception' => $exception]);
+                app(ModuleFailures::class)->report($module, $exception, 'page data');
             }
         }
 
@@ -170,6 +172,7 @@ final class ModuleExtensions
                 $custom = $resolver();
             } catch (Throwable $exception) {
                 Log::warning("Module {$module} could not provide its branding.", ['exception' => $exception]);
+                app(ModuleFailures::class)->report($module, $exception, 'branding');
 
                 continue;
             }

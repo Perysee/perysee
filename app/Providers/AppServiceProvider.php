@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Modules\ModuleExtensions;
+use App\Modules\ModuleFailures;
 use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
 use App\Modules\ModuleScope;
@@ -20,6 +21,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(ModuleRegistry::class);
         $this->app->singleton(ModuleLoader::class);
+        $this->app->singleton(ModuleFailures::class);
         $this->app->singleton(ModuleExtensions::class);
         $this->app->singleton(ModuleSettings::class);
         $this->app->singleton(ModuleScope::class);

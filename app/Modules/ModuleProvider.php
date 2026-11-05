@@ -14,6 +14,8 @@ use Illuminate\Support\ServiceProvider;
 
 /**
  * Base class of a module's ModuleServiceProvider.
+ *
+ * @api Part of module API 1: protected methods below keep their meaning until the API version changes.
  */
 abstract class ModuleProvider extends ServiceProvider
 {

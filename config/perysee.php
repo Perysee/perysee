@@ -7,6 +7,14 @@ return [
         'check' => (bool) env('PERYSEE_UPDATE_CHECK', true),
         'repository' => env('PERYSEE_UPDATE_REPOSITORY', 'Perysee/perysee'),
     ],
+    // Set PERYSEE_MODULES=false to start Perysee without loading any module (recovery when a module breaks the instance).
+    'modules_enabled' => (bool) env('PERYSEE_MODULES', true),
+    // A module that fails this many times within `window` seconds is put in quarantine (disabled, data kept).
+    'module_failures' => [
+        'window' => 600,
+        'threshold' => ['stable' => 20, 'beta' => 10, 'experimental' => 5],
+    ],
+    'modules_backup_path' => env('PERYSEE_MODULES_BACKUP_PATH', storage_path('app/modules-backup')),
     'module_uploads' => (bool) env('PERYSEE_MODULE_UPLOADS', true),
     'module_upload_max_kb' => (int) env('PERYSEE_MODULE_UPLOAD_MAX_KB', 20480),
     'geoip_path' => env('PERYSEE_GEOIP_PATH'),

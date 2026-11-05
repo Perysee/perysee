@@ -8,6 +8,9 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
+/**
+ * @internal Not part of the module API: modules must not call it, and it may change in any release.
+ */
 final class ModuleLoader
 {
     /** @var array<string, string> */
@@ -24,6 +27,9 @@ final class ModuleLoader
      */
     public function load(): void
     {
+        if (! config('perysee.modules_enabled')) {
+            return;
+        }
         foreach ($this->registry->enabled() as $id => $module) {
             if (isset($this->loaded[$id])) {
                 continue;
@@ -39,6 +45,7 @@ final class ModuleLoader
             } catch (Throwable $exception) {
                 $this->failures[$id] = $exception->getMessage();
                 Log::warning("Module {$id} could not be loaded.", ['exception' => $exception]);
+                app(ModuleFailures::class)->report($id, $exception, 'loading');
             }
         }
     }

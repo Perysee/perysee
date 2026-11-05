@@ -5,5 +5,6 @@
     "core": "0.1.1",
     "requires": [],
     "entitlement": "example",
+    "stability": "stable",
     "description": "A small module that shows how modules extend Perysee. Safe to enable, change and remove."
 }
