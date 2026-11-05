@@ -103,7 +103,8 @@ jobs:
           php artisan --version
           test ! -f .env
           test "$(php -r 'echo json_decode(file_get_contents("release.json"))->version;')" = "${{ needs.plan.outputs.tag }}"
-          test "$(php -r 'echo (require "config/perysee.php")["version"];')" = "${{ needs.plan.outputs.version }}"
+          # The config file calls env() and storage_path(), which only exist inside Laravel: read the literal.
+          test "$(sed -n "s/^ *'version' => '\([^']*\)',.*/\1/p" config/perysee.php)" = "${{ needs.plan.outputs.version }}"
       - uses: actions/upload-artifact@v7
         with:
           name: perysee-release
