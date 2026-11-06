@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '0.1.1',
+    'version' => '0.1.2',
     'modules_path' => env('PERYSEE_MODULES_PATH', storage_path('app/modules')),
     'update' => [
         'check' => (bool) env('PERYSEE_UPDATE_CHECK', true),
