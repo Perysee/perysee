@@ -18,6 +18,9 @@ A module adds to what exists instead of getting its own corner:
 | `addNavigation($zone, $label, $icon, $route)` | An entry in the `workspace` or `admin` navigation |
 | `shareData($closure)` | Data for your screens, as `modules.data["{{id}}"]` |
 | `brand($closure)` | Instance name, logo address and accent color |
+| `listen($eventClass, $listener)` | React to a Core event such as `GoalConverted` or `ModuleQuarantined` (needs `"core": "0.4.0"` or later) |
+| `notificationChannel($key, $channel)` | Declare a way to notify someone, such as a chat or a webhook (same requirement) |
+| `reportSource($key, $source)` | Add figures to periodic reports (same requirement) |
 
 | In `dist/module.js` | Effect |
 | --- | --- |
