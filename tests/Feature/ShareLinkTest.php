@@ -55,6 +55,50 @@ class ShareLinkTest extends TestCase
         })->assertDontSee($site->public_id);
     }
 
+    public function test_link_never_returns_another_site_or_unlisted_section(): void
+    {
+        $today = now('UTC')->toDateString();
+        [$site, , $token] = $this->link(['pages']);
+        $other = Website::factory()->create();
+        DB::table('stats_daily')->insert([['website_id' => $site->id, 'stat_date' => $today, 'pageviews' => 5], ['website_id' => $other->id, 'stat_date' => $today, 'pageviews' => 900]]);
+        DB::table('stats_dimension_daily')->insert([
+            ['website_id' => $site->id, 'stat_date' => $today, 'dimension_type' => 'path', 'dimension_value' => '/mine', 'dimension_hash' => sha1('/mine'), 'metric_count' => 5],
+            ['website_id' => $other->id, 'stat_date' => $today, 'dimension_type' => 'path', 'dimension_value' => '/theirs', 'dimension_hash' => sha1('/theirs'), 'metric_count' => 900],
+            ['website_id' => $site->id, 'stat_date' => $today, 'dimension_type' => 'source', 'dimension_value' => 'secret-source', 'dimension_hash' => sha1('secret-source'), 'metric_count' => 5],
+        ]);
+
+        $this->get('/s/'.$token.'?website_id='.$other->id.'&site='.$other->id.'&filters[path][]=/theirs')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('report', null)->where('series', [])->where('dimension', 'path')->where('dimensionReport.total', 5)->where('dimensionReport.data.0.value', '/mine')->has('dimensionReport.data', 1));
+        $this->get('/s/'.$token.'?dimension=source')->assertNotFound();
+        $this->getJson('/s/'.$token.'/api/overview')->assertNotFound();
+        $this->getJson('/s/'.$token.'/api/dimensions?dimension=source')->assertNotFound();
+        $this->getJson('/s/'.$token.'/api/recent')->assertNotFound();
+        $this->getJson('/s/'.$token.'/api/dimensions?dimension=path&website_id='.$other->id)->assertOk()->assertJsonPath('data.0.value', '/mine')->assertJsonMissingPath('data.1')->assertHeader('Cache-Control');
+    }
+
+    public function test_only_an_owner_manages_links_and_never_those_of_another_site(): void
+    {
+        [$site, $owner] = $this->siteWithOwner();
+        $viewer = User::factory()->create();
+        $site->members()->attach($viewer, ['role' => 'viewer']);
+        $admin = User::factory()->create(['is_admin' => true]);
+        $payload = ['sections' => ['overview']];
+        $this->actingAs($viewer)->get('/sites/'.$site->id.'/sharing')->assertForbidden();
+        $this->post('/sites/'.$site->id.'/sharing', $payload)->assertForbidden();
+        $this->actingAs($admin)->post('/sites/'.$site->id.'/sharing', $payload)->assertForbidden();
+        $this->assertDatabaseCount('share_links', 0);
+
+        [, $foreign] = $this->link();
+        [, $mine] = $this->link(['overview'], null, null, $site);
+        $this->actingAs($viewer)->delete('/sites/'.$site->id.'/sharing/'.$mine->id)->assertForbidden();
+        $this->actingAs($owner)->delete('/sites/'.$site->id.'/sharing/'.$foreign->id)->assertNotFound();
+        $this->assertNull($foreign->fresh()->revoked_at);
+        $this->delete('/sites/'.$site->id.'/sharing/'.$mine->id)->assertRedirect();
+        $this->assertNotNull($mine->fresh()->revoked_at);
+        $this->post('/sites/'.$site->id.'/sharing', ['sections' => ['nonsense']])->assertSessionHasErrors('sections.0');
+        $this->post('/sites/'.$site->id.'/sharing', ['sections' => []])->assertSessionHasErrors('sections');
+    }
+
     public function test_owner_creates_link_and_only_hash_is_stored(): void
     {
         [$site, $owner] = $this->siteWithOwner();

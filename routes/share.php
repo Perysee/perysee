@@ -8,4 +8,5 @@ use Illuminate\Support\Facades\Route;
 // Public, read-only report links. No account is involved: the link itself is the credential.
 Route::middleware(['web', EnsureInstalled::class, ResolveShareLink::class])->name('share.')->group(function (): void {
     Route::get('/s/{token}', [PublicShareController::class, 'show'])->name('show');
+    Route::get('/s/{token}/api/{report}', [PublicShareController::class, 'api'])->whereIn('report', ['overview', 'timeseries', 'dimensions'])->name('api');
 });

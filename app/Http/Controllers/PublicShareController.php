@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Analytics\Reporting\Reports;
 use App\Models\ShareLink;
 use App\Models\Website;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,6 +34,22 @@ class PublicShareController extends Controller
             'dimension' => $dimension,
             'dimensionReport' => $dimension !== null ? $this->dimensionReport($reports, $site, $period, $dimension) : null,
         ]);
+    }
+
+    public function api(Request $request, string $token, string $report, Reports $reports): JsonResponse
+    {
+        [$link, $site] = $this->context($request);
+        $period = $this->period($request, $site, $reports);
+        if ($report === 'dimensions') {
+            $dimension = $this->dimension($request, $link);
+            abort_if($dimension === null, 404);
+            $data = $this->dimensionReport($reports, $site, $period, $dimension);
+        } else {
+            abort_unless($link->allows('overview'), 404);
+            $data = $report === 'overview' ? $this->overview($reports, $site, $period) : ['data' => $reports->series($site, $period)];
+        }
+
+        return response()->json($data)->header('Cache-Control', 'no-store, private');
     }
 
     /** @return array{0: ShareLink, 1: Website} */
