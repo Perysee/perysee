@@ -8,6 +8,7 @@ use App\Models\Website;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -74,12 +75,17 @@ class Reports
     {
         $current ??= $this->overview($site, $period);
         $previous = $this->previousPeriod($period, $site);
-        $overview = $this->overview($site, $previous);
+        $known = [
+            'rows' => DB::table('stats_daily')->where('website_id', $site->id)->whereBetween('stat_date', [$previous['from'], $previous['to']])->get(),
+            'history' => $this->measurementPeriods($site, $previous),
+            'freshness' => $current['freshness'],
+        ];
+        $overview = $this->overview($site, $previous, $known);
 
         return [
             'period' => ['from' => $previous['from'], 'to' => $previous['to']],
             'totals' => $overview['totals'],
-            'series' => $this->alignSeries($site, $previous, $period, $this->series($site, $previous)),
+            'series' => $this->alignSeries($site, $previous, $period, $this->series($site, $previous, $known)),
             'availability' => $overview['availability'],
             'coverage' => $overview['coverage'],
             'freshness' => $overview['freshness'],
@@ -117,13 +123,16 @@ class Reports
         return $verdict;
     }
 
-    public function overview(Website $site, array $period): array
+    /**
+     * @param  array{rows?: Collection, history?: array, freshness?: array}  $known  reads the caller already made
+     */
+    public function overview(Website $site, array $period, array $known = []): array
     {
-        $rows = DB::table('stats_daily')->where('website_id', $site->id)->whereBetween('stat_date', [$period['from'], $period['to']])->get();
+        $rows = $known['rows'] ?? DB::table('stats_daily')->where('website_id', $site->id)->whereBetween('stat_date', [$period['from'], $period['to']])->get();
         $pageviews = (int) $rows->sum('pageviews');
         $measured = (int) $rows->sum('session_pageviews');
         $unknown = (int) $rows->sum('unknown_pageviews');
-        $history = $this->measurementPeriods($site, $period);
+        $history = $known['history'] ?? $this->measurementPeriods($site, $period);
         $coverage = $this->sessionCoverage($period['start'], $period['end'], $history);
         $hasDisabled = collect($history)->contains(fn ($entry) => $entry['mode'] === 'pageviews');
         $available = $measured > 0 || $coverage !== 'unavailable';
@@ -135,10 +144,10 @@ class Reports
             'period' => ['from' => $period['from'], 'to' => $period['to'], 'timezone' => $site->timezone],
             'totals' => ['pageviews' => $pageviews, 'custom_events' => (int) $rows->sum('custom_events'), 'sessions' => $available || $sessions > 0 ? $sessions : null],
             'coverage' => ['measured_pageviews' => $measured, 'pageviews' => $pageviews, 'country_pageviews' => (int) $rows->sum('country_pageviews')],
-            'attribution_v2_since' => app(InstanceHealth::class)->get('attribution_v2_since'),
+            'attribution_v2_since' => isset($known['freshness']) ? null : app(InstanceHealth::class)->get('attribution_v2_since'),
             'measurement_periods' => $history,
             'availability' => ['sessions' => $sessionAvailability, 'dimensions' => $pageviews === 0 ? 'unavailable' : ($knownDimensions === $pageviews ? 'available' : 'partial'), 'countries' => $rows->sum('country_pageviews') === 0 ? 'unavailable' : ((int) $rows->sum('country_pageviews') < $pageviews ? 'partial' : 'available')],
-            'freshness' => ['aggregated_at' => app(InstanceHealth::class)->get('aggregate_site:'.$site->id), 'pending' => DB::table('events')->where('website_id', $site->id)->whereNull('processed_at')->exists()],
+            'freshness' => $known['freshness'] ?? ['aggregated_at' => app(InstanceHealth::class)->get('aggregate_site:'.$site->id), 'pending' => DB::table('events')->where('website_id', $site->id)->whereNull('processed_at')->exists()],
         ];
 
         return ! empty($period['filters']) ? app(SegmentReports::class)->overview($site, $period, $base) : $base;
@@ -196,12 +205,15 @@ class Reports
         return $series;
     }
 
-    public function series(Website $site, array $period): array
+    /**
+     * @param  array{rows?: Collection, history?: array}  $known  the daily rows and measurement periods the caller already read
+     */
+    public function series(Website $site, array $period, array $known = []): array
     {
         $hourly = $period['granularity'] === 'hour';
-        $rows = DB::table($hourly ? 'stats_hourly' : 'stats_daily')->where('website_id', $site->id)->whereBetween('stat_date', [$period['from'], $period['to']])->orderBy($hourly ? 'bucket_start' : 'stat_date')->get()->keyBy($hourly ? 'bucket_start' : 'stat_date');
+        $rows = ! $hourly && isset($known['rows']) ? $known['rows']->keyBy('stat_date') : DB::table($hourly ? 'stats_hourly' : 'stats_daily')->where('website_id', $site->id)->whereBetween('stat_date', [$period['from'], $period['to']])->orderBy($hourly ? 'bucket_start' : 'stat_date')->get()->keyBy($hourly ? 'bucket_start' : 'stat_date');
         $keys = $this->bucketKeys($site, $period);
-        $history = $this->measurementPeriods($site, $period);
+        $history = $known['history'] ?? $this->measurementPeriods($site, $period);
         $series = [];
         foreach ($keys as $key => $label) {
             $row = $rows->get($key);

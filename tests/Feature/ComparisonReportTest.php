@@ -250,4 +250,51 @@ class ComparisonReportTest extends TestCase
         $this->assertNull($comparison['series'][0]['sessions']);
         $this->assertSame('unavailable', $comparison['series'][0]['session_availability']);
     }
+
+    /**
+     * @return list<array{sql: string, bindings: array<int, mixed>}>
+     */
+    private function queriesDuring(callable $work): array
+    {
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = ['sql' => $query->sql, 'bindings' => $query->bindings];
+        });
+        $work();
+
+        return $queries;
+    }
+
+    public function test_comparison_adds_at_most_four_queries(): void
+    {
+        $site = $this->memberSite();
+        $this->measured($site, '2026-10-01 00:00:00');
+        $this->day($site, '2026-10-20', 10);
+        $this->day($site, '2026-10-13', 4);
+        $url = '/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24';
+        $this->get($url)->assertOk();
+
+        $off = count($this->queriesDuring(fn () => $this->get($url)->assertOk()));
+        $on = count($this->queriesDuring(fn () => $this->get($url.'&compare=previous')->assertOk()));
+        $this->assertLessThanOrEqual(4, $on - $off, 'Comparing added '.($on - $off).' queries.');
+
+        $hourlyOff = count($this->queriesDuring(fn () => $this->get('/sites/'.$site->id.'?from=2026-10-20&to=2026-10-20')->assertOk()));
+        $hourlyOn = count($this->queriesDuring(fn () => $this->get('/sites/'.$site->id.'?from=2026-10-20&to=2026-10-20&compare=previous')->assertOk()));
+        $this->assertLessThanOrEqual(4, $hourlyOn - $hourlyOff, 'Comparing one day added '.($hourlyOn - $hourlyOff).' queries.');
+    }
+
+    public function test_no_extra_query_when_off(): void
+    {
+        $site = $this->memberSite();
+        $this->partialMock(Reports::class, function ($mock): void {
+            $mock->shouldNotReceive('comparison');
+            $mock->shouldNotReceive('previousPeriod');
+        });
+
+        $queries = $this->queriesDuring(fn () => $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24')->assertOk());
+
+        foreach ($queries as $query) {
+            $this->assertNotContains('2026-10-11', $query['bindings'], 'A query read the previous period: '.$query['sql']);
+        }
+    }
 }
