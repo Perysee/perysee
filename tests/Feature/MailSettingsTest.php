@@ -110,6 +110,58 @@ class MailSettingsTest extends TestCase
         $this->assertNull(app(InstanceHealth::class)->get('mail_settings'));
     }
 
+    public function test_apply_configures_the_smtp_mailer_lazily_and_purges_the_resolved_one(): void
+    {
+        $this->settings()->save($this->valid());
+        $this->assertSame('log', config('mail.default'), 'Saving does not touch the running configuration.');
+
+        app('mail.manager')->mailer('log');
+        $this->settings()->apply();
+
+        $this->assertSame('smtp', config('mail.default'));
+        $smtp = config('mail.mailers.smtp');
+        $this->assertSame('smtp.example.com', $smtp['host']);
+        $this->assertSame(587, $smtp['port']);
+        $this->assertSame('mailer', $smtp['username']);
+        $this->assertSame(self::SECRET, $smtp['password']);
+        $this->assertSame('smtp', $smtp['scheme']);
+        $this->assertTrue($smtp['require_tls']);
+        $this->assertSame(10, $smtp['timeout']);
+        $this->assertNull($smtp['url']);
+        $this->assertSame(['address' => 'noreply@example.com', 'name' => 'Acme Analytics'], config('mail.from'));
+        $this->assertNull($this->readMailers(), 'The resolved mailers are forgotten so the change takes effect at once.');
+        $this->assertSame('smtps', $this->schemeFor('tls'));
+        $this->assertSame('smtp', $this->schemeFor('none'));
+        $this->assertFalse(config('mail.mailers.smtp.auto_tls'), 'Without encryption the transport must not upgrade on its own.');
+        $this->assertFalse(config('mail.mailers.smtp.require_tls'));
+    }
+
+    public function test_apply_does_nothing_when_the_saved_settings_are_not_in_use(): void
+    {
+        $this->settings()->apply();
+        $this->assertSame('log', config('mail.default'));
+
+        $this->settings()->save($this->valid(['enabled' => false]));
+        $this->settings()->apply();
+        $this->assertSame('log', config('mail.default'));
+        $this->assertSame('127.0.0.1', config('mail.mailers.smtp.host'));
+    }
+
+    private function schemeFor(string $encryption): string
+    {
+        $this->settings()->apply($this->settings()->build($this->valid(['encryption' => $encryption, 'port' => null])));
+
+        return config('mail.mailers.smtp.scheme');
+    }
+
+    private function readMailers(): ?array
+    {
+        $manager = app('mail.manager');
+        $property = new \ReflectionProperty($manager, 'mailers');
+
+        return $property->getValue($manager) ?: null;
+    }
+
     public function test_an_unreadable_stored_password_is_treated_as_missing_instead_of_failing(): void
     {
         app(InstanceHealth::class)->put('mail_settings', ['enabled' => true, 'host' => 'smtp.example.com', 'port' => 587, 'encryption' => 'starttls', 'username' => 'mailer', 'password' => 'not-a-valid-payload', 'from_address' => 'a@example.com', 'from_name' => '']);

@@ -152,6 +152,37 @@ class MailSettings
         $this->state->put(self::KEY, $values);
     }
 
+    /**
+     * Points the SMTP mailer at the saved settings, or at `$values` (as built by {@see build()}) to try unsaved ones.
+     * It runs when a message is about to leave, never on every request, and forgets any resolved mailer so the
+     * change takes effect at once. Without usable saved settings the environment configuration is left alone.
+     */
+    public function apply(?array $values = null): void
+    {
+        if ($values === null) {
+            if (! $this->configured()) {
+                return;
+            }
+            $values = $this->credentials();
+        }
+        $name = $values['from_name'] !== '' ? $values['from_name'] : config('app.name');
+        config([
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.url' => null,
+            'mail.mailers.smtp.scheme' => $values['encryption'] === 'tls' ? 'smtps' : 'smtp',
+            'mail.mailers.smtp.auto_tls' => $values['encryption'] === 'starttls',
+            'mail.mailers.smtp.require_tls' => $values['encryption'] === 'starttls',
+            'mail.mailers.smtp.host' => $values['host'],
+            'mail.mailers.smtp.port' => $values['port'],
+            'mail.mailers.smtp.username' => $values['username'],
+            'mail.mailers.smtp.password' => $values['password'] ?? null,
+            'mail.mailers.smtp.timeout' => self::TIMEOUT,
+            'mail.from.address' => $values['from_address'],
+            'mail.from.name' => $name,
+        ]);
+        app('mail.manager')->forgetMailers();
+    }
+
     public function reset(): void
     {
         $this->state->forget(self::KEY);
