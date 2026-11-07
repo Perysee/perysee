@@ -56,6 +56,30 @@ class AnalyticsCoverageTest extends TestCase
         $this->assertStringNotContainsString('newsletter', $csv);
     }
 
+    public function test_the_dimension_export_neutralises_every_text_a_spreadsheet_could_run_and_leaves_numbers_alone(): void
+    {
+        $site = Website::factory()->create();
+        $viewer = User::factory()->create();
+        $site->members()->attach($viewer, ['role' => 'viewer']);
+        $values = ['+33 promo', '-sale', "\tpad", "\x00=cmd", "=\xff", 'plain'];
+        foreach ($values as $index => $source) {
+            DB::table('stats_dimension_daily')->insert(['website_id' => $site->id, 'stat_date' => '2026-10-24', 'dimension_type' => 'source', 'dimension_hash' => hash('sha256', $source), 'dimension_value' => $source, 'metric_count' => 3 + $index]);
+        }
+
+        $csv = $this->actingAs($viewer)->get('/sites/'.$site->id.'/export?from=2026-10-24&to=2026-10-24&dimension=source')->assertOk()->streamedContent();
+
+        $cells = [];
+        foreach (array_slice(explode("\n", trim($csv)), 1) as $line) {
+            $row = str_getcsv($line, escape: '');
+            $cells[$row[0]] = $row[1];
+        }
+        foreach (array_slice($values, 0, 5) as $value) {
+            $this->assertArrayHasKey("'".$value, $cells);
+        }
+        $this->assertSame('8', $cells['plain']);
+        $this->assertSame('3', $cells["'+33 promo"]);
+    }
+
     public function test_old_tracker_dimensions_are_not_invented_and_mixed_measurement_is_partial(): void
     {
         $site = Website::factory()->create(['tracking_mode' => 'sessions']);
