@@ -17,7 +17,9 @@ return new class extends Migration
                 $table->char('value_hash', 64);
                 $table->string('prop_value', 64);
                 $table->bigInteger('metric_count')->default(0);
+                // Thousandths of the site currency of the events that carried a value, and how many did.
                 $table->bigInteger('value_sum')->default(0);
+                $table->bigInteger('valued_count')->default(0);
                 $table->primary(['website_id', 'stat_date', 'event_name', 'prop_key', 'value_hash'], 'stats_event_property_daily_pk');
                 $table->index(['website_id', 'event_name', 'prop_key', 'stat_date'], 'stats_event_property_daily_report');
             });
