@@ -7,7 +7,7 @@ import {queryUrl} from '../interface-query.mjs';
 import {formatMoney} from '../event-values.mjs';
 const props=defineProps(['website','siteLinks','period','today','report','exportUrl']);
 const page=usePage();
-const events=computed(()=>props.report.events.map(item=>({value:item.name,label:item.name+' · '+item.count})));
+const events=computed(()=>props.report.events.map(item=>({value:item.name,label:item.name})));
 const hasValues=computed(()=>props.report.keys.some(key=>key.values.some(row=>row.valued>0)));
 const money=value=>formatMoney(value,props.report.currency);
 const columns=computed(()=>[{accessorKey:'value',header:'Value'},{accessorKey:'count',header:'Events'},...(hasValues.value?[{accessorKey:'amount',header:'Value total'},{accessorKey:'average',header:'Average'}]:[])]);
