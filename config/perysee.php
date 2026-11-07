@@ -1,8 +1,11 @@
 <?php
 
 return [
-    'version' => '0.1.2',
+    'version' => '0.2.0',
     'modules_path' => env('PERYSEE_MODULES_PATH', storage_path('app/modules')),
+    // "docker" when the instance runs from the image built by the Docker installer: code is replaced by rebuilding
+    // the image, never in place, so the in-place updater refuses to run.
+    'install_mode' => env('PERYSEE_INSTALL_MODE', 'standard'),
     'update' => [
         'check' => (bool) env('PERYSEE_UPDATE_CHECK', true),
         'repository' => env('PERYSEE_UPDATE_REPOSITORY', 'Perysee/perysee'),
@@ -33,6 +36,7 @@ return [
     ],
     'raw_retention_days' => (int) env('PERYSEE_RAW_RETENTION_DAYS', 90),
     'redis_enabled' => (bool) env('PERYSEE_REDIS_ENABLED', false),
-    'landing_url' => env('PERYSEE_LANDING_URL', 'http://localhost:3000'),
-    'docs_url' => env('PERYSEE_DOCS_URL', 'http://localhost:3001'),
+    'landing_url' => env('PERYSEE_LANDING_URL', 'https://perysee.com'),
+    'docs_url' => env('PERYSEE_DOCS_URL', 'https://docs.perysee.com'),
+    'repository_url' => env('PERYSEE_REPOSITORY_URL', 'https://github.com/Perysee/perysee'),
 ];

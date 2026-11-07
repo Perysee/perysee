@@ -11,16 +11,26 @@ permissions:
 
 jobs:
   tests:
-    name: PHP ${{ matrix.php }} / MariaDB 11.4
+    name: PHP ${{ matrix.php }} / MariaDB ${{ matrix.mariadb }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
+      # Every PHP version runs against the default database; the other supported MariaDB series (see
+      # App\Installation\DatabaseVersion) are each covered once, on the oldest and the newest PHP.
+      # `mariadb` is the series and names the job: the branch rulesets require "PHP 8.3 / MariaDB 11.4" and
+      # "PHP 8.5 / MariaDB 11.4" by that name. The default series is pinned to a patch release below.
       matrix:
-        php: ['8.3', '8.5']
+        php: ['8.3', '8.4', '8.5']
+        mariadb: ['11.4']
+        include:
+          - php: '8.3'
+            mariadb: '10.11'
+          - php: '8.5'
+            mariadb: '11.8'
     services:
       mariadb:
-        image: mariadb:11.4.8
+        image: mariadb:${{ matrix.mariadb == '11.4' && '11.4.8' || matrix.mariadb }}
         env:
           MARIADB_ROOT_PASSWORD: ci-root-only
           MARIADB_DATABASE: perysee_test
@@ -71,3 +81,5 @@ jobs:
       - run: npm run test:tracker
       - run: npm run test:distribution
       - run: bash -n scripts/install.sh
+      - name: Lint the shell installer
+        run: shellcheck --severity=warning scripts/install.sh

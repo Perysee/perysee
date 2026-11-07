@@ -34,6 +34,7 @@ const signedIn = (extra = {}) => ({
     flash: {},
     assets: { logo: "/logo.svg", world: "/maps/world.json", brands: "/brands" },
     docsUrl: "https://docs.example.test",
+    repositoryUrl: "https://github.example.test/perysee",
     currentUrl: "/dashboard",
     links: {
         dashboard: "/dashboard", "sites.index": "/sites", "sites.create": "/sites/create", health: "/health", settings: "/settings",
@@ -71,7 +72,11 @@ test("no link of the application carries a protocol, so every click stays an Ine
 
     assert.ok(hrefs.length > 8, `expected the menu links to be rendered, found ${hrefs.length}`);
     const external = hrefs.filter((href) => /^[a-z][a-z0-9+.-]*:/i.test(href));
-    assert.deepEqual(external, ["https://docs.example.test"], "only the documentation, which lives on another site, may be absolute");
+    assert.deepEqual(
+        [...new Set(external)].sort(),
+        ["https://docs.example.test", "https://github.example.test/perysee"],
+        "only the documentation and the repository, which live on other sites, may be absolute",
+    );
 });
 
 test("module entries appear in the menu and the active page is marked", async () => {

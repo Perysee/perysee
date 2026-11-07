@@ -71,6 +71,22 @@ jobs:
     needs: [plan, checks]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      # A throwaway database for the terminal-installation smoke test of the production ZIP below.
+      mariadb:
+        image: mariadb:11.4.8
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-only
+          MARIADB_DATABASE: perysee_smoke
+          MARIADB_USER: perysee_smoke
+          MARIADB_PASSWORD: ci-smoke-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
       - uses: actions/checkout@v6
         with:
@@ -98,13 +114,38 @@ jobs:
         run: cd dist && sha256sum --check SHA256SUMS
       - name: Smoke-test the actual production ZIP
         run: |
-          php dist/install.php --archive dist/perysee.zip --checksums dist/SHA256SUMS --target "$RUNNER_TEMP/perysee-smoke" --url https://stats.example.com --yes
+          php dist/install.php --archive dist/perysee.zip --checksums dist/SHA256SUMS --target "$RUNNER_TEMP/perysee-smoke" --url https://stats.example.com --yes --finish none
           cd "$RUNNER_TEMP/perysee-smoke"
           php artisan --version
           test ! -f .env
           test "$(php -r 'echo json_decode(file_get_contents("release.json"))->version;')" = "${{ needs.plan.outputs.tag }}"
           # The config file calls env() and storage_path(), which only exist inside Laravel: read the literal.
           test "$(sed -n "s/^ *'version' => '\([^']*\)',.*/\1/p" config/perysee.php)" = "${{ needs.plan.outputs.version }}"
+      - name: Smoke-test the terminal installation of the production ZIP
+        env:
+          PERYSEE_DB_PASSWORD: ci-smoke-only
+          PERYSEE_ADMIN_PASSWORD: Smoke-Test-Password-123
+        run: |
+          cd "$RUNNER_TEMP/perysee-smoke"
+          php artisan perysee:install --url https://stats.example.com --db-host 127.0.0.1 --db-port 3306 --db-name perysee_smoke --db-user perysee_smoke --admin-name Smoke --admin-email smoke@example.com --no-interaction
+          test -f storage/app/private/installation/installed
+          test ! -f storage/app/private/installation/secret
+          test -f .env
+          # An installed instance is never installed again.
+          if php artisan perysee:install --url https://stats.example.com --db-host 127.0.0.1 --db-port 3306 --db-name perysee_smoke --db-user perysee_smoke --admin-name Other --admin-email other@example.com --no-interaction; then
+            echo "::error::A second installation was accepted."
+            exit 1
+          fi
+      - name: Smoke-test the Docker image built from the release files
+        env:
+          RELEASE_VERSION: ${{ needs.plan.outputs.tag }}
+        run: |
+          docker build --build-arg PHP_VERSION=8.3 --tag perysee-smoke dist
+          docker run --rm --entrypoint php perysee-smoke artisan --version
+          docker run --rm --entrypoint php perysee-smoke -r 'foreach (["pdo_mysql", "zip", "mbstring", "openssl"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "missing $e\n"); exit(1); } }'
+          test "$(docker run --rm --entrypoint php perysee-smoke -r 'echo json_decode(file_get_contents("release.json"))->version;')" = "$RELEASE_VERSION"
+          printf 'APP_URL=https://stats.example.com\nAPP_KEY=base64:%s\nDB_DATABASE=perysee\nDB_USERNAME=perysee\nDB_PASSWORD=ci\nMARIADB_ROOT_PASSWORD=ci\n' "$(openssl rand -base64 32)" > "$RUNNER_TEMP/smoke.env"
+          docker compose --env-file "$RUNNER_TEMP/smoke.env" --file dist/compose.yaml config --quiet
       - uses: actions/upload-artifact@v7
         with:
           name: perysee-release
@@ -112,6 +153,9 @@ jobs:
             dist/perysee.zip
             dist/install.php
             dist/install.sh
+            dist/Dockerfile
+            dist/compose.yaml
+            dist/docker-entrypoint.sh
             dist/SHA256SUMS
           if-no-files-found: error
 
@@ -137,7 +181,7 @@ jobs:
           RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: |
           (cd dist && sha256sum --check SHA256SUMS)
-          gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --draft --title "Perysee $RELEASE_TAG" --generate-notes dist/perysee.zip dist/install.php dist/install.sh dist/SHA256SUMS
+          gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --draft --title "Perysee $RELEASE_TAG" --generate-notes dist/perysee.zip dist/install.php dist/install.sh dist/Dockerfile dist/compose.yaml dist/docker-entrypoint.sh dist/SHA256SUMS
           if [[ "$RELEASE_TAG" == *-* ]]; then
             gh release edit "$RELEASE_TAG" --prerelease --draft=false
           else
