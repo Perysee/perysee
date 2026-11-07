@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Installation\InstallationState;
 use App\Models\User;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Tests\Support\KeepsSessionCookie;
 use Tests\TestCase;
 
 /**
@@ -16,7 +18,7 @@ use Tests\TestCase;
  */
 class LoginFlowCharacterizationTest extends TestCase
 {
-    use RefreshDatabase;
+    use KeepsSessionCookie, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -30,7 +32,7 @@ class LoginFlowCharacterizationTest extends TestCase
         $this->get('/login')->assertOk();
         $before = session()->getId();
 
-        $this->post('/login', ['email' => $user->email, 'password' => 'password'])->assertRedirect('/sites');
+        $this->browser()->post('/login', ['email' => $user->email, 'password' => 'password'])->assertRedirect('/sites');
 
         $this->assertAuthenticatedAs($user);
         $this->assertNotSame($before, session()->getId());
@@ -129,7 +131,7 @@ class LoginFlowCharacterizationTest extends TestCase
         $user = User::factory()->create();
         $this->post('/login', ['email' => $user->email, 'password' => 'incorrect']);
         $this->assertFalse(Auth::check());
-        $this->assertNull(session('login_web_'.sha1(\Illuminate\Auth\SessionGuard::class)));
+        $this->assertNull(session('login_web_'.sha1(SessionGuard::class)));
     }
 
     public function test_recovering_the_administrator_rotates_the_remember_token_and_locks_the_installation(): void

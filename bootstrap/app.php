@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\BootstrapInstallation;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\TrackSession;
 use App\Http\Middleware\TrustConfiguredProxies;
 use App\Modules\ModuleFailures;
 use Illuminate\Foundation\Application;
@@ -27,9 +28,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->authenticateSessions();
         $middleware->web(append: [HandleInertiaRequests::class]);
         $middleware->redirectUsersTo('/sites');
+        // two-factor: keeps the list of open sessions current
+        $middleware->web(append: [TrackSession::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash(['current_password', 'password', 'password_confirmation', 'db_password', 'installation_secret']);
+        $exceptions->dontFlash(['current_password', 'password', 'password_confirmation', 'db_password', 'installation_secret', 'code', 'recovery_code']);
         // An exception raised by a module's own files counts against that module (and can put it in quarantine).
         $exceptions->report(function (Throwable $exception): void {
             try {

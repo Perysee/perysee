@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountSecurityController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DemoController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\GoalController;
 use App\Http\Controllers\GuideController;
 use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\InstanceHealthController;
+use App\Http\Controllers\InstanceSecurityController;
 use App\Http\Controllers\InstanceUpdateController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\MailSettingsController;
@@ -17,9 +19,11 @@ use App\Http\Controllers\ShareLinkController;
 use App\Http\Controllers\SiteFaviconController;
 use App\Http\Controllers\SiteInvitationController;
 use App\Http\Controllers\SiteMemberController;
+use App\Http\Controllers\TwoFactorChallengeController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Middleware\EnsureInstalled;
+use App\Http\Middleware\RequireTwoFactor;
 use App\Http\Middleware\ThrottleInvitationLinks;
 use App\Installation\InstallationState;
 use Illuminate\Support\Facades\Route;
@@ -37,8 +41,11 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [AuthController::class, 'create'])->name('login');
         Route::post('/login', [AuthController::class, 'store'])->name('login.store');
+        // two-factor: the second step of a sign-in (the visitor is still a guest here)
+        Route::get('/login/two-factor', [TwoFactorChallengeController::class, 'show'])->name('login.two-factor');
+        Route::post('/login/two-factor', [TwoFactorChallengeController::class, 'store'])->middleware('throttle:30,1')->name('login.two-factor.store');
     });
-    Route::middleware('auth')->group(function (): void {
+    Route::middleware(['auth', RequireTwoFactor::class])->group(function (): void {
         Route::get('/dashboard', [WorkspaceController::class, 'dashboard'])->name('dashboard');
         Route::get('/pixels', [WorkspaceController::class, 'pixels'])->name('pixels');
         Route::get('/modules/{module}/assets/{file}', ModuleAssetController::class)->where('file', '[A-Za-z0-9_.-]+')->name('modules.assets');
@@ -101,6 +108,16 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
         Route::get('/account/password', [AuthController::class, 'editPassword'])->name('password.edit');
         Route::put('/account/password', [AuthController::class, 'updatePassword'])->name('password.update');
+        // two-factor: account security (2FA, open sessions, access log) and the instance switch
+        Route::get('/account/security', [AccountSecurityController::class, 'show'])->name('account.security');
+        Route::post('/account/security/two-factor', [AccountSecurityController::class, 'start'])->middleware('throttle:10,1')->name('account.security.two-factor.start');
+        Route::post('/account/security/two-factor/confirm', [AccountSecurityController::class, 'confirm'])->middleware('throttle:10,1')->name('account.security.two-factor.confirm');
+        Route::delete('/account/security/two-factor', [AccountSecurityController::class, 'disable'])->middleware('throttle:10,1')->name('account.security.two-factor.disable');
+        Route::post('/account/security/recovery-codes', [AccountSecurityController::class, 'regenerateCodes'])->middleware('throttle:10,1')->name('account.security.recovery-codes');
+        Route::delete('/account/security/sessions', [AccountSecurityController::class, 'revokeOthers'])->name('account.security.sessions.others');
+        Route::delete('/account/security/sessions/{session}', [AccountSecurityController::class, 'revokeSession'])->whereNumber('session')->name('account.security.sessions.destroy');
+        Route::get('/settings/security', [InstanceSecurityController::class, 'show'])->name('settings.security');
+        Route::put('/settings/security', [InstanceSecurityController::class, 'update'])->name('settings.security.update');
         Route::get('/guides/{guide}', [GuideController::class, 'show'])->name('guides.show');
         Route::get('/demo/{website}', [DemoController::class, 'show'])->name('demo.show');
         Route::resource('sites', WebsiteController::class)->parameters(['sites' => 'website']);
