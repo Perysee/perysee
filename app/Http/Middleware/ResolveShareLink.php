@@ -7,7 +7,6 @@ use App\Support\Coordination;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -52,6 +51,7 @@ class ResolveShareLink
             return response()->json(['message' => 'Not found.'], 404);
         }
 
-        return Inertia::render('Share/Unavailable')->toResponse($request)->setStatusCode(404);
+        // A static page: it must not echo the token, so every reason looks exactly the same.
+        return response()->view('share-unavailable', [], 404);
     }
 }

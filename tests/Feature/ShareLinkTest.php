@@ -76,6 +76,32 @@ class ShareLinkTest extends TestCase
         $this->getJson('/s/'.$token.'/api/dimensions?dimension=path&website_id='.$other->id)->assertOk()->assertJsonPath('data.0.value', '/mine')->assertJsonMissingPath('data.1')->assertHeader('Cache-Control');
     }
 
+    public function test_expired_and_revoked_links_return_identical_404(): void
+    {
+        [, , $expired] = $this->link(['overview'], null, now()->subMinute());
+        [, $revoked, $revokedToken] = $this->link();
+        $revoked->update(['revoked_at' => now()]);
+        [$deleting, , $deletingToken] = $this->link();
+        $deleting->forceFill(['deleting_at' => now()])->save();
+        [, , $good] = $this->link();
+
+        $this->get('/s/'.$good)->assertOk();
+        $unknown = $this->get('/s/'.str_repeat('a', 43));
+        $unknown->assertNotFound();
+        $unknownJson = $this->getJson('/s/'.str_repeat('a', 43).'/api/overview');
+        $unknownJson->assertNotFound();
+        foreach ([$expired, $revokedToken, $deletingToken] as $token) {
+            $page = $this->get('/s/'.$token);
+            $page->assertNotFound();
+            $this->assertSame($unknown->getContent(), $page->getContent());
+            $json = $this->getJson('/s/'.$token.'/api/overview');
+            $json->assertNotFound();
+            $this->assertSame($unknownJson->getContent(), $json->getContent());
+            $this->post('/s/'.$token.'/unlock', ['password' => 'x'])->assertNotFound();
+        }
+        $this->get('/s/'.str_repeat('a', 500))->assertNotFound();
+    }
+
     public function test_only_an_owner_manages_links_and_never_those_of_another_site(): void
     {
         [$site, $owner] = $this->siteWithOwner();

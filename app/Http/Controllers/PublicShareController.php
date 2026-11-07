@@ -52,6 +52,11 @@ class PublicShareController extends Controller
         return response()->json($data)->header('Cache-Control', 'no-store, private');
     }
 
+    public function unlock(Request $request)
+    {
+        abort(404);
+    }
+
     /** @return array{0: ShareLink, 1: Website} */
     private function context(Request $request): array
     {
