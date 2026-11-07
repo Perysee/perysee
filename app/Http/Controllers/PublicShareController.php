@@ -6,7 +6,10 @@ use App\Analytics\Reporting\Reports;
 use App\Models\ShareLink;
 use App\Models\Website;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,6 +22,9 @@ class PublicShareController extends Controller
     public function show(Request $request, Reports $reports): Response
     {
         [$link, $site] = $this->context($request);
+        if (! $request->attributes->get('share_unlocked')) {
+            return Inertia::render('Share/Unlock');
+        }
         $period = $this->period($request, $site, $reports);
         $dimension = $this->dimension($request, $link);
         $overview = $link->allows('overview');
@@ -39,6 +45,7 @@ class PublicShareController extends Controller
     public function api(Request $request, string $token, string $report, Reports $reports): JsonResponse
     {
         [$link, $site] = $this->context($request);
+        abort_unless($request->attributes->get('share_unlocked'), 404);
         $period = $this->period($request, $site, $reports);
         if ($report === 'dimensions') {
             $dimension = $this->dimension($request, $link);
@@ -52,9 +59,17 @@ class PublicShareController extends Controller
         return response()->json($data)->header('Cache-Control', 'no-store, private');
     }
 
-    public function unlock(Request $request)
+    public function unlock(Request $request, string $token): RedirectResponse
     {
-        abort(404);
+        [$link] = $this->context($request);
+        $data = $request->validate(['password' => ['required', 'string', 'max:128']]);
+        if ($link->password_hash === null || ! Hash::check($data['password'], $link->password_hash)) {
+            throw ValidationException::withMessages(['password' => 'The password is not correct.']);
+        }
+        $request->session()->put('share_unlocked.'.$link->id, $link->secret_version);
+
+        // Back to the clean address, so the token is never part of a form submission result.
+        return redirect()->route('share.show', $token);
     }
 
     /** @return array{0: ShareLink, 1: Website} */

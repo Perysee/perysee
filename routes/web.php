@@ -66,6 +66,7 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/sites/{website}/favicon', SiteFaviconController::class)->middleware('throttle:120,1')->name('sites.favicon');
         Route::get('/sites/{website}/sharing', [ShareLinkController::class, 'index'])->name('sites.sharing');
         Route::post('/sites/{website}/sharing', [ShareLinkController::class, 'store'])->name('sites.sharing.store');
+        Route::put('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'update'])->name('sites.sharing.update');
         Route::delete('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'destroy'])->name('sites.sharing.destroy');
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
         Route::get('/sites/{website}/{section}', [WorkspaceController::class, 'sitePage'])->whereIn('section', ['countries', 'pages', 'events', 'sessions', 'realtime', 'sources', 'campaigns', 'devices', 'pixels'])->name('sites.section');

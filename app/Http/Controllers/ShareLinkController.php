@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Inertia\Response;
 
@@ -60,6 +61,25 @@ class ShareLinkController extends Controller
         [, $token] = ShareLink::issue($website, $request->user(), $data['label'] ?? '', $data['sections'], $data['password'] ?? null, $expires);
 
         return redirect()->route('sites.sharing', $website)->with('share_created', ['url' => route('share.show', $token, false)]);
+    }
+
+    /** Sets or removes the password. Either change invalidates every session that unlocked the link. */
+    public function update(Request $request, Website $website, string $link): RedirectResponse
+    {
+        $this->authorizeSharing($website);
+        $model = $website->shareLinks()->findOrFail($link);
+        $data = $request->validate(['password' => ['nullable', 'string', 'min:8', 'max:128'], 'remove_password' => ['sometimes', 'boolean']]);
+        if (! empty($data['password'])) {
+            $model->password_hash = Hash::make($data['password']);
+        } elseif ($request->boolean('remove_password')) {
+            $model->password_hash = null;
+        } else {
+            return redirect()->route('sites.sharing', $website);
+        }
+        $model->secret_version++;
+        $model->save();
+
+        return redirect()->route('sites.sharing', $website)->with('status', __('Link password updated.'));
     }
 
     public function destroy(Website $website, string $link): RedirectResponse

@@ -102,6 +102,48 @@ class ShareLinkTest extends TestCase
         $this->get('/s/'.str_repeat('a', 500))->assertNotFound();
     }
 
+    public function test_password_required_then_session_unlocks(): void
+    {
+        [$site, , $token] = $this->link(['overview'], 'correct horse');
+        DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => now('UTC')->toDateString(), 'pageviews' => 7]);
+
+        $this->get('/s/'.$token)->assertOk()->assertInertia(function (Assert $page): void {
+            $page->component('Share/Unlock');
+            $keys = array_keys($page->toArray()['props']);
+            sort($keys);
+            $this->assertSame(['assets', 'currentUrl', 'errors', 'flash'], $keys);
+        })->assertDontSee('Public blog');
+        $this->getJson('/s/'.$token.'/api/overview')->assertNotFound();
+
+        $this->post('/s/'.$token.'/unlock', ['password' => 'wrong'])->assertSessionHasErrors('password');
+        $this->get('/s/'.$token)->assertInertia(fn (Assert $page) => $page->component('Share/Unlock'));
+
+        $this->post('/s/'.$token.'/unlock', ['password' => 'correct horse'])->assertRedirect('/s/'.$token);
+        $this->get('/s/'.$token)->assertInertia(fn (Assert $page) => $page->component('Share/Show')->where('report.totals.pageviews', 7));
+        $this->getJson('/s/'.$token.'/api/overview')->assertOk();
+    }
+
+    public function test_changing_password_invalidates_session(): void
+    {
+        [$site, $link, $token] = $this->link(['overview'], 'correct horse');
+        $owner = User::factory()->create();
+        $site->members()->attach($owner, ['role' => 'owner']);
+        $this->post('/s/'.$token.'/unlock', ['password' => 'correct horse']);
+        $this->get('/s/'.$token)->assertInertia(fn (Assert $page) => $page->component('Share/Show'));
+
+        $this->actingAs($owner)->put('/sites/'.$site->id.'/sharing/'.$link->id, ['password' => 'another secret'])->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertSame(2, $link->fresh()->secret_version);
+        $this->assertNotSame('another secret', $link->fresh()->password_hash);
+        $this->get('/s/'.$token)->assertInertia(fn (Assert $page) => $page->component('Share/Unlock'));
+        $this->post('/s/'.$token.'/unlock', ['password' => 'correct horse'])->assertSessionHasErrors('password');
+        $this->post('/s/'.$token.'/unlock', ['password' => 'another secret'])->assertRedirect();
+        $this->get('/s/'.$token)->assertInertia(fn (Assert $page) => $page->component('Share/Show'));
+
+        $this->put('/sites/'.$site->id.'/sharing/'.$link->id, ['remove_password' => true])->assertRedirect();
+        $this->assertNull($link->fresh()->password_hash);
+        $this->assertSame(3, $link->fresh()->secret_version);
+    }
+
     public function test_only_an_owner_manages_links_and_never_those_of_another_site(): void
     {
         [$site, $owner] = $this->siteWithOwner();
