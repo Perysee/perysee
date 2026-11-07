@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountSecurityController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DemoController;
 use App\Http\Controllers\FunnelController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\ShareLinkController;
 use App\Http\Controllers\SiteFaviconController;
 use App\Http\Controllers\SiteInvitationController;
 use App\Http\Controllers\SiteMemberController;
+use App\Http\Controllers\TrackingCheckController;
 use App\Http\Controllers\TwoFactorChallengeController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WorkspaceController;
@@ -96,7 +98,14 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::post('/sites/{website}/sharing', [ShareLinkController::class, 'store'])->name('sites.sharing.store');
         Route::put('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'update'])->name('sites.sharing.update');
         Route::delete('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'destroy'])->name('sites.sharing.destroy');
+        // read-api: management of the tokens of the read API (owners only)
+        Route::get('/sites/{website}/api-tokens', [ApiTokenController::class, 'index'])->name('sites.api-tokens');
+        Route::post('/sites/{website}/api-tokens', [ApiTokenController::class, 'store'])->name('sites.api-tokens.store');
+        Route::delete('/sites/{website}/api-tokens/{token}', [ApiTokenController::class, 'destroy'])->whereNumber('token')->name('sites.api-tokens.destroy');
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
+        // Installation check
+        Route::get('/sites/{website}/tracking/verify', [TrackingCheckController::class, 'show'])->name('sites.verify');
+        Route::post('/sites/{website}/tracking/probe', [TrackingCheckController::class, 'probeToken'])->middleware('throttle:6,1')->name('sites.verify.probe');
         Route::get('/sites/{website}/team', [SiteMemberController::class, 'index'])->name('sites.team');
         Route::delete('/sites/{website}/team/me', [SiteMemberController::class, 'leave'])->name('sites.team.leave');
         Route::put('/sites/{website}/team/{member}', [SiteMemberController::class, 'update'])->whereNumber('member')->name('sites.team.update');

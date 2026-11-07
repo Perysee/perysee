@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Reporting\ReportPresenter;
 use App\Analytics\Reporting\Reports;
 use App\Models\ShareLink;
 use App\Models\Website;
@@ -22,7 +23,7 @@ use Inertia\Response;
  */
 class PublicShareController extends Controller
 {
-    public function show(Request $request, Reports $reports): Response
+    public function show(Request $request, Reports $reports, ReportPresenter $presenter): Response
     {
         [$link, $site] = $this->context($request);
         if (! $request->attributes->get('share_unlocked')) {
@@ -38,15 +39,15 @@ class PublicShareController extends Controller
             'sections' => $link->sections,
             'period' => ['from' => $period['from'], 'to' => $period['to'], 'granularity' => $period['granularity']],
             'today' => now($site->timezone)->toDateString(),
-            'report' => $overview ? $this->overview($reports, $site, $period) : null,
-            'series' => $overview ? $reports->series($site, $period) : [],
+            'report' => $overview ? $presenter->overview($site, $period) : null,
+            'series' => $overview ? $presenter->series($site, $period) : [],
             'dimensionOptions' => $link->dimensions(),
             'dimension' => $dimension,
-            'dimensionReport' => $dimension !== null ? $this->dimensionReport($reports, $site, $period, $dimension) : null,
+            'dimensionReport' => $dimension !== null ? $presenter->dimensionReport($site, $period, $dimension) : null,
         ]);
     }
 
-    public function api(Request $request, string $token, string $report, Reports $reports): JsonResponse
+    public function api(Request $request, string $token, string $report, Reports $reports, ReportPresenter $presenter): JsonResponse
     {
         [$link, $site] = $this->context($request);
         abort_unless($request->attributes->get('share_unlocked'), 404);
@@ -54,10 +55,10 @@ class PublicShareController extends Controller
         if ($report === 'dimensions') {
             $dimension = $this->dimension($request, $link);
             abort_if($dimension === null, 404);
-            $data = $this->dimensionReport($reports, $site, $period, $dimension);
+            $data = $presenter->dimensionReport($site, $period, $dimension);
         } else {
             abort_unless($link->allows('overview'), 404);
-            $data = $report === 'overview' ? $this->overview($reports, $site, $period) : ['data' => $reports->series($site, $period)];
+            $data = $report === 'overview' ? $presenter->overview($site, $period) : ['data' => $presenter->series($site, $period)];
         }
 
         return response()->json($data)->header('Cache-Control', 'no-store, private');
@@ -112,26 +113,5 @@ class PublicShareController extends Controller
         abort_unless(is_string($dimension) && in_array($dimension, $allowed, true), 404);
 
         return $dimension;
-    }
-
-    /** The totals and coverage a visitor needs, without instance-level details. */
-    private function overview(Reports $reports, Website $site, array $period): array
-    {
-        $report = $reports->overview($site, $period);
-
-        return [
-            'period' => $report['period'],
-            'totals' => $report['totals'],
-            'coverage' => $report['coverage'],
-            'availability' => $report['availability'],
-            'freshness' => ['aggregated_at' => $report['freshness']['aggregated_at']],
-        ];
-    }
-
-    private function dimensionReport(Reports $reports, Website $site, array $period, string $dimension): array
-    {
-        $report = $reports->dimensionReport($site, $period, $dimension);
-
-        return ['total' => $report['total'], 'distinct_values' => $report['distinct_values'], 'series' => $report['series'], 'data' => $report['data'], 'map' => $report['map']];
     }
 }

@@ -161,6 +161,13 @@ const number = (value) =>
                     <UButton :to="site.tracking_url" label="Set up tracking" size="xs" />
                 </div>
             </div>
+            <div v-else-if="site.silent" class="site-trend is-quiet">
+                <div class="flex flex-col items-start gap-2 px-6 py-5">
+                    <p class="text-sm font-medium">Silent: no event for several days</p>
+                    <p class="text-xs text-muted">Check that the script is still on your pages.</p>
+                    <UButton :to="site.verify_url" label="Verify the installation" color="warning" variant="subtle" size="xs" />
+                </div>
+            </div>
             <div v-else-if="quiet(site)" class="site-trend is-quiet">
                 <p class="text-xs text-muted">No traffic in this period</p>
             </div>

@@ -110,6 +110,18 @@ const columns = [
                             class="mt-1"
                             >Demonstration data</UBadge
                         >
+                        <div v-if="row.original.silent" class="mt-1">
+                            <UButton
+                                :to="row.original.verify_url"
+                                icon="i-tabler-alert-triangle"
+                                label="Silent"
+                                title="No recent event: verify the installation"
+                                :aria-label="'Silent: verify the installation of ' + row.original.name"
+                                color="warning"
+                                variant="subtle"
+                                size="xs"
+                            />
+                        </div>
                     </div>
                 </div></template
             >
