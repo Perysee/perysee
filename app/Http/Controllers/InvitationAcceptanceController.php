@@ -23,7 +23,6 @@ class InvitationAcceptanceController extends Controller
 {
     public function show(Request $request, string $token): Response
     {
-        $this->throttle($request);
         $invitation = SiteInvitation::findPending($token);
         abort_if(! $invitation || $invitation->website->deleting_at, 404);
 
@@ -38,17 +37,20 @@ class InvitationAcceptanceController extends Controller
 
     public function accept(AcceptInvitationRequest $request, string $token): RedirectResponse
     {
-        $this->throttle($request);
         $outcome = DB::transaction(function () use ($request, $token): Website|RedirectResponse {
             $invitation = SiteInvitation::pending()->where('token_hash', SiteInvitation::hashToken($token))->lockForUpdate()->first();
             abort_if(! $invitation, 404);
             $website = Website::whereKey($invitation->website_id)->lockForUpdate()->first();
             abort_if(! $website || $website->deleting_at, 404);
 
+            // After five failures the invitation is closed to everyone, the invited person included: it has to be sent again.
+            $failures = 'invitation-fail:'.$invitation->id;
+            abort_if(RateLimiter::tooManyAttempts($failures, 5), 404);
             $user = $request->user();
             if ($user) {
                 // Never say which address was invited.
                 if (mb_strtolower($user->email) !== $invitation->email) {
+                    RateLimiter::hit($failures, 3600);
                     throw ValidationException::withMessages(['invitation' => __('This invitation is not valid for this account.')]);
                 }
             } elseif (User::whereRaw('lower(email) = ?', [$invitation->email])->exists()) {
@@ -82,12 +84,5 @@ class InvitationAcceptanceController extends Controller
         $request->session()->regenerate();
 
         return redirect()->route('sites.show', $outcome);
-    }
-
-    private function throttle(Request $request): void
-    {
-        $key = 'invitation-ip:'.$request->ip();
-        abort_if(RateLimiter::tooManyAttempts($key, 10), 429, 'Too many attempts. Try again in a minute.');
-        RateLimiter::hit($key, 60);
     }
 }

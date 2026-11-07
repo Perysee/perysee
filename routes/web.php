@@ -17,6 +17,7 @@ use App\Http\Controllers\SiteMemberController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Middleware\EnsureInstalled;
+use App\Http\Middleware\ThrottleInvitationLinks;
 use App\Installation\InstallationState;
 use Illuminate\Support\Facades\Route;
 
@@ -26,8 +27,10 @@ Route::post('/install/unlock', [InstallationController::class, 'unlock'])->name(
 Route::post('/install/database', [InstallationController::class, 'database'])->name('install.database');
 Route::post('/install/administrator', [InstallationController::class, 'administrator'])->name('install.administrator');
 Route::middleware(EnsureInstalled::class)->group(function (): void {
-    Route::get('/invitations/{token}', [InvitationAcceptanceController::class, 'show'])->name('invitations.show');
-    Route::post('/invitations/{token}', [InvitationAcceptanceController::class, 'accept'])->name('invitations.accept');
+    Route::middleware(ThrottleInvitationLinks::class)->group(function (): void {
+        Route::get('/invitations/{token}', [InvitationAcceptanceController::class, 'show'])->name('invitations.show');
+        Route::post('/invitations/{token}', [InvitationAcceptanceController::class, 'accept'])->name('invitations.accept');
+    });
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [AuthController::class, 'create'])->name('login');
         Route::post('/login', [AuthController::class, 'store'])->name('login.store');

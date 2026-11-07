@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -73,6 +74,7 @@ class InvitationAcceptanceTest extends TestCase
         [, $revoked, $revokedToken] = $this->invitation('gone@example.com');
         $revoked->forceFill(['revoked_at' => now()])->save();
 
+        RateLimiter::clear('invitation-ip:127.0.0.1');
         foreach ([$expiredToken, $revokedToken, str_repeat('a', 64), 'short'] as $candidate) {
             $this->get('/invitations/'.$candidate)->assertNotFound();
             $this->post('/invitations/'.$candidate, $this->details())->assertNotFound();
@@ -111,6 +113,33 @@ class InvitationAcceptanceTest extends TestCase
         $other->members()->attach($invitee, ['role' => 'owner']);
         $this->post('/invitations/'.$otherToken)->assertRedirect();
         $this->assertSame('owner', $other->members()->whereKey($invitee->id)->first()->pivot->role);
+    }
+
+    public function test_invitation_endpoints_are_throttled_and_answer_uniformly(): void
+    {
+        [, $invitation, $token] = $this->invitation('invited@example.com');
+        [, $revoked, $revokedToken] = $this->invitation('gone@example.com');
+        $revoked->forceFill(['revoked_at' => now()])->save();
+        $unknown = $this->get('/invitations/'.str_repeat('b', 64));
+        $this->get('/invitations/'.$revokedToken)->assertNotFound()->assertContent($unknown->getContent());
+
+        // Five wrong-account attempts close the invitation, even to the right person.
+        $stranger = User::factory()->create();
+        $this->actingAs($stranger);
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->post('/invitations/'.$token)->assertSessionHasErrors('invitation');
+        }
+        $this->actingAs(User::factory()->create(['email' => 'invited@example.com']))->post('/invitations/'.$token)->assertNotFound();
+        $this->assertNull($invitation->fresh()->accepted_at);
+
+        // Per address: the eleventh request of the minute is refused.
+        $this->flushSession();
+        RateLimiter::clear('invitation-ip:127.0.0.1');
+        for ($request = 0; $request < 10; $request++) {
+            $this->get('/invitations/'.str_repeat('c', 64))->assertNotFound();
+        }
+        $this->get('/invitations/'.str_repeat('c', 64))->assertStatus(429);
+        $this->post('/invitations/'.str_repeat('c', 64), $this->details())->assertStatus(429);
     }
 
     public function test_a_weak_password_is_refused_and_keeps_the_invitation_usable(): void

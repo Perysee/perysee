@@ -113,6 +113,19 @@ class TeamManagementTest extends TestCase
         $this->assertSame(1, $site->members()->wherePivot('role', 'owner')->count());
     }
 
+    public function test_an_owner_can_create_twenty_invitations_an_hour(): void
+    {
+        [$site, $owner] = $this->siteWith('owner');
+        $this->actingAs($owner);
+
+        for ($index = 0; $index < 20; $index++) {
+            $this->post('/sites/'.$site->id.'/invitations', ['email' => "person$index@example.com", 'role' => 'viewer'])->assertRedirect();
+        }
+
+        $this->post('/sites/'.$site->id.'/invitations', ['email' => 'one-more@example.com', 'role' => 'viewer'])->assertStatus(429);
+        $this->assertDatabaseCount('site_invitations', 20);
+    }
+
     public function test_a_configured_mailer_sends_the_invitation_and_a_failure_falls_back_to_the_link(): void
     {
         config(['mail.default' => 'smtp']);
