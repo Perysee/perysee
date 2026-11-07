@@ -243,3 +243,70 @@ test('bundled country database must match its pinned checksum', t => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /country database checksum mismatch/);
 });
+
+// A stand-in for the application's own artisan, which reports how install.php called it.
+function reportingArtisan(f, { status = 0 } = {}) {
+    writeFileSync(join(f.source, 'artisan'), `<?php
+echo 'ARTISAN ' . implode(' ', array_slice($argv, 1)) . "\\n";
+if (in_array('--browser', $argv, true)) {
+    echo "https://stats.example.com/install#secret=fixture-secret\\n";
+}
+exit(${status});
+`);
+}
+test('an unknown mode is refused before anything is downloaded or written', (t) => {
+    const f = fixture(t);
+    build(f);
+    const target = join(f.root, 'app');
+    const result = install(f, target, ['--mode', 'nonsense']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unknown installation mode/);
+    assert.equal(existsSync(target), false);
+});
+test('the manual mode prepares the browser installer and prints the link that carries the secret', (t) => {
+    const f = fixture(t);
+    reportingArtisan(f);
+    build(f);
+    const target = join(f.root, 'app');
+    const result = install(f, target, ['--mode', 'manual']);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /ARTISAN perysee:install --browser --url=https:\/\/stats\.example\.com/);
+    assert.match(result.stdout, /https:\/\/stats\.example\.com\/install#secret=fixture-secret/);
+    assert.match(result.stdout, /document root to: .*\/app\/public/);
+});
+test('finishing in the terminal hands over to perysee:install and reports its failure', (t) => {
+    const f = fixture(t);
+    reportingArtisan(f, { status: 1 });
+    build(f);
+    const result = install(f, join(f.root, 'app'), ['--finish', 'terminal']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, /ARTISAN perysee:install --url=https:\/\/stats\.example\.com/);
+    assert.doesNotMatch(result.stdout, /--browser/);
+    assert.match(result.stderr, /perysee:install did not finish/);
+});
+test('finish none installs the files only and keeps the manual instructions', (t) => {
+    const f = fixture(t);
+    reportingArtisan(f);
+    build(f);
+    const target = join(f.root, 'app');
+    const result = install(f, target, ['--finish', 'none']);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.doesNotMatch(result.stdout, /ARTISAN/);
+    assert.match(result.stdout, /https:\/\/stats\.example\.com\/install/);
+    assert.equal(existsSync(join(target, '.env')), false);
+});
+test('a failing browser preparation falls back to the manual instructions without failing the install', (t) => {
+    const f = fixture(t);
+    reportingArtisan(f, { status: 1 });
+    build(f);
+    const result = install(f, join(f.root, 'app'));
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /storage\/app\/private\/installation\/secret/);
+});
+test('an unknown finish value is refused', (t) => {
+    const f = fixture(t);
+    build(f);
+    const result = install(f, join(f.root, 'app'), ['--finish', 'whatever']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /--finish must be/);
+});
