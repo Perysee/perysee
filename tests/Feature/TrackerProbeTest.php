@@ -183,4 +183,18 @@ class TrackerProbeTest extends TestCase
 
         $this->postJson('/sites/'.$site->id.'/tracking/probe')->assertStatus(429);
     }
+
+    public function test_other_throttled_pages_do_not_spend_the_probe_budget(): void
+    {
+        $site = Website::factory()->create();
+        $owner = User::factory()->create();
+        $site->members()->attach($owner, ['role' => 'owner']);
+        $this->actingAs($owner);
+        // Unnamed throttles share one counter per user: every page load fetches the favicon (throttle:120,1).
+        foreach (range(1, 10) as $ignored) {
+            $this->get('/sites/'.$site->id.'/favicon');
+        }
+
+        $this->postJson('/sites/'.$site->id.'/tracking/probe')->assertOk();
+    }
 }
