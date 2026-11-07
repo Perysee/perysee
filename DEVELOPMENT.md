@@ -144,6 +144,61 @@ Le budget est vérifié entre les lots : le temps d'une requête SQL bloquée d�
 
 Les rapports privés utilisent la session web, le service commun `Reports` et les permissions de site, sans accès implicite de l'admin. Le CSV journalier expose la disponibilité des sessions ; les tables de dimensions et leur export sont limités aux 100 premières valeurs et acceptent un filtre exact. Les rapports de dimensions calculent leurs totaux et séries quotidiennes sur la sélection complète (avant la limite de 100 valeurs affichées), avec le même filtre exact que le CSV. La navigation conserve la période et les sélecteurs de dates conservent le filtre. Le brut est réservé au contrôle de réception, borné à 100 lignes et quinze minutes ; les compteurs de réception couvrent toute la fenêtre et ne sont pas plafonnés au nombre de lignes affichées. Une configuration connue depuis la migration ne reconstitue pas le mode de mesure des années antérieures.
 
+## Équipe, partage public, objectifs et comparaison
+
+Quatre fonctions s'appuient sur des migrations additives (`2026_11_07_*`) : `site_invitations`, `share_links`, `goals`, `goal_versions`, `goal_sessions` et `stats_goal_daily`. Aucune ne modifie `users` ni `site_members`. Les décisions de conception sont dans `docs/adr/` ([001](docs/adr/001-public-share-links-separate-shell.md), [002](docs/adr/002-invitation-tokens-and-the-no-mail-path.md)).
+
+### Planificateur
+
+Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` déclare :
+
+| Commande | Fréquence | Rôle |
+| --- | --- | --- |
+| `perysee:aggregate --batch=500 --budget-seconds=15` | 5 min | Consolidation des événements, segments et objectifs en direct. |
+| `perysee:maintenance --limit=1000` | 5 min | Battement du planificateur, suppression des sites, rétention des statistiques, rapports de parcours périmés, invitations périmées, puis `perysee:prune-tracking`. |
+| `perysee:rebuild-segments --batch=500` | 5 min | Reconstruction des segments sur l'historique conservé. |
+| `perysee:rebuild-goals --batch=500` | 1 min, sans chevauchement | Compte les événements passés pour un objectif défini après coup. Sans travail en attente, le coût est une lecture. |
+| `perysee:journey-reports --batch=500 --budget=10` | 1 min, sans chevauchement | Rapports de parcours asynchrones. |
+| `perysee:update --requested --yes` | 1 min, sans chevauchement | Prend la demande de mise à jour déposée depuis la page Santé. |
+| `perysee:update:check --quiet-unless-new` | 04:17 | Cherche une nouvelle version. |
+| `perysee:modules catalog --refresh-only` | 04:43 | Rafraîchit le catalogue de modules. |
+
+### Équipe et invitations
+
+- Écran `/sites/{website}/team` (`SiteMemberController`) : tout membre voit la liste ; seul un `owner` voit les invitations et les commandes (inviter, changer un rôle, retirer, renvoyer, révoquer). Un administrateur d'instance sans rôle sur le site n'a aucun accès implicite. Chacun peut quitter un site (`DELETE /sites/{website}/team/me`).
+- Un site garde toujours un propriétaire : changements de rôle, retraits et départs passent par `App\Support\SiteTeam`, sous verrou sur la ligne du site, et refusent de retirer le dernier `owner`. `TeamMariaDbTest` rejoue deux propriétaires qui se rétrogradent en même temps avec de vrais processus ; il est ignoré hors MariaDB.
+- Invitation : adresse e-mail (minuscules) et rôle, valable 7 jours, une seule invitation en attente par site et adresse. Le jeton (`random_bytes(32)` en hexadécimal) n'est jamais stocké : seule son empreinte SHA-256 l'est (`token_hash`). « Renvoyer » change le jeton ; l'ancien lien cesse de fonctionner.
+- **Le courrier est facultatif.** Si `MAIL_MAILER` vaut `log` ou `array` (défaut), ou si l'envoi échoue, l'invitation est conservée et le lien `/invitations/{token}` est affiché une seule fois au propriétaire, avec un bouton de copie. Avec un expéditeur configuré, un `Mailable` est envoyé de façon synchrone (pas de file). Un compte créé par invitation n'a son adresse marquée vérifiée que si un message est réellement parti.
+- `GET /invitations/{token}` ne consomme jamais le jeton (les scanners de courrier ouvrent les liens) ; le `POST` le consomme, dans une transaction avec `lockForUpdate`. Jeton inconnu, expiré, révoqué ou utilisé : même 404. Les réponses portent `Referrer-Policy: no-referrer` (`BootstrapInstallation`).
+- Compte inexistant : nom et mot de passe (12 caractères au moins), le compte n'est jamais administrateur. Compte existant : connexion obligatoire avec l'adresse invitée, sinon message générique qui ne révèle pas l'adresse. Rien n'est fusionné entre adresses.
+- Limites : 20 invitations par heure et par utilisateur, un renvoi par minute et par invitation, 10 requêtes par minute et par adresse IP sur les liens (`ThrottleInvitationLinks`). Cinq tentatives d'acceptation depuis un compte connecté qui n'est pas l'invité ferment l'invitation (une heure).
+- Rétention : `perysee:maintenance` supprime les invitations expirées, acceptées ou révoquées depuis plus de 30 jours.
+
+### Liens de partage publics
+
+- Écran `/sites/{website}/sharing` (propriétaire seulement, jamais sur un site de démonstration). Un lien porte les sections choisies (`overview`, `pages`, `sources`, `campaigns`, `devices`, `countries`, `events`), une date d'expiration facultative et un mot de passe facultatif (8 caractères au moins).
+- Routes publiques dans `routes/share.php` : `GET /s/{token}`, `POST /s/{token}/unlock`, `GET /s/{token}/api/{overview|timeseries|dimensions}`. Elles passent par `ResolveShareLink`, pas par la liaison de modèle. Lien inconnu, révoqué, expiré, site supprimé ou de démonstration : une même page 404 statique (JSON pour l'API). Les échecs sont limités à 60 par minute et par adresse IP.
+- Le jeton (32 octets aléatoires, base64url) n'est jamais stocké : `share_links.token_hash` (SHA-256) et un indice de six caractères pour la liste. Le lien complet n'est affiché qu'une fois, à la création. Le jeton est dans l'URL (historique du navigateur, journaux d'un proxy) : mot de passe, expiration et révocation sont les réponses prévues.
+- Mot de passe : 5 essais par lien en 15 minutes, 20 par adresse IP en une heure. Le modifier ou le retirer incrémente `secret_version` et déconnecte les visiteurs qui l'avaient saisi.
+- Coque séparée (`Pages/Share/Show.vue`, `Unlock.vue`) : pour les routes `share.*`, `HandleInertiaRequests` ne partage que `currentUrl`, `assets`, `flash` et `errors` ; aucun compte, aucune navigation, aucun module. Réponses en `Cache-Control: no-store, private`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow`. Aucun filtre, export ou identifiant de site n'est lu depuis la requête.
+- L'usage est enregistré au plus une fois par heure et par lien (`last_used_at`, `use_count`). Les liens expirés ou révoqués ne sont pas purgés ; les lignes disparaissent avec le site (clé étrangère en cascade).
+
+### Objectifs et conversions
+
+- Écrans `/sites/{website}/goals` et `/goals/{goal}` (lecture pour tout membre, création, modification et archivage pour un `owner`), API JSON et export CSV. Cinq objectifs actifs au plus par site ; type `event` (événement nommé) ou `path` (chemin normalisé) ; seuil de 1 à 1000 occurrences par session.
+- Modifier un objectif crée une nouvelle version (`goal_versions`) ; les versions antérieures restent consultables (`?version=`). Archiver ne supprime rien.
+- Une session mesurée convertit au plus une fois par version d'objectif, sur l'événement qui atteint le seuil ; elle est attribuée aux dimensions de son premier événement (**premier contact**). Un événement sans session mesurée compte comme occurrence, jamais comme conversion. Les compteurs sont dans `stats_goal_daily` (jour local du site) ; `goal_sessions` sert de registre et de déduplication.
+- **Données brutes et rétention.** Un objectif défini après coup est compté sur les événements bruts existants à sa création (`snapshot_id`), par lots de `perysee:rebuild-goals`, donc au mieux sur `raw_retention_days` (90 jours par défaut). Les événements postérieurs sont comptés par l'agrégateur ; les deux ne se chevauchent jamais. Le rapport signale un historique incomplet (`rebuilding` pendant le comptage, `partial` au-delà de la rétention brute ou si des sessions manquent).
+- `perysee:prune-tracking` (appelé par `perysee:maintenance`) supprime les lignes de `goal_sessions` dont la dernière occurrence dépasse `raw_retention_days`. Les compteurs de `stats_goal_daily` ne sont pas touchés par la rétention des statistiques. La suppression d'un site retire ses objectifs, versions, sessions et compteurs par lots.
+
+### Comparaison de périodes
+
+`compare=previous` (seule valeur acceptée, 422 sinon) ajoute un bloc `comparison` produit par `Reports::comparison()`. La période précédente a la même durée et finit la veille du début, en calendrier du fuseau du site. Le serveur décide seul si un pourcentage peut s'afficher (`reliability.<métrique>.percent_allowed` et `reason`) : `current_period` (la période inclut aujourd'hui), `previous_zero`, `unavailable`, `partial_coverage`, `rebuilding`, `not_applicable` (filtre d'événement). Le front rend ces raisons sans les recalculer. La série précédente est alignée par rang de jour, ou par heure locale pour une période d'un jour (les jours de 23 et 25 heures laissent le créneau manquant vide). Sans `compare`, aucune requête supplémentaire et les réponses sont identiques ; `GET /api/sites/{id}/overview` ajoute la clé `comparison` seulement à la demande ; l'export CSV l'ignore. Le tableau de bord ne compare que les totaux et saute les sites en reconstruction.
+
+### Tests ajoutés
+
+`ComparisonReportTest` (18), `TeamManagementTest` (11), `TeamMariaDbTest` (1, MariaDB seulement), `InvitationAcceptanceTest` (6), `ShareLinkTest` (12), `GoalDefinitionTest` (4), `GoalConversionTest` (7), `GoalBackfillTest` (6), `GoalReportingTest` (6), `GoalCostTest` (3), `GoalPurgeTest` (2), plus `tests/Charts/comparison.test.mjs`. Sur SQLite, ces 76 tests PHP passent (un ignoré). La suite MariaDB (voir « Vérifications ») rejoue les mêmes classes avec le conteneur Apple `perysee-mariadb` (`bash scripts/mariadb.sh test-db`, `php scripts/configure-testing.php`, `composer test:mariadb`) ; elle est la seule à exécuter `TeamMariaDbTest`. Les tests d'objectifs ne supposent aucun identifiant fixe : MariaDB ne remet pas l'auto-incrément à zéro entre deux tests.
+
 ## Fiabilité et laboratoire de performances
 
 ```sh
