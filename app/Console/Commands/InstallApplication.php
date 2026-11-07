@@ -24,12 +24,16 @@ final class InstallApplication extends Command
         {--db-name= : Database name}
         {--db-user= : Database user}
         {--admin-name= : Administrator name}
-        {--admin-email= : Administrator email}';
+        {--admin-email= : Administrator email}
+        {--browser : Only prepare the installation and print the link that opens the browser installer already unlocked}';
 
     protected $description = 'Install Perysee from the terminal: migrate the database, create the administrator and lock the installation. Passwords come from PERYSEE_DB_PASSWORD and PERYSEE_ADMIN_PASSWORD or a hidden prompt, never from arguments.';
 
     public function handle(Installer $installer, InstallationState $state, Diagnostics $diagnostics): int
     {
+        if ($this->option('browser')) {
+            return $this->prepareBrowserInstallation($installer, $state, $diagnostics);
+        }
         try {
             $installer->assertAvailable();
             $input = $this->gather();
@@ -53,6 +57,35 @@ final class InstallApplication extends Command
             $this->line('Administrator password (shown once): '.$input['administrator']['password']);
         }
         $this->info("Perysee is installed. Sign in at {$input['url']}/login with {$input['administrator']['email']}.");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * The secret already exists before the first visit, and travels in the URL fragment, which browsers never
+     * send to the server: nothing to fetch from the file manager.
+     */
+    private function prepareBrowserInstallation(Installer $installer, InstallationState $state, Diagnostics $diagnostics): int
+    {
+        try {
+            $installer->assertAvailable();
+            $url = rtrim((string) ($this->option('url') ?: $this->askIfInteractive('Public HTTPS URL (origin only)')), '/');
+            if (! $this->isOrigin($url)) {
+                throw ValidationException::withMessages(['url' => 'Provide an HTTPS origin without a path, credentials, query or fragment.']);
+            }
+            $this->assertDiagnostics($diagnostics);
+            $state->bootstrap();
+        } catch (HttpException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        } catch (ValidationException $exception) {
+            $this->error($exception->validator->errors()->first());
+
+            return self::FAILURE;
+        }
+        $this->info('Open this link to finish the installation in your browser. It is valid until the installation is complete; do not share it.');
+        $this->line($url.'/install#secret='.trim((string) file_get_contents($state->secretPath())));
 
         return self::SUCCESS;
     }

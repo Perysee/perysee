@@ -96,6 +96,42 @@ class InstallCommandTest extends TestCase
         $this->assertTrue(User::firstOrFail()->is_admin);
     }
 
+    public function test_the_browser_option_prints_a_link_that_carries_the_secret_in_the_fragment(): void
+    {
+        $this->artisan('perysee:install', ['--browser' => true, '--url' => 'https://stats.example.com', '--no-interaction' => true])
+            ->assertSuccessful();
+
+        $state = app(InstallationState::class);
+        $secret = trim(file_get_contents($state->secretPath()));
+        $this->assertFalse($state->isLocked());
+        $this->assertDatabaseCount('users', 0);
+        $this->assertNotSame('', app(EnvironmentFile::class)->values()['APP_KEY']);
+        $this->assertSame('https://stats.example.com/install#secret='.$secret, $this->installLink());
+    }
+
+    public function test_the_browser_link_reuses_the_same_secret_when_run_again(): void
+    {
+        $arguments = ['--browser' => true, '--url' => 'https://stats.example.com', '--no-interaction' => true];
+        $this->artisan('perysee:install', $arguments)->assertSuccessful();
+        $first = $this->installLink();
+        $this->artisan('perysee:install', $arguments)->assertSuccessful();
+
+        $this->assertSame($first, $this->installLink());
+    }
+
+    public function test_the_browser_option_refuses_an_installed_instance_and_a_bad_url(): void
+    {
+        $this->artisan('perysee:install', ['--browser' => true, '--url' => 'https://stats.example.com/app', '--no-interaction' => true])->assertFailed();
+
+        User::factory()->create();
+        $this->artisan('perysee:install', ['--browser' => true, '--url' => 'https://stats.example.com', '--no-interaction' => true])->assertFailed();
+    }
+
+    private function installLink(): string
+    {
+        return 'https://stats.example.com/install#secret='.trim(file_get_contents(app(InstallationState::class)->secretPath()));
+    }
+
     public function test_the_public_url_must_be_an_https_origin(): void
     {
         putenv('PERYSEE_ADMIN_PASSWORD=Strong-password-123!');
