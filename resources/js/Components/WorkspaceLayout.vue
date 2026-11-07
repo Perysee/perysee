@@ -33,6 +33,7 @@ const title = computed(
                   }[p.value.section]
                 : p.value.website?.name || "Overview",
             "sites.tracking": "Tracking setup",
+            "sites.sharing": "Sharing",
             funnels: "Funnels",
             "funnel.report": p.value.funnel?.name || "Funnel",
             journeys: "Journeys",
@@ -146,6 +147,16 @@ const configNav = computed(() =>
                   to: p.value.siteLinks.tracking,
                   active: p.value.screen === "sites.tracking",
               },
+              ...(p.value.canShare
+                  ? [
+                        {
+                            label: "Sharing",
+                            icon: "i-tabler-share",
+                            to: p.value.siteLinks.sharing,
+                            active: p.value.screen === "sites.sharing",
+                        },
+                    ]
+                  : []),
               ...(p.value.canUpdate
                   ? [
                         {

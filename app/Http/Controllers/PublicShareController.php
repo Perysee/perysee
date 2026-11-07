@@ -9,6 +9,7 @@ use App\Support\Coordination;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +30,7 @@ class PublicShareController extends Controller
         }
         $period = $this->period($request, $site, $reports);
         $dimension = $this->dimension($request, $link);
+        $this->recordUse($link);
         $overview = $link->allows('overview');
 
         return Inertia::render('Share/Show', [
@@ -78,6 +80,14 @@ class PublicShareController extends Controller
 
         // Back to the clean address, so the token is never part of a form submission result.
         return redirect()->route('share.show', $token);
+    }
+
+    /** Stamps the link at most once an hour, in one statement, so a busy link costs almost no writes. */
+    private function recordUse(ShareLink $link): void
+    {
+        ShareLink::whereKey($link->id)
+            ->where(fn ($query) => $query->whereNull('last_used_at')->orWhere('last_used_at', '<=', now()->subHour()))
+            ->update(['last_used_at' => now(), 'use_count' => DB::raw('use_count + 1')]);
     }
 
     /** @return array{0: ShareLink, 1: Website} */

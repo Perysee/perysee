@@ -145,6 +145,52 @@ class ShareLinkTest extends TestCase
         $this->assertSame(3, $link->fresh()->secret_version);
     }
 
+    public function test_last_used_at_updates_once_per_hour(): void
+    {
+        $this->travelTo(now()->startOfMinute());
+        [, $link, $token] = $this->link();
+        $this->assertNull($link->last_used_at);
+        $this->get('/s/'.$token)->assertOk();
+        $first = $link->fresh()->last_used_at;
+        $this->assertNotNull($first);
+        $this->assertSame(1, $link->fresh()->use_count);
+
+        $this->travel(30)->minutes();
+        $this->get('/s/'.$token)->assertOk();
+        $this->assertEquals($first, $link->fresh()->last_used_at);
+        $this->assertSame(1, $link->fresh()->use_count);
+
+        $this->travel(31)->minutes();
+        $this->get('/s/'.$token)->assertOk();
+        $this->assertTrue($link->fresh()->last_used_at->gt($first));
+        $this->assertSame(2, $link->fresh()->use_count);
+
+        // A locked link or a refused request is not a use.
+        [, $locked, $lockedToken] = $this->link(['overview'], 'correct horse');
+        $this->get('/s/'.$lockedToken)->assertOk();
+        $this->assertNull($locked->fresh()->last_used_at);
+    }
+
+    public function test_sharing_screen_lists_links_with_status_and_revokes_them(): void
+    {
+        [$site, $owner] = $this->siteWithOwner();
+        $viewer = User::factory()->create();
+        $site->members()->attach($viewer, ['role' => 'viewer']);
+        [, $active] = $this->link(['overview', 'pages'], 'correct horse', null, $site);
+        [, $expired] = $this->link(['overview'], null, now()->subDay(), $site);
+        [, $revoked] = $this->link(['overview'], null, null, $site);
+        $revoked->update(['revoked_at' => now()]);
+
+        $this->actingAs($owner)->get('/sites/'.$site->id)->assertInertia(fn (Assert $page) => $page->where('canShare', true)->where('siteLinks.sharing', '/sites/'.$site->id.'/sharing'));
+        $this->get('/sites/'.$site->id.'/sharing')->assertInertia(fn (Assert $page) => $page
+            ->component('Workspace')->where('screen', 'sites.sharing')->has('shareLinks', 3)
+            ->where('shareLinks.0.status', 'revoked')->where('shareLinks.1.status', 'expired')
+            ->where('shareLinks.2.status', 'active')->where('shareLinks.2.protected', true)->where('shareLinks.2.sections', ['overview', 'pages'])
+            ->where('shareLinks.2.revoke_url', '/sites/'.$site->id.'/sharing/'.$active->id)->where('sectionOptions', array_keys(ShareLink::SECTIONS)));
+        $this->actingAs($viewer)->get('/sites/'.$site->id)->assertInertia(fn (Assert $page) => $page->where('canShare', false));
+        $this->delete('/sites/'.$site->id.'/sharing/'.$expired->id)->assertForbidden();
+    }
+
     public function test_share_responses_are_no_store_noreferrer_noindex(): void
     {
         [, , $token] = $this->link();
