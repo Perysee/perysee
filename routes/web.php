@@ -10,6 +10,7 @@ use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\InstanceHealthController;
 use App\Http\Controllers\InstanceUpdateController;
 use App\Http\Controllers\InvitationAcceptanceController;
+use App\Http\Controllers\MailSettingsController;
 use App\Http\Controllers\ModuleAssetController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\ShareLinkController;
@@ -70,6 +71,10 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/api/sites/{website}/goals/{goal}', [GoalController::class, 'api'])->name('sites.goals.api');
         Route::get('/sites/{website}/export', [AnalyticsController::class, 'export'])->name('sites.export');
         Route::get('/settings', [WorkspaceController::class, 'settings'])->name('settings');
+        Route::get('/settings/mail', [MailSettingsController::class, 'show'])->name('settings.mail');
+        Route::put('/settings/mail', [MailSettingsController::class, 'update'])->name('settings.mail.update');
+        Route::delete('/settings/mail', [MailSettingsController::class, 'reset'])->name('settings.mail.reset');
+        Route::post('/settings/mail/test', [MailSettingsController::class, 'test'])->middleware('throttle:5,1')->name('settings.mail.test');
         Route::get('/settings/modules', [ModuleController::class, 'index'])->name('modules.index');
         Route::post('/settings/modules/install', [ModuleController::class, 'install'])->name('modules.install');
         Route::post('/settings/modules/catalog/refresh', [ModuleController::class, 'refreshCatalog'])->name('modules.catalog.refresh');
