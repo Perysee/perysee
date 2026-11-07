@@ -1,3 +1,4 @@
+import { alignByRank, previousLabel } from "./comparison.mjs";
 export const metricLabels = {
     pageviews: "Pageviews",
     sessions: "Sessions started",
@@ -80,27 +81,36 @@ export function lineOption(
         ],
     };
     if (!comparison) return option;
+    // Align by the rank the server gives each previous point (day rank, or local hour slot); plain arrays fall back to their index.
+    const byRank = alignByRank(comparison);
+    const when = previousLabel;
+    option.aria.label = {
+        description: `${metricLabels[metric]} over time, with a dashed line with diamond markers for the previous period of the same length.`,
+    };
     option.legend = { show: !compact, top: 0, right: 0, textStyle: { color: text, fontSize: 12 } };
     option.tooltip.formatter = (points) => {
         const index = points[0].dataIndex;
+        const previous = byRank.get(index);
         return [
             series[index]?.label,
             ...points.map(({ seriesName, value }, position) =>
-                position === 0 || !comparison[index]
+                position === 0 || !previous
                     ? `${seriesName}: ${value ?? "—"}`
-                    : `${seriesName} (${comparison[index].label}): ${value ?? "—"}`,
+                    : `${seriesName} (${when(previous)}): ${value ?? "—"}`,
             ),
         ].join("\n");
     };
     option.series.push({
         name: "Previous period",
         type: "line",
-        data: series.map((_, index) => comparison[index]?.[metric] ?? null),
+        data: series.map((_, index) => byRank.get(index)?.[metric] ?? null),
         connectNulls: false,
         smooth: false,
-        showSymbol: false,
+        showSymbol: !compact,
+        symbol: "emptyDiamond",
+        symbolSize: 7,
         lineStyle: { color: text, width: 1.5, type: "dashed", opacity: 0.55 },
-        itemStyle: { color: text, opacity: 0.55 },
+        itemStyle: { color: text, opacity: 0.7 },
         emphasis: { focus: "series" },
     });
     return option;

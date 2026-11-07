@@ -9,7 +9,7 @@ import BreakdownTable from "./BreakdownTable.vue";
 import ClientReport from "./ClientReport.vue";
 import CampaignTable from "./CampaignTable.vue";
 import { queryUrl, reportFilters } from "../interface-query.mjs";
-import { variation, describeVariation } from "../comparison.mjs";
+import { describeComparison, comparisonRows } from "../comparison.mjs";
 const props = defineProps([
     "website",
     "canUpdate",
@@ -102,23 +102,46 @@ const variationIcons = {
     flat: "i-tabler-minus",
 };
 const variationOf = (key) => {
-    const change = variation(
+    const change = describeComparison(
         props.report.totals[key],
-        props.comparison?.totals[key] ?? null,
+        props.comparison?.totals?.[key] ?? null,
+        props.comparison?.reliability?.[key],
     );
     return {
-        ...describeVariation(change),
-        direction: change?.direction ?? "new",
-        icon: variationIcons[change?.direction] ?? "i-tabler-plus",
+        ...change,
+        icon: variationIcons[change.direction],
     };
 };
+const chartKeys = computed(() =>
+    overview.value ? Object.keys(labels) : [metric.value],
+);
 const chartColumns = computed(() => [
     { accessorKey: "label", header: "Period" },
-    ...(overview.value ? Object.keys(labels) : [metric.value]).map((key) => ({
-        accessorKey: key,
-        header: labels[key],
-    })),
+    ...chartKeys.value.flatMap((key) => [
+        { accessorKey: key, header: labels[key] },
+        ...(props.comparison
+            ? [
+                  {
+                      accessorKey: `previous_${key}`,
+                      header: `Previous ${labels[key].toLowerCase()}`,
+                      cell: ({ row }) => format(row.original[`previous_${key}`]),
+                  },
+              ]
+            : []),
+    ]),
+    ...(props.comparison
+        ? [
+              {
+                  accessorKey: "previous_label",
+                  header: "Previous date",
+                  cell: ({ row }) => row.original.previous_label ?? "—",
+              },
+          ]
+        : []),
 ]);
+const chartRows = computed(() =>
+    comparisonRows(props.series, props.comparison?.series, chartKeys.value),
+);
 const recentColumns = [
     { accessorKey: "event_name", header: "Event" },
     { accessorKey: "path", header: "Page" },
@@ -345,18 +368,28 @@ const lastConsolidation = computed(() =>
                         ><strong class="metric-value">{{
                             format(report.totals[key])
                         }}</strong
-                        ><span
-                            v-if="comparison"
-                            class="metric-variation"
-                            :class="`is-${variationOf(key).direction}`"
-                            :title="variationOf(key).label"
-                            ><UIcon
-                                :name="variationOf(key).icon"
-                                class="size-3.5"
-                                aria-hidden="true"
-                            />{{ variationOf(key).text
-                            }}<span class="sr-only">
-                                {{ variationOf(key).label }}</span
+                        ><span v-if="comparison" class="metric-comparison"
+                            ><span class="metric-previous"
+                                >Previous: {{ variationOf(key).previousText }}
+                                <template v-if="variationOf(key).deltaText"
+                                    >({{ variationOf(key).deltaText }})</template
+                                ></span
+                            ><span
+                                v-if="variationOf(key).percent"
+                                class="metric-variation"
+                                :class="`is-${variationOf(key).direction}`"
+                                ><UIcon
+                                    :name="variationOf(key).icon"
+                                    class="size-3.5"
+                                    aria-hidden="true"
+                                />{{ variationOf(key).percent
+                                }}<span class="sr-only">
+                                    {{ variationOf(key).label }}</span
+                                ></span
+                            ><span
+                                v-else-if="variationOf(key).reasonText"
+                                class="metric-reason"
+                                >{{ variationOf(key).reasonText }}</span
                             ></span
                         ><span class="metric-caption">{{
                             key === "pageviews"
@@ -474,7 +507,7 @@ const lastConsolidation = computed(() =>
                         label="View chart data"
                         class="m-3" /><template #content
                         ><UTable
-                            :data="series"
+                            :data="chartRows"
                             :columns="chartColumns" /></template
                 ></UCollapsible>
             </div>

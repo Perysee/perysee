@@ -97,6 +97,38 @@ test("the comparison line is dashed and aligned with the current period by index
     assert.match(text, /Previous period \(10-12\): 2/);
 });
 
+test("previous points are aligned by rank, with a distinct symbol and no hover-only date", () => {
+    const current = [
+        { label: "00:00 CEST", pageviews: 1 },
+        { label: "01:00 CEST", pageviews: 2 },
+        { label: "02:00 CEST", pageviews: 3 },
+        { label: "02:00 CET", pageviews: 4 },
+        { label: "03:00 CET", pageviews: 5 },
+    ];
+    const previous = [
+        { label: "00:00 CEST", day: "2026-10-24", rank: 0, pageviews: 9 },
+        { label: "02:00 CEST", day: "2026-10-24", rank: 2, pageviews: 8 },
+        { label: "03:00 CEST", day: "2026-10-24", rank: 4, pageviews: 7 },
+        { label: "04:00 CEST", day: "2026-10-24", rank: null, pageviews: 6 },
+    ];
+    const option = lineOption(current, "pageviews", { comparison: previous });
+    assert.deepEqual(option.series[1].data, [9, null, 8, null, 7]);
+    assert.equal(option.series[1].connectNulls, false);
+    assert.notEqual(option.series[1].symbol, option.series[0].symbol ?? "circle");
+    assert.equal(option.series[1].showSymbol, true);
+    assert.match(option.aria.label.description, /previous period/);
+    const text = option.tooltip.formatter([
+        { dataIndex: 2, seriesName: "Pageviews", value: 3 },
+        { dataIndex: 2, seriesName: "Previous period", value: 8 },
+    ]);
+    assert.match(text, /Previous period \(2026-10-24 02:00 CEST\): 8/);
+    const gap = option.tooltip.formatter([
+        { dataIndex: 3, seriesName: "Pageviews", value: 4 },
+        { dataIndex: 3, seriesName: "Previous period", value: null },
+    ]);
+    assert.match(gap, /Previous period: —/);
+});
+
 test("without a comparison the chart keeps a single series and the default tooltip", () => {
     const option = lineOption([{ label: "a", pageviews: 1 }], "pageviews");
     assert.equal(option.series.length, 1);
