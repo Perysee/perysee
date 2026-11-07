@@ -8,7 +8,7 @@ use Throwable;
 
 /**
  * Keeps the "why is nothing arriving?" evidence: one row per site, hour and cause, incremented in place.
- * Writing is capped (20 per minute per site and cause, shared by every visitor) so a flood of refused
+ * Writing is capped (20 per minute per site and cause, shared by every visitor of that site) so a flood of refused
  * requests costs the cache counter it always cost, not a database write each. The counts are therefore
  * "at least". Nothing here may change the answer given to the tracker.
  */
@@ -27,12 +27,13 @@ class RejectionLog
     public function write(RejectionCause $cause, ?int $websiteId, ?string $siteKey = null, ?string $origin = null): void
     {
         try {
-            if (! app(Coordination::class)->throttle('rejlog:'.($websiteId ?? 'x').':'.$cause->value, self::WRITES_PER_MINUTE, 60)) {
-                return;
-            }
             if ($websiteId === null && $siteKey !== null && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $siteKey)) {
                 // Only requests that named a real site are filed under it; a forged key never reaches the table.
                 $websiteId = DB::table('websites')->where('public_id', $siteKey)->whereNull('deleting_at')->value('id');
+            }
+            // The budget is per site (0 = no site), so the noise of one site cannot starve the evidence of another.
+            if (! app(Coordination::class)->throttle('rejlog:'.(int) ($websiteId ?? 0).':'.$cause->value, self::WRITES_PER_MINUTE, 60)) {
+                return;
             }
             $this->upsert($cause, (int) ($websiteId ?? 0), in_array($cause, [RejectionCause::DomainNotAllowed, RejectionCause::UnknownSite], true) ? $this->host($origin) : null);
         } catch (Throwable) {

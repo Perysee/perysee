@@ -187,7 +187,7 @@ async function runTest() {
         <ul class="divide-y divide-default text-sm">
             <li v-for="item in check.rejections" :key="item.cause" class="py-3 flex flex-wrap justify-between gap-2">
                 <span>{{ causeLabels[item.cause] ?? item.cause }}<span v-if="item.host" class="text-muted"> · from {{ item.host }}</span></span>
-                <span class="text-muted">at least {{ item.hits }}, last {{ ago(item.last_at) }}</span>
+                <span class="text-muted"><template v-if="item.hits !== null">at least {{ item.hits }}, </template><template v-else>possibly this site, </template>last {{ ago(item.last_at) }}</span>
             </li>
         </ul>
         <p class="data-note mt-3">Only the cause, the hour, a count and the origin host are kept, for seven days. No address, browser or page is stored.</p>
