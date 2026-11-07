@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Analytics\Ingestion\PropertyPolicy;
 use App\Installation\InstallationState;
 use App\Models\Website;
 use App\Support\Coordination;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class EventPropertiesIngestionTest extends TestCase
@@ -20,7 +20,7 @@ class EventPropertiesIngestionTest extends TestCase
         app(InstallationState::class)->exclusive(fn () => app(InstallationState::class)->complete());
     }
 
-    private function event(Website $site, array $extra = []): \Illuminate\Testing\TestResponse
+    private function event(Website $site, array $extra = []): TestResponse
     {
         $payload = array_merge(['v' => 1, 'site' => $site->public_id, 'type' => 'event', 'mode' => 'pageviews', 'host' => $site->domain, 'path' => '/thanks', 'consent' => true, 'event_name' => 'purchase'], $extra);
 

@@ -77,6 +77,7 @@ class InstanceHealth
             'oldest_pending' => (clone $pending)->min('received_at'), 'database_bytes' => $size,
             'collection_failures' => app(Coordination::class)->failures('collection_failures'),
             'collection_rejections' => app(Coordination::class)->failures('collection_rejections'),
+            'property_truncations' => app(Coordination::class)->failures('property_truncations'),
             'raw_retention_days' => (int) $this->get('raw_retention_days', config('perysee.raw_retention_days', 90)),
             'stats_retention_days' => (int) $this->get('stats_retention_days', 1095),
             'deleting_sites' => DB::table('websites')->whereNotNull('deleting_at')->count(),

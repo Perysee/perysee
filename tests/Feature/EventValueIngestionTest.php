@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Installation\InstallationState;
 use App\Models\Website;
+use App\Support\Coordination;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class EventValueIngestionTest extends TestCase
@@ -18,7 +20,7 @@ class EventValueIngestionTest extends TestCase
         app(InstallationState::class)->exclusive(fn () => app(InstallationState::class)->complete());
     }
 
-    private function event(Website $site, array $extra = [], array $headers = []): \Illuminate\Testing\TestResponse
+    private function event(Website $site, array $extra = [], array $headers = []): TestResponse
     {
         $mode = $site->tracking_mode ?: 'pageviews';
         $payload = array_merge(['v' => 1, 'site' => $site->public_id, 'type' => 'event', 'mode' => $mode, 'host' => $site->domain, 'path' => '/thanks', 'consent' => true, 'event_name' => 'purchase'], $mode === 'sessions' ? ['session' => str_repeat('a', 32)] : [], $extra);
@@ -110,11 +112,11 @@ class EventValueIngestionTest extends TestCase
     public function test_a_refused_value_is_counted_as_a_rejection(): void
     {
         $site = Website::factory()->create();
-        $before = app(\App\Support\Coordination::class)->failures('collection_rejections');
+        $before = app(Coordination::class)->failures('collection_rejections');
 
         $this->event($site, ['value' => -1])->assertUnprocessable();
 
-        $this->assertSame($before + 1, app(\App\Support\Coordination::class)->failures('collection_rejections'));
+        $this->assertSame($before + 1, app(Coordination::class)->failures('collection_rejections'));
     }
 
     public function test_unknown_fields_are_still_refused(): void

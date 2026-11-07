@@ -182,7 +182,9 @@ class EventPropertyReportTest extends TestCase
         $this->assertSame(['event', 'property', 'value', 'count', 'value_total', 'value_average'], $rows[0]);
         $values = array_column(array_slice($rows, 1), 2);
         sort($values);
-        $this->assertSame(["'+SUM(1)", "'-2+3", "'=cmd|' /C calc'!A0", "'@x", "'\t=1"], $values);
+        $expected = ["'+SUM(1)", "'-2+3", "'=cmd|' /C calc'!A0", "'@x", "'\t=1"];
+        sort($expected);
+        $this->assertSame($expected, $values);
         $formula = collect($rows)->first(fn (array $row): bool => str_starts_with($row[2], "'=cmd"));
         $this->assertSame(['purchase', 'payment', "'=cmd|' /C calc'!A0", '1', '1.5', '1.5'], $formula);
     }
@@ -215,10 +217,9 @@ class EventPropertyReportTest extends TestCase
             $pages[] = $this->getJson('/s/'.$token.'/api/'.$report.'?from=2026-10-20&to=2026-10-26')->assertOk()->getContent();
         }
         foreach ($pages as $page) {
-            foreach (['event_props', 'event_value', 'value_sum', 'valued', 'amount', '&quot;props', '"props"'] as $forbidden) {
+            foreach (['event_props', 'event_value', 'value_sum', 'valued', 'amount', 'payment'] as $forbidden) {
                 $this->assertStringNotContainsString($forbidden, $page);
             }
-            $this->assertStringNotContainsString('card', str_replace('"payment"', '', $page));
         }
     }
 }

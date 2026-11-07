@@ -46,6 +46,7 @@ const processing = computed(() =>
         oldest_pending: "Oldest pending event",
         collection_failures: "Collection failures",
         collection_rejections: "Collection rejections",
+        property_truncations: "Event properties shortened",
         deleting_sites: "Sites being deleted",
     }).map(([key, label]) => ({
         label,
