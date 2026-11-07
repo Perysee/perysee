@@ -42,7 +42,7 @@ class Segments
         if ($events->isNotEmpty()) {
             $known = array_fill_keys(DB::table('segment_events')->whereIn('event_id', $events->pluck('id'))->pluck('event_id')->all(), true);
             $sites = $events->pluck('website_id')->unique()->values();
-            foreach ($events->where('event_type', 1)->pluck('session_key')->filter()->unique()->chunk(500) as $keys) {
+            foreach ($events->pluck('session_key')->filter()->unique()->chunk(500) as $keys) {
                 foreach (DB::table('segment_sessions')->whereIn('website_id', $sites)->whereIn('session_key', $keys->values())->get() as $row) {
                     $sessions[$row->website_id.'|'.$row->session_key] = $row;
                 }
@@ -80,33 +80,46 @@ class Segments
         }
     }
 
-    public function ingest(object $event, object $site): void
+    /**
+     * The first event of a measured session as the open batch currently knows it, or null.
+     */
+    public function firstEvent(int $site, string $key): ?object
+    {
+        $row = $this->batch['sessions'][$site.'|'.$key] ?? null;
+
+        return $row ? (object) json_decode($row->event_data, true, flags: JSON_THROW_ON_ERROR) : null;
+    }
+
+    /**
+     * @return bool False when the event had already been ingested.
+     */
+    public function ingest(object $event, object $site): bool
     {
         if ($this->batch !== null) {
             if (isset($this->batch['known'][$event->id])) {
-                return;
+                return false;
             }
             $this->batch['known'][$event->id] = true;
             $this->batch['pending'][] = ['event_id' => $event->id, 'website_id' => $site->id, 'received_at' => $event->received_at];
         } elseif (! DB::table('segment_events')->insertOrIgnore(['event_id' => $event->id, 'website_id' => $site->id, 'received_at' => $event->received_at])) {
-            return;
+            return false;
         }
         $this->increment($event, $site, $event->event_type === 1 ? 'pageviews' : 'custom_events', 1);
         if ($event->event_type !== 1 || ! $event->session_key) {
-            return;
+            return true;
         }
         $identity = ['website_id' => $site->id, 'session_key' => $event->session_key];
         $slot = $site->id.'|'.$event->session_key;
         $first = $this->batch !== null ? ($this->batch['sessions'][$slot] ?? null) : DB::table('segment_sessions')->where($identity)->first();
         if ($first && [Carbon::parse($first->first_seen_at)->getTimestampMs(), $first->first_event_id] <= [Carbon::parse($event->received_at)->getTimestampMs(), $event->id]) {
-            return;
+            return true;
         }
         if ($first) {
             $this->increment((object) json_decode($first->event_data, true, flags: JSON_THROW_ON_ERROR), $site, 'sessions', -1);
         }
         $known = $this->firstSeen !== null ? ($this->firstSeen)($site->id, $event->session_key) : DB::table('measured_sessions')->where($identity)->value('first_seen_at');
         if ($known && Carbon::parse($known)->lt(Carbon::parse($event->received_at))) {
-            return;
+            return true;
         }
         $this->increment($event, $site, 'sessions', 1);
         $values = ['first_event_id' => $event->id, 'first_seen_at' => $event->received_at, 'event_data' => json_encode($event, JSON_THROW_ON_ERROR)];
@@ -114,9 +127,11 @@ class Segments
             $this->batch['sessions'][$slot] = (object) ($identity + $values);
             $this->batch['dirty'][$slot] = true;
 
-            return;
+            return true;
         }
         DB::table('segment_sessions')->updateOrInsert($identity, $values);
+
+        return true;
     }
 
     private function increment(object $event, object $site, string $metric, int $delta): void
