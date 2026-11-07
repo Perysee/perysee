@@ -64,9 +64,10 @@ class MaintainAnalytics extends Command
             $cutoff = now('UTC')->subDays($days + 1)->toDateString();
             // Pending work can still move session counters in historical buckets.
             $statsLocked = DB::table('events')->whereNull('processed_at')->where('received_at', '<', $cutoff)->exists();
-            foreach ($statsLocked ? [] : ['stats_daily', 'stats_hourly', 'stats_dimension_daily', 'stats_segment_daily', 'stats_segment_hourly'] as $table) {
+            foreach ($statsLocked ? [] : ['stats_daily', 'stats_hourly', 'stats_dimension_daily', 'stats_segment_daily', 'stats_segment_hourly', 'stats_goal_daily'] as $table) {
                 $keys = match ($table) {
                     'stats_segment_daily', 'stats_segment_hourly' => ['website_id', 'bucket_start', 'segment_hash'],
+                    'stats_goal_daily' => ['website_id', 'goal_id', 'version', 'bucket_start', 'segment_hash'],
                     'stats_daily' => ['website_id', 'stat_date'], 'stats_hourly' => ['website_id', 'bucket_start'],
                     default => ['website_id', 'stat_date', 'dimension_type', 'dimension_hash'],
                 };
@@ -86,9 +87,11 @@ class MaintainAnalytics extends Command
             }
             // Invitations that expired, were accepted or were revoked more than 30 days ago are of no use any more.
             $invitationCutoff = now('UTC')->subDays(30);
-            DB::table('site_invitations')
-                ->whereIn('id', DB::table('site_invitations')->where(fn ($query) => $query->where('expires_at', '<', $invitationCutoff)->orWhere('accepted_at', '<', $invitationCutoff)->orWhere('revoked_at', '<', $invitationCutoff))->orderBy('id')->limit($limit)->pluck('id'))
-                ->delete();
+            $endedInvitations = DB::table('site_invitations')->where(fn ($query) => $query->where('expires_at', '<', $invitationCutoff)->orWhere('accepted_at', '<', $invitationCutoff)->orWhere('revoked_at', '<', $invitationCutoff))->orderBy('id')->limit($limit)->pluck('id');
+            // Nothing to purge is the usual case: skip the delete so an idle pass stays within its query budget.
+            if ($endedInvitations->isNotEmpty()) {
+                DB::table('site_invitations')->whereIn('id', $endedInvitations)->delete();
+            }
             $this->call('perysee:prune-tracking', ['--limit' => $limit]);
 
             return self::SUCCESS;
