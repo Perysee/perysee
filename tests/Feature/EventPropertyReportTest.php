@@ -109,6 +109,7 @@ class EventPropertyReportTest extends TestCase
 
         $values = array_column($this->api('&event=purchase')['keys'][0]['values'], 'count', 'value');
 
+        ksort($values);
         $this->assertSame(['Card' => 1, 'card' => 1], $values);
     }
 

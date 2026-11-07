@@ -28,7 +28,15 @@ Measured on SQLite with 300 000 events, 2 % of them orders (disposable database,
 | B. nullable `order_hash` + unique key on `events` | 113.3 MB (+4.3 %) | 0.741 ms | 0.679 ms |
 | C. side table (retained) | 109.5 MB (+0.8 %) | 0.533 ms | 1.087 ms |
 
-MariaDB figures (150 000 rows) are in the pull request description; both variants indexes NULLs, so B pays its index entry on every row, including pageviews, on the largest table, and a random hash key on the hottest table. B needs no extra statement for an order, C needs one `INSERT IGNORE` (about +0.4 ms) for events that carry an identifier only. The request that asked for "no extra query on the collection path" is met for every event without `id`, which is nearly all of them; an event with `id` pays one write, never a read. If a deployment prefers B, the migration and the claim are the only places to change.
+Measured on MariaDB 11.4 (InnoDB, 150 000 rows, same shape, throwaway tables):
+
+| Variant | Data | Indexes | Total | Plain insert | Order insert |
+| --- | --- | --- | --- | --- | --- |
+| A. baseline | 21.6 MB | 9.5 MB | 31.1 MB | 0.278 ms | 0.268 ms |
+| B. unique key on `events` | 21.6 MB | 14.0 MB | 35.6 MB (+14.6 %) | 0.362 ms (+30 %) | 0.311 ms |
+| C. side table (retained) | 21.6 MB (+0.27 MB table) | 9.5 MB (+0.27 MB) | 31.6 MB (+1.7 %) | 0.332 ms | 0.608 ms |
+
+Timings are single-connection and noisy; the sizes are the reliable part. InnoDB indexes NULLs, so B pays its index entry on every row, including pageviews, on the largest table, and a random hash key on the hottest table. B needs no extra statement for an order, C needs one `INSERT IGNORE` (about +0.4 ms) for events that carry an identifier only. The request that asked for "no extra query on the collection path" is met for every event without `id`, which is nearly all of them; an event with `id` pays one write, never a read. If a deployment prefers B, the migration and the claim are the only places to change.
 
 ## Consequences
 
