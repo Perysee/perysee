@@ -1,4 +1,4 @@
-# 001. Invitation tokens and the no-mail path
+# 002. Invitation tokens and the no-mail path
 
 Status: proposed
 
