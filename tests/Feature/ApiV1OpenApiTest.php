@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Analytics\Reporting\ReportSections;
 use App\Installation\InstallationState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -56,7 +57,7 @@ class ApiV1OpenApiTest extends TestCase
     public function test_the_description_lists_exactly_the_scopes_the_application_knows(): void
     {
         $document = json_decode($this->get('/api/v1/openapi.json')->getContent(), true);
-        $this->assertSame(array_keys(\App\Analytics\Reporting\ReportSections::SCOPES), $document['components']['securitySchemes']['bearerAuth']['x-scopes']);
+        $this->assertSame(array_keys(ReportSections::SCOPES), $document['components']['securitySchemes']['bearerAuth']['x-scopes']);
         $dimension = collect($document['paths']['/dimensions/{dimension}']['get']['parameters'])->firstWhere('name', 'dimension');
         $this->assertSame(['path', 'source', 'campaign', 'device', 'device_brand', 'browser', 'country', 'event'], $dimension['schema']['enum']);
     }

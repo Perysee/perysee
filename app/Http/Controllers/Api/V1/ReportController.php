@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Analytics\Reporting\ReportPresenter;
-use App\Analytics\Reporting\ReportSections;
 use App\Analytics\Reporting\Reports;
+use App\Analytics\Reporting\ReportSections;
 use App\Http\Api\ApiError;
 use App\Http\Api\ApiScopes;
 use App\Http\Controllers\Controller;
