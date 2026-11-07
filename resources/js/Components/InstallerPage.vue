@@ -140,8 +140,8 @@ storage/app/private/installation/secret</pre
             </h2></template
         >
         <p class="data-note mb-5">
-            Create a dedicated MariaDB 11.4 database and user in your hosting
-            panel first.
+            Create a dedicated MariaDB database (10.11, 11.4 or 11.8) and user in
+            your hosting panel first.
         </p>
         <UForm
             :state="database"

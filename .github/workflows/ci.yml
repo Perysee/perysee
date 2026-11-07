@@ -11,16 +11,24 @@ permissions:
 
 jobs:
   tests:
-    name: PHP ${{ matrix.php }} / MariaDB 11.4
+    name: PHP ${{ matrix.php }} / MariaDB ${{ matrix.mariadb }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
+      # Every PHP version runs against the default database; the other supported MariaDB series (see
+      # App\Installation\DatabaseVersion) are each covered once, on the oldest and the newest PHP.
       matrix:
-        php: ['8.3', '8.5']
+        php: ['8.3', '8.4', '8.5']
+        mariadb: ['11.4.8']
+        include:
+          - php: '8.3'
+            mariadb: '10.11'
+          - php: '8.5'
+            mariadb: '11.8'
     services:
       mariadb:
-        image: mariadb:11.4.8
+        image: mariadb:${{ matrix.mariadb }}
         env:
           MARIADB_ROOT_PASSWORD: ci-root-only
           MARIADB_DATABASE: perysee_test
