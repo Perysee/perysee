@@ -70,6 +70,9 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/sites/{website}/favicon', SiteFaviconController::class)->middleware('throttle:120,1')->name('sites.favicon');
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
         Route::get('/sites/{website}/team', [SiteMemberController::class, 'index'])->name('sites.team');
+        Route::delete('/sites/{website}/team/me', [SiteMemberController::class, 'leave'])->name('sites.team.leave');
+        Route::put('/sites/{website}/team/{member}', [SiteMemberController::class, 'update'])->whereNumber('member')->name('sites.team.update');
+        Route::delete('/sites/{website}/team/{member}', [SiteMemberController::class, 'destroy'])->whereNumber('member')->name('sites.team.destroy');
         Route::post('/sites/{website}/invitations', [SiteInvitationController::class, 'store'])->name('sites.invitations.store');
         Route::post('/sites/{website}/invitations/{invitation}/resend', [SiteInvitationController::class, 'resend'])->whereNumber('invitation')->name('sites.invitations.resend');
         Route::delete('/sites/{website}/invitations/{invitation}', [SiteInvitationController::class, 'revoke'])->whereNumber('invitation')->name('sites.invitations.revoke');

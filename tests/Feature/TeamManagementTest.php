@@ -54,6 +54,65 @@ class TeamManagementTest extends TestCase
         $this->post('/sites/'.$site->id.'/invitations', ['email' => $owner->email, 'role' => 'viewer'])->assertSessionHasErrors('email');
     }
 
+    public function test_an_owner_can_change_roles_and_remove_members_of_their_own_site_only(): void
+    {
+        [$site, $owner] = $this->siteWith('owner');
+        $member = User::factory()->create();
+        $site->members()->attach($member, ['role' => 'viewer']);
+        [$other, $otherOwner] = $this->siteWith('owner');
+        $team = '/sites/'.$site->id.'/team/';
+
+        $this->actingAs($member)->put($team.$owner->id, ['role' => 'viewer'])->assertForbidden();
+        $this->delete($team.$owner->id)->assertForbidden();
+
+        $this->actingAs($owner)->put($team.$member->id, ['role' => 'owner'])->assertSessionHasNoErrors()->assertRedirect($team);
+        $this->assertSame('owner', $site->members()->whereKey($member->id)->first()->pivot->role);
+        $this->put($team.$member->id, ['role' => 'superuser'])->assertSessionHasErrors('role');
+        $this->put($team.$otherOwner->id, ['role' => 'viewer'])->assertNotFound();
+        $this->assertSame('owner', $other->members()->whereKey($otherOwner->id)->first()->pivot->role);
+
+        $this->delete($team.$member->id)->assertRedirect($team);
+        $this->assertFalse($site->members()->whereKey($member->id)->exists());
+        $this->delete($team.$otherOwner->id)->assertNotFound();
+        $this->assertTrue($other->members()->whereKey($otherOwner->id)->exists());
+    }
+
+    public function test_a_member_can_leave_a_site_and_a_site_being_deleted_refuses_changes(): void
+    {
+        [$site, $owner] = $this->siteWith('owner');
+        $viewer = User::factory()->create();
+        $site->members()->attach($viewer, ['role' => 'viewer']);
+        $outsider = User::factory()->create();
+
+        $this->actingAs($outsider)->delete('/sites/'.$site->id.'/team/me')->assertForbidden();
+        $this->actingAs($viewer)->delete('/sites/'.$site->id.'/team/me')->assertRedirect('/sites');
+        $this->assertFalse($site->members()->whereKey($viewer->id)->exists());
+
+        $site->forceFill(['deleting_at' => now()])->save();
+        $this->actingAs($owner)->post('/sites/'.$site->id.'/invitations', ['email' => 'a@example.com', 'role' => 'viewer'])->assertStatus(409);
+        $this->put('/sites/'.$site->id.'/team/'.$owner->id, ['role' => 'viewer'])->assertStatus(409);
+    }
+
+    public function test_the_last_owner_cannot_leave_be_removed_or_be_demoted(): void
+    {
+        [$site, $owner] = $this->siteWith('owner');
+        $viewer = User::factory()->create();
+        $site->members()->attach($viewer, ['role' => 'viewer']);
+        $team = '/sites/'.$site->id.'/team/';
+        $this->actingAs($owner);
+
+        $this->putJson($team.$owner->id, ['role' => 'viewer'])->assertStatus(422)->assertJsonValidationErrors('member');
+        $this->deleteJson($team.$owner->id)->assertStatus(422)->assertJsonValidationErrors('member');
+        $this->deleteJson($team.'me')->assertStatus(422)->assertJsonValidationErrors('member');
+        $this->assertSame('owner', $site->members()->whereKey($owner->id)->first()->pivot->role);
+
+        $site->members()->updateExistingPivot($viewer->id, ['role' => 'owner']);
+        $this->putJson($team.$owner->id, ['role' => 'viewer'])->assertRedirect();
+        $this->actingAs($viewer)->deleteJson($team.$viewer->id)->assertStatus(422);
+        $this->putJson($team.$viewer->id, ['role' => 'viewer'])->assertStatus(422);
+        $this->assertSame(1, $site->members()->wherePivot('role', 'owner')->count());
+    }
+
     public function test_a_configured_mailer_sends_the_invitation_and_a_failure_falls_back_to_the_link(): void
     {
         config(['mail.default' => 'smtp']);
