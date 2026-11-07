@@ -22,6 +22,7 @@ class Ui
         $site = $data['website'] ?? null;
         if ($site instanceof Website) {
             $data['canUpdate'] = $site->exists && Gate::allows('update', $site);
+            $data['canShare'] = $site->exists && Gate::allows('share', $site);
             $data['siteLinks'] = $site->exists ? self::siteLinks($site) : null;
         }
         if ($screen === 'dashboard') {
@@ -72,7 +73,7 @@ class Ui
     private static function siteLinks(Website $site): array
     {
         $links = [];
-        foreach (['filter-options', 'show', 'edit', 'tracking', 'export', 'favicon', 'update', 'destroy'] as $action) {
+        foreach (['filter-options', 'show', 'edit', 'tracking', 'sharing', 'export', 'favicon', 'update', 'destroy'] as $action) {
             $links[$action] = route('sites.'.$action, $site);
         }
         foreach (['pages', 'sources', 'campaigns', 'devices', 'countries', 'events', 'sessions', 'realtime'] as $section) {

@@ -38,7 +38,8 @@ const ModulesPage = defineAsyncComponent(
 const ModuleSettingsPage = defineAsyncComponent(
     () => import("../Components/ModuleSettingsPage.vue"),
 );
-const FunnelsPage = defineAsyncComponent(() => import("../Components/FunnelsPage.vue"));
+const SharingPage = defineAsyncComponent(() => import("../Components/SharingPage.vue"));
+const FunnelsPage =defineAsyncComponent(() => import("../Components/FunnelsPage.vue"));
 const JourneyPage = defineAsyncComponent(() => import("../Components/JourneyPage.vue"));
 const page = usePage();
 const p = computed(() => page.props);
@@ -90,6 +91,7 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
             v-bind="p"
         />
         <TrackingPage v-else-if="p.screen === 'sites.tracking'" v-bind="p" />
+        <SharingPage v-else-if="p.screen === 'sites.sharing'" v-bind="p" />
         <FunnelsPage v-else-if="p.screen === 'funnels'" v-bind="p" />
         <JourneyPage v-else-if="['funnel.report','journeys'].includes(p.screen)" :key="p.funnel?.id || 'journeys'" v-bind="p" />
         <HealthPage v-else-if="p.screen === 'health'" v-bind="p" />

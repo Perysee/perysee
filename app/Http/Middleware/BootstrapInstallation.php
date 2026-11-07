@@ -30,7 +30,9 @@ class BootstrapInstallation
         if (! $request->is('modules/*/assets/*')) {
             $response->headers->set('Cache-Control', 'no-store, private');
         }
-        $response->headers->set('Referrer-Policy', 'same-origin');
+        if (! $response->headers->has('Referrer-Policy')) {
+            $response->headers->set('Referrer-Policy', 'same-origin');
+        }
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'DENY');
 

@@ -5,7 +5,11 @@ import { brandState, pageTitle } from "./branding.mjs";
 import { registerModuleComponents } from "./module-components.js";
 createInertiaApp({
     title: (title) => pageTitle(title, brandState.name),
-    resolve: () => import("./Pages/Workspace.vue"),
+    // Public share pages are standalone; every other screen goes through the workspace shell.
+    resolve: (name) =>
+        name.startsWith("Share/")
+            ? import.meta.glob("./Pages/Share/*.vue")[`./Pages/${name}.vue`]()
+            : import("./Pages/Workspace.vue"),
     setup({ el, App, props, plugin }) {
         brandState.name = props.initialPage?.props?.branding?.name ?? brandState.name;
         const app = createApp({ render: () => h(App, props) })
