@@ -507,14 +507,22 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                     />
                 </div>
                 <template #footer>
-                    <div
-                        class="flex gap-2 items-center whitespace-nowrap text-xs text-muted"
+                    <UDropdownMenu
+                        :items="accountMenu"
+                        :content="{ side: 'top', align: 'start' }"
+                        class="w-full"
                     >
-                        <UIcon
-                            name="i-tabler-shield-check"
-                            class="size-4 shrink-0"
-                        /><span>Your data, your infrastructure</span>
-                    </div>
+                        <UButton
+                            color="neutral"
+                            variant="ghost"
+                            icon="i-tabler-user"
+                            trailing-icon="i-tabler-selector"
+                            :label="p.auth.name"
+                            aria-label="Account menu"
+                            class="w-full"
+                            :ui="{ label: 'truncate', trailingIcon: 'ms-auto' }"
+                        />
+                    </UDropdownMenu>
                 </template>
             </UDashboardSidebar>
             <UDashboardPanel
@@ -549,15 +557,24 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                         <template #right
                             ><div class="flex items-center gap-2">
                         <ColorModeButton />
-                        <UDropdownMenu :items="accountMenu"
-                            ><UButton
-                                color="neutral"
-                                variant="ghost"
-                                icon="i-tabler-user"
-                                trailing-icon="i-tabler-chevron-down"
-                                :label="p.auth.name"
-                                aria-label="Account menu"
-                        /></UDropdownMenu>
+                        <UButton
+                            color="neutral"
+                            variant="ghost"
+                            icon="i-tabler-brand-github"
+                            :to="p.repositoryUrl"
+                            target="_blank"
+                            rel="noopener"
+                            aria-label="GitHub repository"
+                        />
+                        <UButton
+                            color="neutral"
+                            variant="ghost"
+                            icon="i-tabler-book-2"
+                            :to="p.docsUrl"
+                            target="_blank"
+                            rel="noopener"
+                            aria-label="Documentation"
+                        />
                             </div></template
                         >
                     </UDashboardNavbar>

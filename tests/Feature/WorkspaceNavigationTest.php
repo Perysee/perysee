@@ -19,6 +19,12 @@ class WorkspaceNavigationTest extends TestCase
         app(InstallationState::class)->exclusive(fn () => app(InstallationState::class)->complete());
     }
 
+    public function test_workspace_shares_documentation_and_repository_urls(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $this->get('/sites')->assertOk()->assertInertia(fn (Assert $page) => $page->where('docsUrl', rtrim(config('perysee.docs_url'), '/'))->where('repositoryUrl', 'https://github.com/Perysee/perysee'));
+    }
+
     public function test_global_pages_have_workspace_navigation_and_pixels_placeholder(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

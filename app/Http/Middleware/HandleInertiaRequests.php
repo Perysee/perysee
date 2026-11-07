@@ -39,6 +39,7 @@ class HandleInertiaRequests extends Middleware
                 'styles' => $this->moduleAssets('module.css'),
             ] : ['navigation' => ['workspace' => [], 'admin' => [], 'site' => []], 'data' => [], 'active' => [], 'scripts' => [], 'styles' => []],
             'docsUrl' => rtrim(config('perysee.docs_url'), '/'),
+            'repositoryUrl' => rtrim(config('perysee.repository_url'), '/'),
             'flash' => ['status' => fn () => $request->session()->get('status'), 'error' => fn () => $request->session()->get('error')],
         ];
     }
