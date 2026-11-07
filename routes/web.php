@@ -71,6 +71,8 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
         Route::get('/sites/{website}/team', [SiteMemberController::class, 'index'])->name('sites.team');
         Route::post('/sites/{website}/invitations', [SiteInvitationController::class, 'store'])->name('sites.invitations.store');
+        Route::post('/sites/{website}/invitations/{invitation}/resend', [SiteInvitationController::class, 'resend'])->whereNumber('invitation')->name('sites.invitations.resend');
+        Route::delete('/sites/{website}/invitations/{invitation}', [SiteInvitationController::class, 'revoke'])->whereNumber('invitation')->name('sites.invitations.revoke');
         Route::get('/sites/{website}/{section}', [WorkspaceController::class, 'sitePage'])->whereIn('section', ['countries', 'pages', 'events', 'sessions', 'realtime', 'sources', 'campaigns', 'devices', 'pixels'])->name('sites.section');
         Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
         Route::get('/account/password', [AuthController::class, 'editPassword'])->name('password.edit');

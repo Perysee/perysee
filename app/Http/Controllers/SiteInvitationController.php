@@ -6,6 +6,8 @@ use App\Http\Requests\InviteMemberRequest;
 use App\Models\SiteInvitation;
 use App\Models\Website;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 
 class SiteInvitationController extends Controller
@@ -19,6 +21,27 @@ class SiteInvitationController extends Controller
         [$invitation, $token] = SiteInvitation::issue($website, $request->validated('email'), $request->validated('role'), $request->user());
 
         return $this->delivered($website, $invitation, $token);
+    }
+
+    public function resend(Request $request, Website $website, int $invitation): RedirectResponse
+    {
+        Gate::authorize('manageMembers', $website);
+        abort_if($website->deleting_at, 409);
+        $invitation = $website->invitations()->pending()->findOrFail($invitation);
+        $key = 'invitation-resend:'.$invitation->id;
+        abort_if(RateLimiter::tooManyAttempts($key, 1), 429, 'This invitation was just sent. Try again in a minute.');
+        RateLimiter::hit($key, 60);
+
+        return $this->delivered($website, $invitation, $invitation->rotate());
+    }
+
+    public function revoke(Website $website, int $invitation): RedirectResponse
+    {
+        Gate::authorize('manageMembers', $website);
+        abort_if($website->deleting_at, 409);
+        $website->invitations()->pending()->findOrFail($invitation)->forceFill(['revoked_at' => now('UTC')])->save();
+
+        return redirect()->route('sites.team', $website)->with('status', __('Invitation revoked.'));
     }
 
     /** Hands the link to the owner: it is shown once, as the raw token is not kept. */

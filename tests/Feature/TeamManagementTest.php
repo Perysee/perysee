@@ -53,6 +53,44 @@ class TeamManagementTest extends TestCase
         $this->post('/sites/'.$site->id.'/invitations', ['email' => $owner->email, 'role' => 'viewer'])->assertSessionHasErrors('email');
     }
 
+    public function test_resend_rotates_the_token_and_invalidates_the_old_link(): void
+    {
+        [$site, $owner] = $this->siteWith('owner');
+        [$invitation, $oldToken] = SiteInvitation::issue($site, 'a@example.com', 'viewer', $owner);
+        $invitation->forceFill(['expires_at' => now()->addDay()])->save();
+        $base = '/sites/'.$site->id.'/invitations/'.$invitation->id;
+
+        $this->actingAs($owner)->post($base.'/resend')->assertRedirect('/sites/'.$site->id.'/team');
+        $newToken = basename(session('invitation_link'));
+
+        $this->assertNotSame($oldToken, $newToken);
+        $this->assertNull(SiteInvitation::findPending($oldToken));
+        $this->assertSame($invitation->id, SiteInvitation::findPending($newToken)->id);
+        $this->assertTrue($invitation->fresh()->expires_at->isAfter(now()->addDays(6)), 'Resending restarts the validity.');
+        $this->post($base.'/resend')->assertStatus(429);
+
+        $this->delete($base)->assertRedirect('/sites/'.$site->id.'/team');
+        $this->assertNull(SiteInvitation::findPending($newToken));
+        $this->assertNotNull($invitation->fresh()->revoked_at);
+        $this->post($base.'/resend')->assertNotFound();
+    }
+
+    public function test_only_an_owner_of_the_same_site_can_resend_or_revoke_an_invitation(): void
+    {
+        [$site, $owner] = $this->siteWith('owner');
+        [$other, $otherOwner] = $this->siteWith('owner');
+        $viewer = User::factory()->create();
+        $site->members()->attach($viewer, ['role' => 'viewer']);
+        [$invitation, $token] = SiteInvitation::issue($site, 'a@example.com', 'viewer', $owner);
+        $path = '/sites/%d/invitations/'.$invitation->id;
+
+        $this->actingAs($viewer)->delete(sprintf($path, $site->id))->assertForbidden();
+        $this->post(sprintf($path, $site->id).'/resend')->assertForbidden();
+        $this->actingAs($otherOwner)->delete(sprintf($path, $site->id))->assertForbidden();
+        $this->delete(sprintf($path, $other->id))->assertNotFound();
+        $this->assertSame($invitation->id, SiteInvitation::findPending($token)->id);
+    }
+
     public function test_an_owner_can_create_an_invitation_that_stores_only_a_token_hash(): void
     {
         [$site, $owner] = $this->siteWith('owner');
