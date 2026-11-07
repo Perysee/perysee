@@ -71,7 +71,7 @@ test("the page shows a new token once, with a copy button, and lists tokens with
         apiTokens: [{ id: 5, label: "WordPress", hint: "AAAAAA", scopes: ["overview", "pages"], rate_per_minute: 60, status: "active", expires_at: null, revoked_at: null, last_used_at: null, use_count: 0, created_at: "2026-11-08T10:00:00Z", created_by: "Ada", revoke_url: "/sites/1/api-tokens/5" }],
         scopeOptions: ["overview", "pages", "goals"],
         rateLimits: { default: 60, min: 10, max: 300 },
-        apiBase: "https://stats.example.test/api/v1",
+        apiBase: "/api/v1",
         canManageApiTokens: true,
     };
     const created = await render(props({ ...base, created: { token: secret } }), true);
@@ -79,6 +79,7 @@ test("the page shows a new token once, with a copy button, and lists tokens with
     assert.ok(created.includes(secret));
     assert.match(created, /Copy token/);
     assert.match(created, /Authorization: Bearer/);
+    assert.ok(created.includes("/api/v1/overview?period=30d"));
 
     const listed = await render(props({ ...base, created: null }), true);
     assert.ok(!listed.includes(secret));

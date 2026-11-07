@@ -18,7 +18,8 @@ const copied = ref(false);
 const copyFailed = ref(false);
 const colors = { active: "success", expired: "warning", revoked: "neutral" };
 const date = (value) => (value ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "Never");
-const example = computed(() => (props.created ? `curl -H "Authorization: Bearer ${props.created.token}" "${props.apiBase}/overview?period=30d"` : ""));
+const base = computed(() => typeof window === "undefined" ? props.apiBase : new URL(props.apiBase, window.location.origin).href);
+const example = computed(() => (props.created ? `curl -H "Authorization: Bearer ${props.created.token}" "${base.value}/overview?period=30d"` : ""));
 function create() {
     form.post(props.siteLinks["api-tokens"], { preserveScroll: true, onSuccess: () => form.reset("label", "expires_on") });
 }
@@ -49,11 +50,11 @@ async function copy() {
     <UAlert v-if="created" class="mb-5" color="success" variant="soft" icon="i-tabler-key" title="Token created">
         <template #description>
             <p class="text-sm">Copy it now. For your security it cannot be shown again.</p>
-            <pre class="code-block select-all mt-3 whitespace-pre-wrap break-all" tabindex="0" aria-label="API token"><code>{{ created.token }}</code></pre>
+            <pre class="code-block select-all mt-3 wrap-code" tabindex="0" aria-label="API token"><code>{{ created.token }}</code></pre>
             <UButton class="mt-3" :icon="copied ? 'i-tabler-check' : 'i-tabler-copy'" :label="copied ? 'Copied' : 'Copy token'" color="neutral" variant="outline" size="sm" @click="copy" />
             <p v-if="copyFailed" role="alert" class="mt-2 text-sm text-warning">Copy unavailable. Select the token above and copy it manually.</p>
             <p class="mt-4 text-sm">Try it from a terminal:</p>
-            <pre class="code-block mt-2 whitespace-pre-wrap break-all" tabindex="0" aria-label="Example request"><code>{{ example }}</code></pre>
+            <pre class="code-block mt-2 wrap-code" tabindex="0" aria-label="Example request"><code>{{ example }}</code></pre>
         </template>
     </UAlert>
     <UCard class="mb-5">
@@ -102,3 +103,10 @@ async function copy() {
         </ul>
     </UCard>
 </template>
+<style scoped>
+/* .code-block keeps long lines on one line and scrolls; a token and a command must wrap instead. */
+.wrap-code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+</style>
