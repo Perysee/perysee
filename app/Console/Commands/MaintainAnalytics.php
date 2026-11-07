@@ -32,11 +32,12 @@ class MaintainAnalytics extends Command
             $site = DB::table('websites')->whereNotNull('deleting_at')->orderBy('id')->first();
             if ($site) {
                 $remaining = $limit;
-                foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions', 'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels'] as $table) {
+                foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions', 'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels', 'goal_sessions', 'stats_goal_daily', 'goal_versions', 'goals'] as $table) {
                     $query = DB::table($table)->where('website_id', $site->id);
                     $keys = match ($table) {
                         'stats_segment_daily', 'stats_segment_hourly' => ['bucket_start', 'segment_hash'], 'segment_events' => ['event_id'], 'segment_sessions' => ['session_key'],
-                        'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels' => ['id'],
+                        'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels', 'goal_versions', 'goals' => ['id'],
+                        'goal_sessions' => ['goal_id', 'version', 'session_key'], 'stats_goal_daily' => ['goal_id', 'version', 'bucket_start', 'segment_hash'],
                         'events' => ['id'], 'stats_daily' => ['stat_date'], 'stats_hourly' => ['bucket_start'],
                         'stats_dimension_daily' => ['stat_date', 'dimension_type', 'dimension_hash'], 'measured_sessions' => ['session_key'], 'site_measurement_periods' => ['id'],
                     };
@@ -63,9 +64,10 @@ class MaintainAnalytics extends Command
             $cutoff = now('UTC')->subDays($days + 1)->toDateString();
             // Pending work can still move session counters in historical buckets.
             $statsLocked = DB::table('events')->whereNull('processed_at')->where('received_at', '<', $cutoff)->exists();
-            foreach ($statsLocked ? [] : ['stats_daily', 'stats_hourly', 'stats_dimension_daily', 'stats_segment_daily', 'stats_segment_hourly'] as $table) {
+            foreach ($statsLocked ? [] : ['stats_daily', 'stats_hourly', 'stats_dimension_daily', 'stats_segment_daily', 'stats_segment_hourly', 'stats_goal_daily'] as $table) {
                 $keys = match ($table) {
                     'stats_segment_daily', 'stats_segment_hourly' => ['website_id', 'bucket_start', 'segment_hash'],
+                    'stats_goal_daily' => ['website_id', 'goal_id', 'version', 'bucket_start', 'segment_hash'],
                     'stats_daily' => ['website_id', 'stat_date'], 'stats_hourly' => ['website_id', 'bucket_start'],
                     default => ['website_id', 'stat_date', 'dimension_type', 'dimension_hash'],
                 };
@@ -82,6 +84,13 @@ class MaintainAnalytics extends Command
                 if (! DB::table('journey_report_sessions')->where('report_id', $id)->exists()) {
                     DB::table('journey_reports')->where('id', $id)->delete();
                 }
+            }
+            // Invitations that expired, were accepted or were revoked more than 30 days ago are of no use any more.
+            $invitationCutoff = now('UTC')->subDays(30);
+            $endedInvitations = DB::table('site_invitations')->where(fn ($query) => $query->where('expires_at', '<', $invitationCutoff)->orWhere('accepted_at', '<', $invitationCutoff)->orWhere('revoked_at', '<', $invitationCutoff))->orderBy('id')->limit($limit)->pluck('id');
+            // Nothing to purge is the usual case: skip the delete so an idle pass stays within its query budget.
+            if ($endedInvitations->isNotEmpty()) {
+                DB::table('site_invitations')->whereIn('id', $endedInvitations)->delete();
             }
             $this->call('perysee:prune-tracking', ['--limit' => $limit]);
 

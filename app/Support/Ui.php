@@ -22,6 +22,7 @@ class Ui
         $site = $data['website'] ?? null;
         if ($site instanceof Website) {
             $data['canUpdate'] = $site->exists && Gate::allows('update', $site);
+            $data['canShare'] = $site->exists && Gate::allows('share', $site);
             $data['siteLinks'] = $site->exists ? self::siteLinks($site) : null;
         }
         if ($screen === 'dashboard') {
@@ -41,7 +42,7 @@ class Ui
             $data['databaseDefaults'] = collect(config('database.connections.mariadb'))->only(['host', 'port', 'database', 'username'])->all();
         }
         // Displayed as text, so they keep their absolute form: the tracking snippet and the instance settings.
-        $verbatim = array_intersect_key($data, array_flip(['snippet', 'settings']));
+        $verbatim = array_intersect_key($data, array_flip(['snippet', 'settings', 'invitationLink']));
         $data = $verbatim + self::relativize($data);
         foreach (['websites', 'sites'] as $key) {
             if (isset($data[$key])) {
@@ -72,13 +73,14 @@ class Ui
     private static function siteLinks(Website $site): array
     {
         $links = [];
-        foreach (['filter-options', 'show', 'edit', 'tracking', 'export', 'favicon', 'update', 'destroy'] as $action) {
+        foreach (['filter-options', 'show', 'edit', 'tracking', 'sharing', 'team', 'export', 'favicon', 'update', 'destroy'] as $action) {
             $links[$action] = route('sites.'.$action, $site);
         }
         foreach (['pages', 'sources', 'campaigns', 'devices', 'countries', 'events', 'sessions', 'realtime'] as $section) {
             $links[$section] = route('sites.section', [$site, $section]);
         }
         $links['funnels'] = route('sites.funnels.index', $site);
+        $links['goals'] = route('sites.goals.index', $site);
         $links['journeys'] = route('sites.journeys', $site);
         $links['demo'] = $site->is_demo && app()->environment('local') ? route('demo.show', $site) : null;
 

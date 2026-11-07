@@ -4,7 +4,7 @@ import { usePage, router } from "@inertiajs/vue3";
 import TrafficChart from "./TrafficChart.vue";
 import DateRange from "./DateRange.vue";
 import { queryUrl } from "../interface-query.mjs";
-import { variation, describeVariation } from "../comparison.mjs";
+import { describeComparison } from "../comparison.mjs";
 const props = defineProps(["sites", "summaries", "charts", "period", "today", "sitePeriods", "comparisons", "attention"]);
 // With three sites or more, the busiest one leads the grid at full width.
 const featuredId = computed(() => {
@@ -26,14 +26,13 @@ const totals = computed(() =>
 const quiet = (site) =>
     Object.values(props.summaries[site.id].totals).every((total) => !total);
 const variationOf = (site, key) => {
-    const previous = props.comparisons?.[site.id]?.totals[key];
-    const current = props.summaries[site.id].totals[key];
-    if (previous === undefined || current === null) return null;
-    const change = variation(current, previous);
-    return {
-        ...describeVariation(change),
-        direction: change?.direction ?? "new",
-    };
+    const comparison = props.comparisons?.[site.id];
+    if (!comparison) return null;
+    return describeComparison(
+        props.summaries[site.id].totals[key],
+        comparison.totals?.[key] ?? null,
+        comparison.reliability?.[key],
+    );
 };
 const page = usePage();
 const number = (value) =>
@@ -129,15 +128,19 @@ const number = (value) =>
                         number(summaries[site.id].totals[key])
                     }}</strong
                     ><span
-                        v-if="variationOf(site, key)"
+                        v-if="variationOf(site, key)?.percent"
                         class="metric-variation"
                         :class="`is-${variationOf(site, key).direction}`"
-                        :title="variationOf(site, key).label"
-                        >{{ variationOf(site, key).text
+                        >{{ variationOf(site, key).percent
                         }}<span class="metric-versus"> vs previous</span
                         ><span class="sr-only">
                             {{ variationOf(site, key).label }}</span
                         ></span
+                    ><span
+                        v-else-if="variationOf(site, key)?.reasonText"
+                        class="metric-reason"
+                        >Previous: {{ variationOf(site, key).previousText }}.
+                        {{ variationOf(site, key).reasonText }}</span
                     ><span
                         v-else-if="
                             key === 'sessions' &&

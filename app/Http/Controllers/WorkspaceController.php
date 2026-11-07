@@ -25,7 +25,7 @@ class WorkspaceController extends Controller
             $summaries[$site->id] = $reports->overview($site, $period);
             $charts[$site->id] = $reports->series($site, $period);
             if ($period['compare'] === 'previous') {
-                $comparisons[$site->id] = ['totals' => $reports->overview($site, $reports->previousPeriod($period, $site))['totals']];
+                $comparisons[$site->id] = array_diff_key($reports->comparison($site, $period, $summaries[$site->id], totalsOnly: true), ['series' => 1]);
             }
         }
 

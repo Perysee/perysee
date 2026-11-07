@@ -15,7 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        then: fn () => require base_path('routes/tracking.php'),
+        then: function (): void {
+            require base_path('routes/tracking.php');
+            require base_path('routes/share.php');
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->replace(TrustProxies::class, TrustConfiguredProxies::class);

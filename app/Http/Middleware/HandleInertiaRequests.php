@@ -17,9 +17,18 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
+        // A public share page is anonymous: it gets nothing about accounts, sites, navigation or modules.
+        if (str_starts_with((string) $request->route()?->getName(), 'share.')) {
+            return [
+                'errors' => parent::share($request)['errors'],
+                'currentUrl' => $request->getBaseUrl().$request->getPathInfo(),
+                'assets' => ['logo' => asset('logo.svg'), 'world' => asset('maps/world.json'), 'brands' => asset('brands')],
+                'flash' => ['status' => null, 'error' => null],
+            ];
+        }
         $user = $request->user();
         $links = [];
-        foreach (['sites.index', 'sites.create', 'sites.store', 'dashboard', 'login', 'login.store', 'logout', 'password.edit', 'password.update', 'health', 'health.update', 'health.geolocation', 'health.updates.check', 'health.updates.request', 'settings', 'install', 'install.unlock', 'install.database', 'install.administrator'] as $name) {
+        foreach (['sites.index', 'sites.create', 'sites.store', 'dashboard', 'login', 'login.store', 'logout', 'password.edit', 'password.update', 'health', 'health.update', 'health.geolocation', 'health.updates.check', 'health.updates.request', 'settings', 'settings.mail', 'settings.mail.test', 'install', 'install.unlock', 'install.database', 'install.administrator'] as $name) {
             $links[$name] = route($name);
         }
         $links['modules'] = route('modules.index');

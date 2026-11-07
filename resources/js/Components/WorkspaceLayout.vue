@@ -33,12 +33,18 @@ const title = computed(
                   }[p.value.section]
                 : p.value.website?.name || "Overview",
             "sites.tracking": "Tracking setup",
+            "sites.sharing": "Sharing",
+            "sites.team": "Team",
+            invitation: "Invitation",
             funnels: "Funnels",
+            goals: "Goals",
+            "goal.report": p.value.goal?.name || "Goal",
             "funnel.report": p.value.funnel?.name || "Funnel",
             journeys: "Journeys",
             dashboard: "Home",
             health: "Instance health",
             settings: "Instance settings",
+            "settings.mail": "Mail",
             modules: "Modules",
             "modules.settings": "Module settings",
             "auth.login": "Sign in",
@@ -130,7 +136,7 @@ const nav = computed(() => {
             keywords,
             to:
                 queryUrl(p.value.siteLinks[key === "overview" ? "show" : key], key === "realtime" ? {} : {...values, ...Object.fromEntries(dates)}),
-            active: key === "funnels" ? ["funnels","funnel.report"].includes(p.value.screen) : key === "journeys" ? p.value.screen === "journeys" : p.value.screen === "sites.show" && (p.value.section || "overview") === key,
+            active: key === "goals" ? ["goals","goal.report"].includes(p.value.screen) : key === "funnels" ? ["funnels","funnel.report"].includes(p.value.screen) : key === "journeys" ? p.value.screen === "journeys" : p.value.screen === "sites.show" && (p.value.section || "overview") === key,
         })),
         ...(moduleEntries.length ? [{ label: "Modules", type: "label" }, ...moduleEntries] : []),
         ];
@@ -145,6 +151,22 @@ const configNav = computed(() =>
                   icon: "i-tabler-code",
                   to: p.value.siteLinks.tracking,
                   active: p.value.screen === "sites.tracking",
+              },
+              ...(p.value.canShare
+                  ? [
+                        {
+                            label: "Sharing",
+                            icon: "i-tabler-share",
+                            to: p.value.siteLinks.sharing,
+                            active: p.value.screen === "sites.sharing",
+                        },
+                    ]
+                  : []),
+              {
+                  label: "Team",
+                  icon: "i-tabler-users",
+                  to: p.value.siteLinks.team,
+                  active: p.value.screen === "sites.team",
               },
               ...(p.value.canUpdate
                   ? [
@@ -171,6 +193,12 @@ const configNav = computed(() =>
                             icon: "i-tabler-settings",
                             to: p.value.links.settings,
                             active: p.value.screen === "settings",
+                        },
+                        {
+                            label: "Mail",
+                            icon: "i-tabler-mail",
+                            to: p.value.links["settings.mail"],
+                            active: p.value.screen === "settings.mail",
                         },
                         {
                             label: "Modules",
