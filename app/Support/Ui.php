@@ -23,6 +23,7 @@ class Ui
         if ($site instanceof Website) {
             $data['canUpdate'] = $site->exists && Gate::allows('update', $site);
             $data['canShare'] = $site->exists && Gate::allows('share', $site);
+            $data['canManageApiTokens'] = $site->exists && Gate::allows('manageApiTokens', $site);
             $data['siteLinks'] = $site->exists ? self::siteLinks($site) : null;
         }
         if ($screen === 'dashboard') {
@@ -79,6 +80,7 @@ class Ui
         foreach (['pages', 'sources', 'campaigns', 'devices', 'countries', 'events', 'sessions', 'realtime'] as $section) {
             $links[$section] = route('sites.section', [$site, $section]);
         }
+        $links['api-tokens'] = route('sites.api-tokens', $site);
         $links['funnels'] = route('sites.funnels.index', $site);
         $links['goals'] = route('sites.goals.index', $site);
         $links['journeys'] = route('sites.journeys', $site);

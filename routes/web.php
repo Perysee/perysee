@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DemoController;
 use App\Http\Controllers\FunnelController;
@@ -90,6 +91,10 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::post('/sites/{website}/sharing', [ShareLinkController::class, 'store'])->name('sites.sharing.store');
         Route::put('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'update'])->name('sites.sharing.update');
         Route::delete('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'destroy'])->name('sites.sharing.destroy');
+        // read-api: management of the tokens of the read API (owners only)
+        Route::get('/sites/{website}/api-tokens', [ApiTokenController::class, 'index'])->name('sites.api-tokens');
+        Route::post('/sites/{website}/api-tokens', [ApiTokenController::class, 'store'])->name('sites.api-tokens.store');
+        Route::delete('/sites/{website}/api-tokens/{token}', [ApiTokenController::class, 'destroy'])->whereNumber('token')->name('sites.api-tokens.destroy');
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
         // Installation check
         Route::get('/sites/{website}/tracking/verify', [TrackingCheckController::class, 'show'])->name('sites.verify');

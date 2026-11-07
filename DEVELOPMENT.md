@@ -162,6 +162,7 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 | `perysee:update --requested --yes` | 1 min, sans chevauchement | Prend la demande de mise à jour déposée depuis la page Santé. |
 | `perysee:update:check --quiet-unless-new` | 04:17 | Cherche une nouvelle version. |
 | `perysee:modules catalog --refresh-only` | 04:43 | Rafraîchit le catalogue de modules. |
+| `perysee:prune-api-tokens` | toutes les heures, sans chevauchement | Supprime les jetons d'API expirés ou révoqués depuis plus de 30 jours. |
 
 ### Équipe et invitations
 
@@ -182,6 +183,18 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 - Mot de passe : 5 essais par lien en 15 minutes, 20 par adresse IP en une heure. Le modifier ou le retirer incrémente `secret_version` et déconnecte les visiteurs qui l'avaient saisi.
 - Coque séparée (`Pages/Share/Show.vue`, `Unlock.vue`) : pour les routes `share.*`, `HandleInertiaRequests` ne partage que `currentUrl`, `assets`, `flash` et `errors` ; aucun compte, aucune navigation, aucun module. Réponses en `Cache-Control: no-store, private`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow`. Aucun filtre, export ou identifiant de site n'est lu depuis la requête.
 - L'usage est enregistré au plus une fois par heure et par lien (`last_used_at`, `use_count`). Les liens expirés ou révoqués ne sont pas purgés ; les lignes disparaissent avec le site (clé étrangère en cascade).
+
+### API de lecture (`/api/v1`)
+
+- Écran `/sites/{website}/api-tokens` (propriétaire seulement, jamais sur un site de démonstration, aucun accès implicite de l'administrateur d'instance). Un jeton appartient à un site, porte des portées (`overview`, `pages`, `sources`, `campaigns`, `devices`, `countries`, `events`, `goals`, `funnels`), une limite de 10 à 300 requêtes par minute (60 par défaut, plafond `PERYSEE_API_MAX_RATE`) et une expiration facultative (plafond facultatif `PERYSEE_API_MAX_EXPIRY_DAYS`). Un jeton survit au départ de son créateur.
+- Le secret (`psy_` + 32 octets en base64url) n'est jamais stocké : `api_tokens.token_hash` (SHA-256) et les six derniers caractères comme repère. Il n'est affiché qu'une fois, à la création. Il ne circule que dans l'en-tête `Authorization: Bearer` ; dans l'URL ou le corps, il est ignoré.
+- Routes dans `routes/api_v1.php`, hors groupe `web` (ni session, ni cookie, ni CSRF) : `GET /site`, `/overview`, `/timeseries`, `/dimensions/{dimension}`, `/goals`, `/goals/{id}`, `/funnels`, `/funnels/{id}`, et `/openapi.json` (public, `resources/openapi/v1.json`, un test vérifie qu'il décrit exactement les routes). Le site vient du jeton (`ResolveApiToken`), jamais d'une liaison de modèle. Un jeton inconnu, absent, expiré, révoqué ou d'un site supprimé ou de démonstration reçoit un même 401. Erreurs : `{"error": {"code", "message", "details"}}`.
+- Les chiffres viennent de `Reports`, `GoalReports` et `JourneyReports` ; la mise en forme passe par `ReportPresenter` (liste blanche partagée avec les liens de partage, dont le JSON est figé par `ShareJsonCharacterizationTest`) et `ReportSections` (portées vers dimensions). Un filtre exige la portée de sa dimension. Tableaux limités à 100 lignes (`meta.truncated`, `distinct_values`). `compare=previous` renvoie le verdict du serveur sur les pourcentages.
+- Funnels en lecture seule : le dernier résultat déjà calculé pour la version, la période et les filtres demandés, sinon 404 `report_not_computed`. Aucun calcul n'est déclenché.
+- Aucun CORS : `ApiV1Boundary` (premier middleware global) refuse un `OPTIONS` et retire les en-têtes `Access-Control-*` sur `/api/v1/*`. `/api/collect` garde le comportement de toujours. Chaque réponse porte `Cache-Control: no-store, private`, `Referrer-Policy: no-referrer`, `X-Robots-Tag`, `X-Perysee-Api-Version: 1`.
+- Limite par jeton avec `RateLimiter` (en-têtes `X-RateLimit-*`, `Retry-After` sur 429) ; les échecs d'authentification sont limités à 60 par minute et par adresse IP hachée.
+- Usage : `last_used_at` et `use_count` au plus toutes les 10 minutes par jeton (une requête `UPDATE`). Rétention : `perysee:prune-api-tokens` (toutes les heures, sans chevauchement) supprime les jetons expirés ou révoqués depuis plus de 30 jours. Commande dédiée, pas dans `perysee:maintenance`, pour ne pas toucher au budget de requêtes du passage à vide.
+- Décision : [ADR 006](docs/adr/006-read-only-api-tokens.md). Tests : `ApiTokenManagementTest`, `ApiV1AuthTest`, `ApiV1ReportsTest`, `ApiV1RateLimitTest`, `ApiV1GoalsFunnelsTest`, `ApiV1OpenApiTest`, `ApiTokenPurgeTest`, `ShareJsonCharacterizationTest`, plus `tests/Charts/api-tokens-nav.test.mjs`.
 
 ### Objectifs et conversions
 

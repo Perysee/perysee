@@ -43,6 +43,7 @@ const ModuleSettingsPage = defineAsyncComponent(
     () => import("../Components/ModuleSettingsPage.vue"),
 );
 const SharingPage = defineAsyncComponent(() => import("../Components/SharingPage.vue"));
+const ApiTokensPage = defineAsyncComponent(() => import("../Components/ApiTokensPage.vue"));
 const FunnelsPage =defineAsyncComponent(() => import("../Components/FunnelsPage.vue"));
 const JourneyPage = defineAsyncComponent(() => import("../Components/JourneyPage.vue"));
 const GoalsPage = defineAsyncComponent(() => import("../Components/GoalsPage.vue"));
@@ -100,6 +101,7 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
         <TrackingPage v-else-if="p.screen === 'sites.tracking'" v-bind="p" />
         <TrackingVerifyPage v-else-if="p.screen === 'sites.verify'" v-bind="p" />
         <SharingPage v-else-if="p.screen === 'sites.sharing'" v-bind="p" />
+        <ApiTokensPage v-else-if="p.screen === 'sites.api-tokens'" v-bind="p" />
         <TeamPage v-else-if="p.screen === 'sites.team'" v-bind="p" />
         <InvitationPage v-else-if="p.screen === 'invitation'" v-bind="p" />
         <FunnelsPage v-else-if="p.screen === 'funnels'" v-bind="p" />

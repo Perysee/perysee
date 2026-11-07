@@ -35,6 +35,7 @@ const title = computed(
             "sites.tracking": "Tracking setup",
             "sites.verify": "Verify installation",
             "sites.sharing": "Sharing",
+            "sites.api-tokens": "API access",
             "sites.team": "Team",
             invitation: "Invitation",
             funnels: "Funnels",
@@ -160,6 +161,16 @@ const configNav = computed(() =>
                             icon: "i-tabler-share",
                             to: p.value.siteLinks.sharing,
                             active: p.value.screen === "sites.sharing",
+                        },
+                    ]
+                  : []),
+              ...(p.value.canManageApiTokens
+                  ? [
+                        {
+                            label: "API access",
+                            icon: "i-tabler-key",
+                            to: p.value.siteLinks["api-tokens"],
+                            active: p.value.screen === "sites.api-tokens",
                         },
                     ]
                   : []),
