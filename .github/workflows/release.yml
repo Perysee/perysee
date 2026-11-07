@@ -142,7 +142,7 @@ jobs:
         run: |
           docker build --build-arg PHP_VERSION=8.3 --tag perysee-smoke dist
           docker run --rm --entrypoint php perysee-smoke artisan --version
-          docker run --rm --entrypoint php perysee-smoke -r 'foreach (["pdo_mysql", "zip", "mbstring", "openssl"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "missing $e\n"); exit(1); } }'
+          docker run --rm --entrypoint php perysee-smoke -r 'foreach (["pdo_mysql", "zip", "mbstring", "openssl", "iconv", "xmlwriter"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR, "missing $e\n"); exit(1); } }'
           test "$(docker run --rm --entrypoint php perysee-smoke -r 'echo json_decode(file_get_contents("release.json"))->version;')" = "$RELEASE_VERSION"
           printf 'APP_URL=https://stats.example.com\nAPP_KEY=base64:%s\nDB_DATABASE=perysee\nDB_USERNAME=perysee\nDB_PASSWORD=ci\nMARIADB_ROOT_PASSWORD=ci\n' "$(openssl rand -base64 32)" > "$RUNNER_TEMP/smoke.env"
           docker compose --env-file "$RUNNER_TEMP/smoke.env" --file dist/compose.yaml config --quiet
