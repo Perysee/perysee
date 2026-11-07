@@ -61,7 +61,7 @@ class AnalyticsCoverageTest extends TestCase
         $site = Website::factory()->create();
         $viewer = User::factory()->create();
         $site->members()->attach($viewer, ['role' => 'viewer']);
-        $values = ['+33 promo', '-sale', "\tpad", "\x00=cmd", "=\xff", 'plain'];
+        $values = ['+33 promo', '-sale', "\tpad", "\x00=cmd", '=é', 'plain'];
         foreach ($values as $index => $source) {
             DB::table('stats_dimension_daily')->insert(['website_id' => $site->id, 'stat_date' => '2026-10-24', 'dimension_type' => 'source', 'dimension_hash' => hash('sha256', $source), 'dimension_value' => $source, 'metric_count' => 3 + $index]);
         }
