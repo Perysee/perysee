@@ -16,4 +16,10 @@ class WebsitePolicy
     {
         return $website->members()->whereKey($user->id)->wherePivot('role', 'owner')->exists();
     }
+
+    /** Public share links are managed by a site owner only. */
+    public function share(User $user, Website $website): bool
+    {
+        return $website->members()->whereKey($user->id)->wherePivot('role', 'owner')->exists();
+    }
 }
