@@ -56,6 +56,40 @@ test('PERYSEE_PHP always wins, even over a recent default', (t) => {
     assert.equal(result.stdout.trim(), '/custom/php');
 });
 
+// detect_mode suggests the mode that fits the machine: uapi means a cPanel account, a working docker compose means Docker.
+function detectMode(t, { tools = [], cpanelBin = false, dockerWorks = true }) {
+    const root = mkdtempSync(join(tmpdir(), 'perysee-detect-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    for (const tool of tools) {
+        const path = join(bin, tool);
+        writeFileSync(path, tool === 'docker' ? `#!/bin/sh\n${dockerWorks ? 'exit 0' : 'exit 1'}\n` : '#!/bin/sh\nexit 0\n');
+        chmodSync(path, 0o755);
+    }
+    if (cpanelBin) {
+        fakePhp(join(root, 'cpanel/bin/uapi'), true);
+    }
+    return spawnSync('bash', ['-c', 'source "$1"; detect_mode', 'bash', script], {
+        encoding: 'utf8',
+        env: { PATH: `${bin}:/usr/bin:/bin`, PERYSEE_INSTALL_SOURCED: '1', PERYSEE_UAPI_PATH: join(root, 'cpanel/bin/uapi') },
+    }).stdout.trim();
+}
+
+test('a cPanel account is detected by its uapi command, even from outside the PATH', (t) => {
+    assert.equal(detectMode(t, { tools: ['uapi', 'docker'] }), 'cpanel');
+    assert.equal(detectMode(t, { cpanelBin: true }), 'cpanel');
+});
+
+test('Docker is suggested only when docker compose actually works', (t) => {
+    assert.equal(detectMode(t, { tools: ['docker'] }), 'docker');
+    assert.equal(detectMode(t, { tools: ['docker'], dockerWorks: false }), 'manual');
+});
+
+test('the manual mode is the suggestion when nothing else fits', (t) => {
+    assert.equal(detectMode(t, {}), 'manual');
+});
+
 test('no usable php explains what is needed and fails', (t) => {
     const { result } = findPhp(t, { onPath: [['php', false]] });
     assert.notEqual(result.status, 0);

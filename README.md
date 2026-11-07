@@ -58,6 +58,28 @@ Le premier démarrage SQL peut prendre quelques secondes : relancer `health` ava
 
 Le script local conserve les secrets déjà configurés. Ne pas lancer `key:generate` sur une instance existante. Arrêter MariaDB avec `bash scripts/mariadb.sh stop` conserve les données.
 
+## Installation en une commande
+
+```sh
+curl -fsSL https://get.perysee.com | bash
+```
+
+L’installateur demande d’abord le mode (`--mode cpanel|docker|manual` évite la question) et propose celui que détecte la machine. Il vérifie chaque fichier téléchargé contre `SHA256SUMS`. Pour une version précise, utiliser son adresse : `https://get.perysee.com/releases/vX.Y.Z/install.sh`. Prérequis communs : `curl`, PHP CLI 8.3 ou plus (sauf pour Docker), MariaDB 10.11, 11.4 ou 11.8 (PHP 8.3, 8.4 et 8.5 sont testés).
+
+| Mode | Ce que l’installateur fait | Prérequis |
+| --- | --- | --- |
+| `cpanel` | Extrait les fichiers puis, avec la commande locale `uapi` (sans jeton ni port ouvert), crée le sous-domaine dont la racine est `public/`, la base et son utilisateur, choisit le PHP 8.3+ le plus récent et programme le cron `schedule:run`. Ne crée que du nouveau : un nom d’hôte existant est refusé, et un échec supprime uniquement ce que ce passage a créé. | Accès SSH au compte cPanel ; application dans le dossier personnel |
+| `docker` | Construit l’image sur la machine à partir de la release vérifiée, puis démarre l’application, son scheduler et MariaDB avec Docker Compose. Aucune image n’est téléchargée depuis un registre Perysee. Mise à jour : `--mode docker --upgrade --target <dossier>`. | Docker avec le plugin `compose`, `openssl`, reverse proxy HTTPS devant `127.0.0.1:8080` |
+| `manual` | Extrait les fichiers ; l’hébergement (racine du domaine, PHP web, base, cron) reste à préparer. | PHP CLI 8.3+, une base MariaDB vide |
+
+Le mot de passe de l’administrateur est saisi dans le terminal (invite masquée) ou généré puis affiché une seule fois ; il n’est jamais passé en argument ni stocké. Selon `--finish`, l’installation se termine :
+
+- `browser` (défaut en mode manuel) : l’installateur affiche un lien `https://domaine/install#secret=…` qui déverrouille l’assistant tout seul (le secret est dans le fragment, que le navigateur n’envoie jamais au serveur) ;
+- `terminal` : `php artisan perysee:install` termine tout sans navigateur (`PERYSEE_DB_PASSWORD` et `PERYSEE_ADMIN_PASSWORD` peuvent être fournis par l’environnement) ;
+- `none` : seuls les fichiers sont posés.
+
+Le mode cPanel et le mode Docker n’ont pas encore été qualifiés sur un vrai compte ni une vraie machine : seuls leurs échanges avec `uapi` et `docker` sont testés automatiquement.
+
 ## Installation cible sans SSH
 
 La release `perysee.zip` contient `vendor/` de production, les assets compilés dans `public/build/`, `public/fonts/`, `public/tracker/`. La qualification sur de vrais hébergements cPanel reste à réaliser.
@@ -66,7 +88,7 @@ La release `perysee.zip` contient `vendor/` de production, les assets compilés 
 2. Activer HTTPS et diriger la racine du domaine **vers `public/`**. Ne jamais exposer la racine de l’application. Vérifier également les alias et accès alternatifs du serveur.
 3. Autoriser l’écriture dans le dossier de l’application pour créer/remplacer `.env`, ainsi que dans `storage/` et `bootstrap/cache/`. Ne pas utiliser de permissions universelles `0777`.
 4. Déployer sans `.env` préexistant, ou utiliser une configuration de production avec `APP_DEBUG=false`, `APP_ENV=production`, sessions et cache fichiers. Ne pas copier les réglages locaux tels quels. Aucun cache `bootstrap/cache/config.php` ne doit être livré avant installation.
-5. Ouvrir `/install`. La clé applicative et un secret aléatoire d’instance sont initialisés sans connexion SQL. Dans le gestionnaire de fichiers cPanel, ouvrir `storage/app/private/installation/secret` et reporter sa valeur dans l’assistant. Ne pas placer ce secret dans une URL ou un fichier public.
+5. Ouvrir `/install`. La clé applicative et un secret aléatoire d’instance sont initialisés sans connexion SQL. Dans le gestionnaire de fichiers cPanel, ouvrir `storage/app/private/installation/secret` et reporter sa valeur dans l’assistant (avec un terminal, `php artisan perysee:install --browser --url=https://domaine` affiche à la place un lien privé qui déverrouille l’assistant tout seul). Ne pas partager ce secret ni ce lien, et ne pas les placer dans un fichier public.
 6. Corriger les diagnostics, saisir les paramètres SQL puis créer le compte administrateur. Les mots de passe exigent au moins 12 caractères, avec une limite de 72 octets pour bcrypt. Un champ de mot de passe SQL vide conserve une valeur déjà enregistrée pour la même connexion.
 7. Après confirmation, se connecter et ajouter le premier site. Le secret est supprimé et `storage/app/private/installation/installed` verrouille l’installation.
 
