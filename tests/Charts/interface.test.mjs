@@ -57,3 +57,16 @@ test("an absolute address keeps its origin and a path loses any previous query",
     assert.equal(queryUrl("https://stats.test/sites/3", { period: "7d" }), "https://stats.test/sites/3?period=7d");
     assert.equal(queryUrl("/sites/3?old=1", { period: "7d" }), "/sites/3?period=7d");
 });
+
+test("a goal link stays a path and keeps the period, the cross filters and the version", () => {
+    const filters = reportFilters("/sites/3/goals/2?filters[country][]=FR&version=2&page=4");
+    const url = new URL(
+        queryUrl("/sites/3/goals/2", { ...filters, from: "2026-10-01", to: "2026-10-25", version: 2 }),
+        "https://stats.test",
+    );
+    assert.equal(url.pathname, "/sites/3/goals/2");
+    assert.deepEqual(url.searchParams.getAll("filters[country][]"), ["FR"]);
+    assert.equal(url.searchParams.get("from"), "2026-10-01");
+    assert.equal(url.searchParams.get("version"), "2");
+    assert.equal(url.searchParams.has("page"), false);
+});

@@ -13,7 +13,7 @@ test("every site section appears exactly once, in its group", () => {
         [
             "overview", "pages", "sources", "campaigns",
             "devices", "countries", "sessions",
-            "events", "funnels", "journeys",
+            "events", "funnels", "goals", "journeys",
             "realtime",
         ],
     );

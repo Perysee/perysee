@@ -2,6 +2,8 @@ export const metricLabels = {
     pageviews: "Pageviews",
     sessions: "Sessions started",
     custom_events: "Custom events",
+    conversions: "Goal conversions",
+    hits: "Goal hits",
 };
 export function lineOption(
     series,
