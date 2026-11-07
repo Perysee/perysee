@@ -128,4 +128,36 @@ class ComparisonReportTest extends TestCase
             ->where('comparison.reliability.pageviews.reason', 'previous_zero')
             ->where('comparison.totals.pageviews', 0));
     }
+
+    private function measured(Website $site, string $since, string $mode = 'sessions', ?string $until = null): void
+    {
+        DB::table('site_measurement_periods')->insert(['website_id' => $site->id, 'started_at' => $since, 'ended_at' => $until, 'mode' => $mode]);
+    }
+
+    public function test_unavailable_previous_sessions_are_not_zero(): void
+    {
+        $site = $this->memberSite();
+        $this->measured($site, '2026-10-18 00:00:00');
+        DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => '2026-10-20', 'pageviews' => 10, 'session_pageviews' => 10, 'sessions' => 5]);
+        DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => '2026-10-13', 'pageviews' => 4]);
+
+        $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('report.totals.sessions', 5)
+            ->where('comparison.totals.sessions', null)
+            ->where('comparison.availability.sessions', 'unavailable')
+            ->where('comparison.reliability.sessions.percent_allowed', false)
+            ->where('comparison.reliability.sessions.reason', 'unavailable')
+            ->where('comparison.reliability.pageviews.reason', null));
+    }
+
+    public function test_unavailable_current_sessions_withhold_the_percent_too(): void
+    {
+        $site = $this->memberSite();
+        $this->measured($site, '2026-10-01 00:00:00', 'sessions', '2026-10-15 00:00:00');
+        DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => '2026-10-13', 'pageviews' => 4, 'session_pageviews' => 4, 'sessions' => 2]);
+
+        $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous')->assertInertia(fn (Assert $page) => $page
+            ->where('report.totals.sessions', null)
+            ->where('comparison.reliability.sessions.reason', 'unavailable'));
+    }
 }

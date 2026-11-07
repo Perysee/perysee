@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
     variation,
     describeVariation,
+    describeComparison,
 } from "../../resources/js/comparison.mjs";
 import { lineOption } from "../../resources/js/chart-options.mjs";
 import { reportFilters, queryUrl } from "../../resources/js/interface-query.mjs";
@@ -34,10 +35,40 @@ test("variation is described with a sign and in words", () => {
         text: "0 %",
         label: "Unchanged compared with the previous period",
     });
-    assert.deepEqual(describeVariation(null), {
-        text: "New",
-        label: "No data in the previous period",
-    });
+});
+
+test("null is not New: an unavailable variation is an em dash", () => {
+    const missing = describeVariation(null);
+    assert.equal(missing.text, "—");
+    assert.doesNotMatch(JSON.stringify(missing), /New/);
+    const unavailable = describeComparison(12, null, { percent_allowed: false, reason: "unavailable" });
+    assert.equal(unavailable.percent, null);
+    assert.equal(unavailable.previousText, "—");
+    assert.equal(unavailable.delta, null);
+    assert.equal(unavailable.direction, "none");
+    assert.equal(unavailable.reasonText, "Not measured in one of the periods");
+    assert.doesNotMatch(JSON.stringify(unavailable), /New|Up|Down/);
+});
+
+test("the server reliability decides whether a percent is shown", () => {
+    const allowed = describeComparison(150, 100, { percent_allowed: true, reason: null });
+    assert.equal(allowed.percent, "+50 %");
+    assert.equal(allowed.direction, "up");
+    assert.equal(allowed.deltaText, "+50");
+    assert.equal(allowed.previousText, "100");
+    assert.equal(allowed.label, "Up 50 % compared with the previous period");
+    assert.equal(allowed.reasonText, null);
+    const withheld = describeComparison(150, 100, { percent_allowed: false, reason: "current_period" });
+    assert.equal(withheld.percent, null);
+    assert.equal(withheld.direction, "none");
+    assert.equal(withheld.deltaText, "+50");
+    assert.equal(withheld.previousText, "100");
+    assert.equal(withheld.reasonText, "The current period is not over yet");
+    assert.doesNotMatch(JSON.stringify(withheld), /Up|Down/);
+    const zero = describeComparison(3, 0, { percent_allowed: false, reason: "previous_zero" });
+    assert.equal(zero.previousText, "0");
+    assert.equal(zero.reasonText, "No activity in the previous period");
+    assert.equal(describeComparison(3, 4, undefined).percent, null);
 });
 
 test("the comparison line is dashed and aligned with the current period by index", () => {

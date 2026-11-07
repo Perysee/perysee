@@ -96,7 +96,9 @@ class Reports
         $verdict = [];
         foreach (['pageviews', 'sessions', 'custom_events'] as $metric) {
             $reason = null;
-            if ($includesToday) {
+            if ($metric === 'sessions' && ($current['totals'][$metric] === null || $previous['totals'][$metric] === null)) {
+                $reason = 'unavailable';
+            } elseif ($includesToday) {
                 $reason = 'current_period';
             } elseif (($previous['totals'][$metric] ?? 0) === 0) {
                 $reason = 'previous_zero';
