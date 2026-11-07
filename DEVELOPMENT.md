@@ -34,7 +34,6 @@ Les fonctionnalités optionnelles sont des modules (guide : documentation, `Modu
 - **Nouveau module** : `php artisan perysee:make-module <id>` crée le squelette dans le dossier des modules ; le déplacer dans `modules/` pour le versionner. Préfixer les tables et les noms de migration par l'identifiant (les noms de migration sont communs à tous les modules).
 - **Tests** : `php artisan test --compact --filter=Module` (registre, chargeur, installation, périmètre, extensions, pages d'administration, robustesse), `AnnotationsModuleTest`, `WhiteLabelModuleTest`, `ExampleModuleTest`, `MakeModuleTest`, et `npm run test:charts` (hôte JavaScript, rendu des modules). Un module qui s'appuie sur un autre sujet de test charge `base_path('modules')` via `perysee.modules_path`.
 - **Avant de livrer un module** : activation sans erreur de chargement, refus des rôles insuffisants, absence hors du périmètre choisi, activation répétée sans seconde migration, désinstallation limitée à ses tables. Le guide public donne la même liste.
-- **Limites actuelles** : pas de téléchargement, de signature ni de droits par module. La suite MariaDB (`composer test:mariadb`) n'a pas encore été lancée sur ces migrations.
 
 ## Développement local — environnement et démonstrations
 
@@ -57,7 +56,7 @@ npm run build
 php artisan serve
 ```
 
-Le premier démarrage SQL peut prendre quelques secondes : relancer `health` avant de continuer. Ouvrir [localhost:8000/install](http://localhost:8000/install), récupérer le secret dans `storage/app/private/installation/secret`, puis suivre les étapes. Le fichier apparaît à la première ouverture de l’assistant. Utiliser les paramètres MariaDB locaux ci-dessous et le mot de passe de `infra/mariadb/.env`. L’assistant applique les migrations : aucune migration préalable n’est nécessaire.
+Le premier démarrage SQL peut prendre quelques secondes : relancer `health` avant de continuer. Ouvrir [localhost:8000/install](http://localhost:8000/install), récupérer le secret dans `storage/app/private/installation/secret` (ou lancer `php artisan perysee:install --browser --url=http://localhost:8000`, qui affiche un lien `/install#secret=…` déjà déverrouillé), puis suivre les étapes. Sans navigateur, `php artisan perysee:install` fait tout dans le terminal (voir [Installateur](#installateur)). Le fichier apparaît à la première ouverture de l’assistant. Utiliser les paramètres MariaDB locaux ci-dessous et le mot de passe de `infra/mariadb/.env`. L’assistant applique les migrations : aucune migration préalable n’est nécessaire.
 
 | Élément | Valeur locale |
 | --- | --- |
@@ -81,7 +80,7 @@ npm run build
 php artisan migrate:status
 ```
 
-La suite rapide utilise SQLite en mémoire. Pour valider les migrations et le parcours complet avec MariaDB 11.4 :
+La suite rapide utilise SQLite en mémoire. Pour valider les migrations et le parcours complet avec MariaDB 11.4 (la CI exécute aussi 10.11 et 11.8, voir `App\Installation\DatabaseVersion`) :
 
 ```sh
 bash scripts/mariadb.sh test-db
@@ -163,7 +162,26 @@ Le banc HTTP local démarre quatre workers du serveur PHP sur 127.0.0.1:18743 et
 
 Le workflow manuel `Internal performance laboratory` reproduit ces profils et conserve le JSON en artifact privé. Il ne publie aucun engagement commercial. Les résultats de référence sont dans `scripts/benchmarks/results-2026-10-25.json` ; leurs limites et l'interruption du premier client sont détaillées dans le fichier associé. Un test court permet uniquement de vérifier le banc, pas de conclure sur un percentile.
 
+## Installateur
+
+`curl -fsSL https://get.perysee.com | bash` télécharge `install.sh`, épinglé à sa version lors du build. Sans `--mode`, un terminal permet de choisir `cpanel`, `docker` ou `manual` (le mode que la machine suggère est proposé par défaut ; `--yes` sans `--mode` garde le mode manuel). Une version précise s'installe par son adresse : `https://get.perysee.com/releases/vX.Y.Z/install.sh`.
+
+| Élément | Rôle |
+| --- | --- |
+| `scripts/install.sh` | Choix du mode, recherche d'un PHP CLI 8.3+ (`PERYSEE_PHP`, `php`, `php8.x`, `/opt/cpanel/ea-php*`), vérification des fichiers contre `SHA256SUMS`. La branche Docker est du shell pur : ni PHP ni registre Perysee. |
+| `scripts/install.php` | Télécharge/vérifie/extrait le ZIP (jamais d'écrasement), puis termine selon `--finish` (`browser`, `terminal` ou `none`). Mode `cpanel` : `--domain` obligatoire, termine par `perysee:install --cpanel`. |
+| `perysee:install` (`app/Console/Commands/InstallApplication.php`) | Installation complète au terminal ; `--browser` affiche le lien `/install#secret=…` ; `--cpanel --domain=` prépare le compte puis installe. Mots de passe par `PERYSEE_DB_PASSWORD`, `PERYSEE_ADMIN_PASSWORD` ou invite masquée, jamais en argument. |
+| `app/Installation/Cpanel/` | `UapiClient` (commande locale `uapi`, mot de passe de base sur l'entrée standard), `CpanelProvisioner` (sous-domaine, base, utilisateur, PHP, cron ; ne crée que du nouveau et ne supprime que ce qu'il a créé). |
+| `app/Installation/DatabaseVersion.php` | Séries MariaDB prises en charge (10.11, 11.4, 11.8). Ajouter une série impose de l'ajouter à la matrice de `.github/workflows/ci.yml`. MySQL n'est pas pris en charge : verrous et upserts supposent le pilote `mariadb`. |
+| `docker/` | `Dockerfile`, `compose.yaml`, `docker-entrypoint.sh`, publiés avec la release (dans `SHA256SUMS`). L'image est construite chez l'utilisateur depuis le ZIP vérifié. `PERYSEE_INSTALL_MODE=docker` désactive la mise à jour sur place ; mise à jour par `install.sh --mode docker --upgrade --target <dossier>`. |
+
+Tests : `php artisan test` (commande, provisionnement avec `uapi` simulé par `Process::fake`), `npm run test:distribution` (le build de release, `install.php`, `install.sh` avec `curl`, `docker` et un terminal simulés par `PERYSEE_TTY`). La CI de release installe le vrai ZIP contre une base MariaDB éphémère et construit l'image Docker.
+
+`get.perysee.com` redirige vers les fichiers de la release : `install.sh`, `install.php`, `perysee.zip`, `SHA256SUMS`, `Dockerfile`, `compose.yaml` et `docker-entrypoint.sh` (règles dans `Perysee/web`, `infra/get`).
+
 ## Mise à jour, sauvegarde et retour arrière
+
+Une instance Docker (`PERYSEE_INSTALL_MODE=docker`) refuse la mise à jour décrite ci-dessous : le code vit dans l'image, il se remplace avec `install.sh --mode docker --upgrade`.
 
 ### Ce que fait la mise à jour assistée
 
@@ -245,8 +263,7 @@ Les composants sont dans `resources/js/Components/`, la coque persistante dans `
 
 `npm run build` compile l’ensemble dans `public/build/` ; le ZIP embarque ces fichiers et le paquet PHP Inertia dans vendor. L’hébergement exécute PHP et le cron habituel, sans npm, Node ou processus SSR. JavaScript est requis pour l’administration ; la collecte indépendante garde son contrat existant. Les anciennes vues Blade non routées restent provisoirement en place, sans constituer un deuxième rendu applicatif.
 
-Validation : tests Inertia de navigation, droits, absence de secrets, erreurs de formulaires et dates selon le site ; suites PHP/MariaDB et Tracker ; contrôle navigateur du calendrier au clavier, des filtres IA, de la carte, des formulaires et de la navigation mobile. Le calendrier et les tableaux n’utilisent aucun service externe. Les poids et résultats finaux sont consignés dans `docs/SUIVI-FONCTIONNALITES.md`. La compatibilité sur un mutualisé réel reste à qualifier.
-
+Validation : tests Inertia de navigation, droits, absence de secrets, erreurs de formulaires et dates selon le site ; suites PHP/MariaDB et Tracker ; contrôle navigateur du calendrier au clavier, des filtres IA, de la carte, des formulaires et de la navigation mobile. Le calendrier et les tableaux n’utilisent aucun service externe. Les poids et résultats finaux sont consignés dans `docs/SUIVI-FONCTIONNALITES.md`.
 Pour contrôler un installateur ZIP dans le même navigateur que l’instance de développement, utiliser un autre nom d’hôte (par exemple `localhost` si l’application utilise `127.0.0.1`) ou définir un `SESSION_COOKIE` de test distinct avant son premier démarrage. Les cookies ne sont pas isolés par port : deux instances Perysee sur le même hôte peuvent se remplacer leur cookie de session. Le contrôle de production doit conserver les exigences HTTPS et document root ; ne pas les contourner pour terminer un smoke HTTP local.
 
 
