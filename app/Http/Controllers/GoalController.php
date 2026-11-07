@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Aggregation\Goals;
 use App\Analytics\Privacy\NormalizePath;
 use App\Analytics\Reporting\GoalReports;
 use App\Analytics\Reporting\Reports;
@@ -46,7 +47,10 @@ class GoalController extends Controller
 
     private function version(Website $site, int $goal, int $version, array $data): void
     {
-        DB::table('goal_versions')->insert(['website_id' => $site->id, 'goal_id' => $goal, 'version' => $version, 'type' => $data['type'], 'value' => $data['value'], 'threshold' => $data['threshold'], 'snapshot_id' => (int) DB::table('events')->where('website_id', $site->id)->max('id'), 'created_at' => now('UTC')]);
+        $snapshot = (int) DB::table('events')->where('website_id', $site->id)->max('id');
+        DB::table('goal_versions')->insert(['website_id' => $site->id, 'goal_id' => $goal, 'version' => $version, 'type' => $data['type'], 'value' => $data['value'], 'threshold' => $data['threshold'], 'snapshot_id' => $snapshot, 'created_at' => now('UTC')]);
+        // Events that already exist are counted by the scheduler; later ones by the aggregator.
+        app(Goals::class)->queueBackfill($site->id, $goal, $version, $snapshot);
     }
 
     public function index(Request $request, Website $website, Reports $reports): Response
