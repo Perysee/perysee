@@ -72,6 +72,24 @@ class AccessLogTest extends TestCase
         $this->assertStringNotContainsString('pasted-secret', json_encode(AccessLogEntry::all()->toArray()));
     }
 
+    public function test_a_visitor_cannot_fill_the_journal_with_failed_attempts(): void
+    {
+        foreach (range(1, 25) as $n) {
+            $this->post('/login', ['email' => 'nobody'.$n.'@example.test', 'password' => 'incorrect']);
+        }
+        $this->assertSame(10, AccessLogEntry::whereNull('user_id')->where('event', 'login.failed')->count());
+
+        // A known account is capped too, whatever the number of sign-in attempts spread over time.
+        $user = User::factory()->create();
+        foreach (range(1, 8) as $round) {
+            foreach (range(1, 5) as $ignored) {
+                $this->post('/login', ['email' => $user->email, 'password' => 'incorrect']);
+            }
+            $this->travel(61)->seconds();
+        }
+        $this->assertSame(30, AccessLogEntry::where('user_id', $user->id)->where('event', 'login.failed')->count());
+    }
+
     public function test_a_throttled_attempt_is_not_logged_again(): void
     {
         $user = User::factory()->create();
