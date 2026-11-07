@@ -54,6 +54,9 @@ class ApiTokenManagementTest extends TestCase
         $this->assertSame(substr($secret, -6), $row->token_hint);
         $this->assertSame(0, DB::table('api_tokens')->where('token_hash', $secret)->count());
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        // The page that carries the secret asks the browser to encrypt and clear its history entries.
+        $this->assertTrue($response->viewData('page')['encryptHistory']);
+        $this->assertTrue($response->viewData('page')['clearHistory']);
         // The secret is shown once, and the listing never carries it.
         $again = $this->get('/sites/'.$site->id.'/api-tokens');
         $again->assertInertia(fn (Assert $page) => $page->where('created', null));

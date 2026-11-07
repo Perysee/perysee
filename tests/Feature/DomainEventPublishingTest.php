@@ -175,6 +175,31 @@ class DomainEventPublishingTest extends TestCase
         $this->assertSame([], $this->received);
     }
 
+    public function test_conversions_of_batches_already_committed_are_announced_once_when_a_later_batch_fails(): void
+    {
+        $this->listenTo(GoalConverted::class, AggregationCompleted::class, BacklogExceeded::class);
+        $site = $this->site();
+        $goal = $this->goal($site, 'signup');
+        $this->pageview($site, 's1', '2026-10-24 10:00:00');
+        $this->named($site, 's1', '2026-10-24 10:01:00', 'signup');
+        // Batch 2 (two events per batch) fails: its site does not exist.
+        DB::table('events')->insert(['website_id' => 999999, 'received_at' => '2026-10-24 10:02:00', 'event_type' => 1, 'path' => '/', 'tracking_mode' => 'sessions', 'session_key' => 'x', 'consent_given' => true]);
+
+        try {
+            app(Aggregator::class)->run(2);
+            $this->fail('The second batch must fail the pass.');
+        } catch (RuntimeException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame(1, (int) DB::table('stats_goal_daily')->sum('conversions'), 'The first batch is committed.');
+        $converted = $this->payloads('goal.converted');
+        $this->assertCount(1, $converted, 'The committed conversion is announced exactly once.');
+        $this->assertSame(['site_id' => $site->id, 'goal_id' => $goal, 'conversions' => 1], array_intersect_key($converted[0], array_flip(['site_id', 'goal_id', 'conversions'])));
+        $this->assertSame([], $this->payloads('aggregation.completed'), 'A failed pass is not a completed one.');
+        $this->assertSame([], $this->payloads('ingest.backlog_exceeded'));
+    }
+
     public function test_events_are_delivered_after_the_data_is_committed_and_a_failing_listener_does_not_change_the_pass(): void
     {
         $site = $this->site();

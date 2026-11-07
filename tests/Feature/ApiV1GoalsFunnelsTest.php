@@ -78,9 +78,11 @@ class ApiV1GoalsFunnelsTest extends TestCase
         $this->assertSame(['id', 'name', 'archived', 'version', 'type', 'value', 'threshold'], array_keys($api['data']['goal']));
         $this->assertSame($internal['goal'], $api['data']['goal']);
         $this->assertSame(['from' => '2026-10-24', 'to' => '2026-10-26'], $api['data']['period']);
-        foreach (['mode', 'totals', 'series', 'breakdown', 'coverage'] as $key) {
+        foreach (['mode', 'totals', 'series', 'coverage'] as $key) {
             $this->assertSame($internal[$key], $api['data']['report'][$key], $key);
         }
+        // This token reads goals and countries only, so only the country breakdown is returned (see the scope tests below).
+        $this->assertSame(array_intersect_key($internal['breakdown'], ['country' => true]), $api['data']['report']['breakdown']);
         $this->assertSame(['mode', 'totals', 'series', 'breakdown', 'coverage'], array_keys($api['data']['report']));
         $this->assertSame(1, $api['data']['report']['totals']['conversions']);
         // A version that does not exist, a filter outside the scopes and an invalid period.
@@ -89,6 +91,27 @@ class ApiV1GoalsFunnelsTest extends TestCase
         $this->getJson('/api/v1/goals/'.$goal.$range.'&filters[country][]=FR', $this->auth)->assertOk();
         $this->getJson('/api/v1/goals/'.$goal.$range.'&filters[device][]=mobile', $this->auth)->assertForbidden()->assertJsonPath('error.details.required', 'devices');
         $this->getJson('/api/v1/goals/'.$goal.'?from=2026-10-26&to=2026-10-20', $this->auth)->assertStatus(422);
+    }
+
+    public function test_the_breakdowns_of_a_goal_follow_the_scopes_of_the_token(): void
+    {
+        $goal = $this->goal($this->site);
+        $this->event('s1', '10:00:00', 2, 'signup');
+        app(Aggregator::class)->run();
+        $range = '?from=2026-10-24&to=2026-10-26';
+        $bearer = fn (array $scopes): array => ['Authorization' => 'Bearer '.ApiToken::issue($this->site, null, 'T', $scopes, 60, null)[1]];
+
+        $goalsOnly = $this->getJson('/api/v1/goals/'.$goal.$range, $bearer(['goals']))->assertOk()->json('data.report');
+        $this->assertSame([], $goalsOnly['breakdown']);
+        $this->assertArrayHasKey('totals', $goalsOnly);
+
+        $withCountries = $this->getJson('/api/v1/goals/'.$goal.$range, $bearer(['goals', 'countries']))->assertOk()->json('data.report');
+        $this->assertSame(['country'], array_keys($withCountries['breakdown']));
+
+        $all = $this->getJson('/api/v1/goals/'.$goal.$range, $bearer(['goals', 'sources', 'campaigns', 'countries', 'devices']))->assertOk()->json('data.report');
+        $internal = $this->actingAs($this->owner)->getJson('/api/sites/'.$this->site->id.'/goals/'.$goal.$range)->json();
+        $this->assertSame($internal['breakdown'], $all['breakdown']);
+        $this->assertSame(['source', 'campaign', 'country', 'device'], array_keys($all['breakdown']));
     }
 
     public function test_a_goal_of_another_site_is_a_404_identical_to_an_unknown_one(): void
@@ -194,5 +217,27 @@ class ApiV1GoalsFunnelsTest extends TestCase
         DB::table('journey_reports')->insert(['website_id' => $this->site->id, 'cache_key' => str_pad('scanning', 64, '0'), 'status' => 'scanning', 'snapshot_id' => 1, 'payload' => json_encode($payload), 'result' => $result(77), 'created_at' => now(), 'updated_at' => now()]);
 
         $this->getJson('/api/v1/funnels/'.$id.'?from=2026-10-24&to=2026-10-26', $this->auth)->assertOk()->assertJsonPath('data.result.entries', 22);
+    }
+
+    public function test_the_candidates_are_scanned_without_loading_their_result_column(): void
+    {
+        $id = $this->funnel();
+        $payload = ['kind' => 'funnel', 'funnel_id' => $id, 'version' => 1, 'steps' => [], 'from' => '2026-10-24 00:00:00', 'to' => '2026-10-27 00:00:00', 'filters' => []];
+        foreach ([1, 2, 3] as $n) {
+            DB::table('journey_reports')->insert(['website_id' => $this->site->id, 'cache_key' => str_pad('c'.$n, 64, '0'), 'status' => 'ready', 'snapshot_id' => 1, 'payload' => json_encode($payload), 'result' => json_encode(['entries' => $n]), 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $selects = [];
+        DB::listen(function ($query) use (&$selects): void {
+            if (str_contains($query->sql, 'from "journey_reports"') || str_contains($query->sql, 'from `journey_reports`')) {
+                $selects[] = $query->sql;
+            }
+        });
+        $period = ['start' => now('UTC')->setDate(2026, 10, 24)->startOfDay(), 'end' => now('UTC')->setDate(2026, 10, 27)->startOfDay(), 'filters' => []];
+
+        $report = app(JourneyReports::class)->latestReady($this->site, $id, 1, $period);
+
+        $this->assertSame(['entries' => 3], json_decode($report->result, true));
+        $this->assertCount(2, $selects);
+        $this->assertStringNotContainsString('result', $selects[0]);
     }
 }

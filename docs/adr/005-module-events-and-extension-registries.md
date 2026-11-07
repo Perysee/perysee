@@ -21,6 +21,7 @@ Modules could add screens, navigation, branding and health cards, but not react 
 ## Consequences
 
 - Alerting and digest modules, and the Slack, Telegram and webhook channels, can be built outside the Core. None of them is part of this change.
+- A pass that fails after some batches were committed still announces the `goal.converted` of those batches (once); `aggregation.completed` and `ingest.backlog_exceeded` describe a pass that ended and are not published. The failed batch rolled back and its events are retried by the next pass, which announces their conversions then.
 - Delivery can be lost (crash between commit and publication, a listener that fails) and is never repeated. Modules must treat events as hints and read the data when they need certainty.
 - A slow listener delays the scheduler pass that published (cron) or the end of the request of the administrator who triggered the action (HTTP, after the response under FPM), never a visitor's request.
 - `member_id` in `team.invitation_accepted` is an internal identifier. It is the only user-related field; removing it later would need a new schema.

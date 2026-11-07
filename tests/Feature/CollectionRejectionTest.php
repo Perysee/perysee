@@ -96,6 +96,19 @@ class CollectionRejectionTest extends TestCase
         $this->assertSame(0, $this->rows()->where('website_id', 0)->count());
     }
 
+    public function test_the_invalid_noise_of_one_site_does_not_starve_the_evidence_of_another(): void
+    {
+        $noisy = Website::factory()->create();
+        $quiet = Website::factory()->create();
+        foreach (range(1, RejectionLog::WRITES_PER_MINUTE + 5) as $ignored) {
+            $this->send($noisy, ['v' => 2])->assertStatus(422);
+        }
+        $this->send($quiet, ['v' => 2])->assertStatus(422);
+
+        $this->assertSame(1, $this->rows($quiet)->count());
+        $this->assertSame(RejectionLog::WRITES_PER_MINUTE, (int) $this->rows($noisy)->first()->hits);
+    }
+
     public function test_a_forged_site_key_is_never_stored(): void
     {
         $site = Website::factory()->create();

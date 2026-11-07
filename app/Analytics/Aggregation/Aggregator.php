@@ -62,6 +62,10 @@ class Aggregator
             // Module events (ADR 005): after the commit and the unlock, never inside a transaction; they never throw.
             if ($completed) {
                 $pass->finish($count, $processed > 0, $sites === null);
+            } else {
+                // The pass failed, but its earlier batches are committed: their conversions are still announced
+                // (not the completion or the backlog, which describe a pass that ended).
+                $pass->publishConversions();
             }
         }
     }

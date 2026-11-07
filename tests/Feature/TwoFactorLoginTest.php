@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\TwoFactorChallengeController;
 use App\Installation\InstallationState;
 use App\Models\AccessLogEntry;
 use App\Models\User;
@@ -281,5 +282,33 @@ class TwoFactorLoginTest extends TestCase
         $this->post('/login/two-factor', ['code' => $this->totp($this->secret)])->assertRedirect('/login');
         $this->assertGuest();
         $this->assertFalse(Auth::check());
+    }
+
+    public function test_the_attempt_is_counted_before_the_code_is_checked_and_forgiven_on_success(): void
+    {
+        $this->passPassword();
+        $key = TwoFactorChallengeController::userKey($this->user);
+        $seen = new \ArrayObject;
+        // The limiter is read from inside the verification: a parallel request would already see this attempt.
+        app()->instance(Google2FA::class, new class($seen, $key) extends Google2FA
+        {
+            public function __construct(private \ArrayObject $seen, private string $key) {}
+
+            public function oathTotp($secret, $counter, $oathLength = null)
+            {
+                $this->seen[] = RateLimiter::attempts($this->key);
+
+                return parent::oathTotp($secret, $counter, $oathLength);
+            }
+        });
+        app()->forgetInstance(TwoFactor::class);
+
+        $this->post('/login/two-factor', ['code' => '000000'])->assertSessionHasErrors('code');
+        $this->assertNotEmpty($seen->getArrayCopy());
+        $this->assertSame(1, $seen[0], 'The failure is counted before the check.');
+        $this->assertSame(1, RateLimiter::attempts($key), 'A failure is counted once.');
+
+        $this->post('/login/two-factor', ['code' => $this->totp($this->secret)])->assertRedirect();
+        $this->assertSame(0, RateLimiter::attempts($key), 'A success clears the counter.');
     }
 }

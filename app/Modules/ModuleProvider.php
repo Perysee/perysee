@@ -6,6 +6,7 @@ namespace App\Modules;
 
 use App\Http\Middleware\EnsureInstalled;
 use App\Http\Middleware\EnsureModuleActiveForSite;
+use App\Http\Middleware\RequireTwoFactor;
 use App\Modules\Contracts\DomainEvent;
 use App\Modules\Contracts\NotificationChannel;
 use App\Modules\Contracts\ReportSource;
@@ -31,12 +32,12 @@ abstract class ModuleProvider extends ServiceProvider
     }
 
     /**
-     * Routes are served under /modules/{id}, for signed-in users, with route names prefixed by "{id}.".
+     * Routes are served under /modules/{id}, for signed-in users (who must have a second factor when the instance requires one), with route names prefixed by "{id}.".
      */
     protected function loadModuleRoutes(string $file): void
     {
         $id = $this->module->manifest->id;
-        Route::middleware(['web', EnsureInstalled::class, 'auth', EnsureModuleActiveForSite::class.':'.$id])
+        Route::middleware(['web', EnsureInstalled::class, 'auth', RequireTwoFactor::class, EnsureModuleActiveForSite::class.':'.$id])
             ->prefix('modules/'.$id)
             ->name($id.'.')
             ->group($file);
