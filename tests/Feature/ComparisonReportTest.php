@@ -297,4 +297,37 @@ class ComparisonReportTest extends TestCase
             $this->assertNotContains('2026-10-11', $query['bindings'], 'A query read the previous period: '.$query['sql']);
         }
     }
+
+    public function test_api_overview_includes_comparison_only_when_requested(): void
+    {
+        $site = $this->memberSite();
+        $this->day($site, '2026-10-20', 10);
+        $this->day($site, '2026-10-13', 4);
+        $range = '?from=2026-10-18&to=2026-10-24';
+        $reports = app(Reports::class);
+        $expected = $reports->overview($site, $reports->period(Request::create('/', 'GET', ['from' => '2026-10-18', 'to' => '2026-10-24']), $site));
+
+        $off = $this->getJson('/api/sites/'.$site->id.'/overview'.$range)->assertOk();
+        $this->assertSame(json_encode($expected), $off->baseResponse->getContent());
+        $off->assertJsonMissingPath('comparison');
+
+        $this->getJson('/api/sites/'.$site->id.'/overview'.$range.'&compare=previous')->assertOk()
+            ->assertJsonPath('totals.pageviews', 10)
+            ->assertJsonPath('comparison.period.from', '2026-10-11')
+            ->assertJsonPath('comparison.totals.pageviews', 4)
+            ->assertJsonPath('comparison.reliability.pageviews.percent_allowed', true);
+        $this->getJson('/api/sites/'.$site->id.'/timeseries'.$range.'&compare=previous')->assertOk()->assertJsonMissingPath('comparison');
+        $this->getJson('/api/sites/'.$site->id.'/overview'.$range.'&compare=year')->assertStatus(422);
+    }
+
+    public function test_csv_export_ignores_compare(): void
+    {
+        $site = $this->memberSite();
+        $this->day($site, '2026-10-20', 10);
+        $range = '?from=2026-10-18&to=2026-10-24';
+
+        $plain = $this->get('/sites/'.$site->id.'/export'.$range)->assertOk()->streamedContent();
+        $compared = $this->get('/sites/'.$site->id.'/export'.$range.'&compare=previous')->assertOk()->streamedContent();
+        $this->assertSame($plain, $compared);
+    }
 }
