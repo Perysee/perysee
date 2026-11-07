@@ -39,4 +39,11 @@ return [
     'landing_url' => env('PERYSEE_LANDING_URL', 'https://perysee.com'),
     'docs_url' => env('PERYSEE_DOCS_URL', 'https://docs.perysee.com'),
     'repository_url' => env('PERYSEE_REPOSITORY_URL', 'https://github.com/Perysee/perysee'),
+    // Read API (/api/v1): requests a minute per token (an owner picks within min..max) and an optional ceiling on a token's lifetime.
+    'api' => [
+        'default_rate' => 60,
+        'min_rate' => 10,
+        'max_rate' => (int) env('PERYSEE_API_MAX_RATE', 300),
+        'max_expiry_days' => env('PERYSEE_API_MAX_EXPIRY_DAYS') !== null ? (int) env('PERYSEE_API_MAX_EXPIRY_DAYS') : null,
+    ],
 ];
