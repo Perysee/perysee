@@ -79,7 +79,7 @@ class Reports
         return [
             'period' => ['from' => $previous['from'], 'to' => $previous['to']],
             'totals' => $overview['totals'],
-            'series' => $this->series($site, $previous),
+            'series' => $this->alignSeries($site, $previous, $period, $this->series($site, $previous)),
             'availability' => $overview['availability'],
             'coverage' => $overview['coverage'],
             'freshness' => $overview['freshness'],
@@ -144,12 +144,15 @@ class Reports
         return ! empty($period['filters']) ? app(SegmentReports::class)->overview($site, $period, $base) : $base;
     }
 
-    public function series(Website $site, array $period): array
+    /**
+     * The buckets of a period keyed as in the stats tables: UTC hours (labelled in site time) or local dates.
+     *
+     * @return array<string, string>
+     */
+    private function bucketKeys(Website $site, array $period): array
     {
-        $hourly = $period['granularity'] === 'hour';
-        $rows = DB::table($hourly ? 'stats_hourly' : 'stats_daily')->where('website_id', $site->id)->whereBetween('stat_date', [$period['from'], $period['to']])->orderBy($hourly ? 'bucket_start' : 'stat_date')->get()->keyBy($hourly ? 'bucket_start' : 'stat_date');
         $keys = [];
-        if ($hourly) {
+        if ($period['granularity'] === 'hour') {
             for ($cursor = $period['start']->copy(); $cursor->lt($period['end']); $cursor->addMinute()) {
                 $hour = $cursor->copy()->setTimezone($site->timezone)->startOfHour()->utc()->toDateTimeString();
                 $keys[$hour] = Carbon::parse($hour, 'UTC')->setTimezone($site->timezone)->format('H:i T');
@@ -159,6 +162,45 @@ class Reports
                 $keys[$day->toDateString()] = $day->toDateString();
             }
         }
+
+        return $keys;
+    }
+
+    /**
+     * Number the points of the previous series by the slot of the current period they line up with: the day rank, or
+     * the local hour of the day (so 23 and 25 hour days leave the missing slot empty instead of shifting the rest).
+     *
+     * @param  list<array<string, mixed>>  $series
+     * @return list<array<string, mixed>>
+     */
+    private function alignSeries(Website $site, array $period, array $current, array $series): array
+    {
+        $slots = [];
+        if ($period['granularity'] === 'hour') {
+            foreach (array_values($this->bucketKeys($site, $current)) as $rank => $label) {
+                $slots[substr($label, 0, 5)] ??= $rank;
+            }
+        }
+        foreach ($series as $index => &$point) {
+            $point['rank'] = $period['granularity'] === 'hour' ? ($slots[substr($point['label'], 0, 5)] ?? null) : $index;
+            $point['day'] = $period['granularity'] === 'hour' ? Carbon::parse($point['date'], 'UTC')->setTimezone($site->timezone)->toDateString() : $point['date'];
+        }
+        if ($period['granularity'] === 'hour') {
+            $seen = [];
+            foreach ($series as &$point) {
+                $point['rank'] = isset($seen[$point['rank']]) ? null : $point['rank'];
+                $seen[$point['rank']] = true;
+            }
+        }
+
+        return $series;
+    }
+
+    public function series(Website $site, array $period): array
+    {
+        $hourly = $period['granularity'] === 'hour';
+        $rows = DB::table($hourly ? 'stats_hourly' : 'stats_daily')->where('website_id', $site->id)->whereBetween('stat_date', [$period['from'], $period['to']])->orderBy($hourly ? 'bucket_start' : 'stat_date')->get()->keyBy($hourly ? 'bucket_start' : 'stat_date');
+        $keys = $this->bucketKeys($site, $period);
         $history = $this->measurementPeriods($site, $period);
         $series = [];
         foreach ($keys as $key => $label) {

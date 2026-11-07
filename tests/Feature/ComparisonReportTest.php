@@ -197,4 +197,57 @@ class ComparisonReportTest extends TestCase
             ->where('comparison.segment_coverage.missing_sessions', 0)
             ->where('comparison.reliability.sessions.reason', 'partial_coverage'));
     }
+
+    private function comparisonFor(Website $site, array $query): array
+    {
+        $reports = app(Reports::class);
+
+        return $reports->comparison($site, $reports->period(Request::create('/', 'GET', $query), $site));
+    }
+
+    public function test_previous_period_across_dst_and_leap_year(): void
+    {
+        $site = $this->memberSite();
+
+        $year = $this->comparisonFor($site, ['from' => '2026-01-01', 'to' => '2026-01-07']);
+        $this->assertSame(['2025-12-25', '2025-12-31'], [$year['period']['from'], $year['period']['to']]);
+        $this->assertSame(range(0, 6), array_column($year['series'], 'rank'));
+        $this->assertSame('2025-12-25', $year['series'][0]['date']);
+
+        $leap = $this->comparisonFor($site, ['from' => '2024-03-01', 'to' => '2024-03-07']);
+        $this->assertSame(['2024-02-23', '2024-02-29'], [$leap['period']['from'], $leap['period']['to']]);
+        $this->assertCount(7, $leap['series']);
+
+        $site->forceFill(['timezone' => 'Europe/Paris'])->save();
+        $autumn = $this->comparisonFor($site, ['from' => '2026-10-25', 'to' => '2026-10-25']);
+        $this->assertSame(['2026-10-24', '2026-10-24'], [$autumn['period']['from'], $autumn['period']['to']]);
+        $byRank = array_column($autumn['series'], 'label', 'rank');
+        $this->assertCount(24, $autumn['series']);
+        $this->assertSame('02:00 CEST', $byRank[2]);
+        $this->assertArrayNotHasKey(3, $byRank, 'the repeated 02:00 of the 25-hour day has no counterpart');
+        $this->assertSame('03:00 CEST', $byRank[4]);
+        $this->assertSame('23:00 CEST', $byRank[24]);
+
+        $spring = $this->comparisonFor($site, ['from' => '2026-03-29', 'to' => '2026-03-29']);
+        $byRank = array_column(array_filter($spring['series'], fn (array $point): bool => $point['rank'] !== null), 'label', 'rank');
+        $this->assertSame('03:00 CET', $byRank[2], 'slot 2 of the 23-hour day is 03:00');
+        $this->assertSame('23:00 CET', $byRank[22]);
+        $this->assertCount(23, $byRank);
+
+        $day = $this->comparisonFor($site, ['from' => '2026-06-10', 'to' => '2026-06-10']);
+        $this->assertSame(['2026-06-09', '2026-06-09'], [$day['period']['from'], $day['period']['to']]);
+        $this->assertCount(24, $day['series']);
+    }
+
+    public function test_purged_previous_history_is_unavailable_not_zero(): void
+    {
+        $site = $this->memberSite();
+        $this->measured($site, '2026-10-18 00:00:00');
+        DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => '2026-10-20', 'pageviews' => 3, 'session_pageviews' => 3, 'sessions' => 2]);
+
+        $comparison = $this->comparisonFor($site, ['from' => '2026-10-18', 'to' => '2026-10-24']);
+        $this->assertNull($comparison['totals']['sessions']);
+        $this->assertNull($comparison['series'][0]['sessions']);
+        $this->assertSame('unavailable', $comparison['series'][0]['session_availability']);
+    }
 }
