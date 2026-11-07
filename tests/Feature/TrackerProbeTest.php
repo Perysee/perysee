@@ -7,10 +7,11 @@ use App\Analytics\Ingestion\ProbeToken;
 use App\Installation\InstallationState;
 use App\Models\User;
 use App\Models\Website;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class TrackerProbeTest extends TestCase
@@ -116,7 +117,12 @@ class TrackerProbeTest extends TestCase
     public function test_a_database_failure_during_the_probe_is_not_acknowledged(): void
     {
         $site = Website::factory()->create();
-        Schema::drop('collection_diagnostics');
+        // No DDL here: on MariaDB it would end the test transaction and destroy the shared table.
+        Event::listen(QueryExecuted::class, function ($query): void {
+            if (str_contains($query->sql, 'collection_diagnostics')) {
+                throw new \RuntimeException('diagnostics are unavailable');
+            }
+        });
 
         $this->probe($site, $this->token($site))->assertStatus(503);
     }

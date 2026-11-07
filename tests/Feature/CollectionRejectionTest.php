@@ -7,9 +7,11 @@ use App\Analytics\InstanceHealth;
 use App\Installation\InstallationState;
 use App\Models\Website;
 use App\Support\Coordination;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -157,7 +159,12 @@ class CollectionRejectionTest extends TestCase
     public function test_a_failing_recorder_does_not_change_the_answer(): void
     {
         $site = Website::factory()->create();
-        Schema::drop('collection_diagnostics');
+        // No DDL here: on MariaDB it would end the test transaction and destroy the shared table.
+        Event::listen(QueryExecuted::class, function ($query): void {
+            if (str_contains($query->sql, 'collection_diagnostics')) {
+                throw new \RuntimeException('diagnostics are unavailable');
+            }
+        });
 
         $this->send($site, [], 'https://outsider.example')->assertForbidden();
         $this->send($site, ['v' => 2])->assertStatus(422);
