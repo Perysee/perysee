@@ -41,7 +41,7 @@ class Ui
             $data['databaseDefaults'] = collect(config('database.connections.mariadb'))->only(['host', 'port', 'database', 'username'])->all();
         }
         // Displayed as text, so they keep their absolute form: the tracking snippet and the instance settings.
-        $verbatim = array_intersect_key($data, array_flip(['snippet', 'settings']));
+        $verbatim = array_intersect_key($data, array_flip(['snippet', 'settings', 'invitationLink']));
         $data = $verbatim + self::relativize($data);
         foreach (['websites', 'sites'] as $key) {
             if (isset($data[$key])) {
@@ -72,7 +72,7 @@ class Ui
     private static function siteLinks(Website $site): array
     {
         $links = [];
-        foreach (['filter-options', 'show', 'edit', 'tracking', 'export', 'favicon', 'update', 'destroy'] as $action) {
+        foreach (['filter-options', 'show', 'edit', 'tracking', 'team', 'export', 'favicon', 'update', 'destroy'] as $action) {
             $links[$action] = route('sites.'.$action, $site);
         }
         foreach (['pages', 'sources', 'campaigns', 'devices', 'countries', 'events', 'sessions', 'realtime'] as $section) {

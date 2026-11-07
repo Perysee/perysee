@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class TeamManagementTest extends TestCase
@@ -52,6 +53,33 @@ class TeamManagementTest extends TestCase
 
         $this->post('/sites/'.$site->id.'/invitations', ['email' => 'b@example.com', 'role' => 'admin'])->assertSessionHasErrors('role');
         $this->post('/sites/'.$site->id.'/invitations', ['email' => $owner->email, 'role' => 'viewer'])->assertSessionHasErrors('email');
+    }
+
+    public function test_the_team_screen_lists_members_and_pending_invitations_for_owners_only(): void
+    {
+        [$site, $owner] = $this->siteWith('owner');
+        $viewer = User::factory()->create(['name' => 'Vera Viewer']);
+        $site->members()->attach($viewer, ['role' => 'viewer']);
+        SiteInvitation::issue($site, 'pending@example.com', 'viewer', $owner);
+        [$settled] = SiteInvitation::issue($site, 'revoked@example.com', 'viewer', $owner);
+        $settled->forceFill(['revoked_at' => now()])->save();
+        $outsider = User::factory()->create();
+
+        $this->actingAs($outsider)->get('/sites/'.$site->id.'/team')->assertForbidden();
+        $this->actingAs($owner)->get('/sites/'.$site->id.'/team')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('screen', 'sites.team')->where('canManage', true)->where('siteLinks.team', '/sites/'.$site->id.'/team')
+            ->has('members', 2)->where('members.0.role', 'owner')->where('members.0.you', true)
+            ->has('invitations', 1)->where('invitations.0.email', 'pending@example.com')->where('invitations.0.role', 'viewer')
+            ->has('invitations.0.resend_url')->has('invitations.0.revoke_url')->missing('invitations.0.token_hash'));
+
+        $this->actingAs($viewer)->get('/sites/'.$site->id.'/team')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('canManage', false)->has('members', 2)->where('invitations', [])->where('invitationLink', null));
+
+        $this->actingAs($owner)->post('/sites/'.$site->id.'/invitations', ['email' => 'next@example.com', 'role' => 'owner']);
+        $this->get('/sites/'.$site->id.'/team')->assertInertia(fn (Assert $page) => $page
+            ->where('invitationLink', fn ($link) => preg_match('#^http://[^/]+/invitations/[a-f0-9]{64}$#', $link) === 1)
+            ->where('invitationEmail', 'next@example.com'));
+        $this->get('/sites/'.$site->id.'/team')->assertInertia(fn (Assert $page) => $page->where('invitationLink', null));
     }
 
     public function test_an_owner_can_change_roles_and_remove_members_of_their_own_site_only(): void

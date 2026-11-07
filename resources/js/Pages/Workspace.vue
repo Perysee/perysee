@@ -32,6 +32,8 @@ const InstallerPage = defineAsyncComponent(
 const TrackingPage = defineAsyncComponent(
     () => import("../Components/TrackingPage.vue"),
 );
+const TeamPage = defineAsyncComponent(() => import("../Components/TeamPage.vue"));
+const InvitationPage = defineAsyncComponent(() => import("../Components/InvitationPage.vue"));
 const ModulesPage = defineAsyncComponent(
     () => import("../Components/ModulesPage.vue"),
 );
@@ -71,6 +73,7 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
 <template>
     <template v-if="!p.auth || p.screen === 'install'">
         <InstallerPage v-if="p.screen === 'install'" v-bind="p" />
+        <InvitationPage v-else-if="p.screen === 'invitation'" v-bind="p" />
         <AccountPage v-else v-bind="p" />
     </template>
     <template v-else>
@@ -90,6 +93,8 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
             v-bind="p"
         />
         <TrackingPage v-else-if="p.screen === 'sites.tracking'" v-bind="p" />
+        <TeamPage v-else-if="p.screen === 'sites.team'" v-bind="p" />
+        <InvitationPage v-else-if="p.screen === 'invitation'" v-bind="p" />
         <FunnelsPage v-else-if="p.screen === 'funnels'" v-bind="p" />
         <JourneyPage v-else-if="['funnel.report','journeys'].includes(p.screen)" :key="p.funnel?.id || 'journeys'" v-bind="p" />
         <HealthPage v-else-if="p.screen === 'health'" v-bind="p" />

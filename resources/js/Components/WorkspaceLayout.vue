@@ -33,6 +33,8 @@ const title = computed(
                   }[p.value.section]
                 : p.value.website?.name || "Overview",
             "sites.tracking": "Tracking setup",
+            "sites.team": "Team",
+            invitation: "Invitation",
             funnels: "Funnels",
             "funnel.report": p.value.funnel?.name || "Funnel",
             journeys: "Journeys",
@@ -145,6 +147,12 @@ const configNav = computed(() =>
                   icon: "i-tabler-code",
                   to: p.value.siteLinks.tracking,
                   active: p.value.screen === "sites.tracking",
+              },
+              {
+                  label: "Team",
+                  icon: "i-tabler-users",
+                  to: p.value.siteLinks.team,
+                  active: p.value.screen === "sites.team",
               },
               ...(p.value.canUpdate
                   ? [
