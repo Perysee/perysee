@@ -228,6 +228,17 @@ Un administrateur règle le serveur SMTP depuis **Administration > Mail** (`/set
 - **Sécurité.** Réservé aux administrateurs, 5 envois de test par minute et par administrateur, délai de connexion de 10 s. Le serveur se connecte à l’hôte choisi par un administrateur, au même niveau de confiance que l’hôte de base de données de l’installateur.
 - **Tests.** `MailSettingsTest`, `InstanceMailerTest`, `MailSettingsPageTest`, `TeamManagementTest` (invitations) et `tests/Charts/workspace-shell.test.mjs`. Pour une vérification de bout en bout sans vrai serveur, un petit puits SMTP local (Python `asyncio`, 127.0.0.1:2525) suffit : choisir « None » comme chiffrement.
 
+## Vérificateur d’installation du tracker
+
+Une page **Verify the installation** par site (`/sites/{site}/tracking/verify`, liée depuis « Tracking setup ») répond à « pourquoi rien n’apparaît ? ». Décisions : [ADR 004](docs/adr/004-tracker-installation-check.md).
+
+- **Collecteur.** Chaque refus est une `App\Analytics\Ingestion\CollectionRejected` (statut et corps identiques à l’ancien `abort_*`) portant une `RejectionCause`. Elle est enregistrée dans le `catch` de `TrackingController::collect`, après le rollback, par `RejectionLog`. Le chemin accepté ne change pas : un SELECT du site, un INSERT, plus un UPDATE à la première collecte ; `CollectionQueryBudgetTest` fige cette liste. Les refus de forme (413, 415, 422) sont désormais comptés dans « Collection rejections ».
+- **Stockage.** Table `collection_diagnostics` : une ligne par site, heure UTC et cause, `hits` incrémenté par upsert, rétention de 7 jours (`perysee:prune-diagnostics`, toutes les heures). Ni IP, ni User-Agent, ni chemin, ni payload ; `sample_host` seulement pour `domain_not_allowed` et `unknown_site`. Écritures limitées à 20 par minute, site et cause : les comptes affichés sont « au moins N ».
+- **Test « Test now ».** Réservé aux propriétaires : `POST /sites/{site}/tracking/probe` (6 par minute) délivre un jeton HMAC de 10 minutes lié au site ; le navigateur le présente dans l’en-tête `X-Perysee-Probe` au vrai `/api/collect`, qui répond 204 sans rien écrire dans `events` ni dans `first_collected_at`. `OPTIONS /api/collect` répond au preflight. Le test ne prouve pas la liste de domaines ni le consentement du site suivi.
+- **Sites silencieux.** `SiteActivity` ajoute `last_event_at` et `silent` aux listes (une requête groupée par page). Seuil : `perysee.silent_site_days` (`PERYSEE_SILENT_SITE_DAYS`, 3 jours).
+- **Budget au repos.** `IdleSchedulerCostTest` est à 30 requêtes sur SQLite (limite 30) : la purge n’est donc pas dans `perysee:maintenance` mais dans sa propre commande.
+- **Tests.** `CollectionQueryBudgetTest`, `CollectionRejectionCharacterizationTest`, `CollectionRejectionTest`, `CollectionDiagnosticsPurgeTest`, `TrackerCheckTest`, `TrackerProbeTest`, `SilentSiteIndicatorTest`, `tests/Charts/tracker-check.test.mjs`.
+
 ## Installateur
 
 `curl -fsSL https://get.perysee.com | bash` télécharge `install.sh`, épinglé à sa version lors du build. Sans `--mode`, un terminal permet de choisir `cpanel`, `docker` ou `manual` (le mode que la machine suggère est proposé par défaut ; `--yes` sans `--mode` garde le mode manuel). Une version précise s'installe par son adresse : `https://get.perysee.com/releases/vX.Y.Z/install.sh`.
