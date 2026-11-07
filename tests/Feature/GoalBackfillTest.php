@@ -33,6 +33,11 @@ class GoalBackfillTest extends TestCase
             'country_code' => $country, 'geo_available' => true, 'device_type' => 'mobile', 'dimensions_available' => true, 'source_value' => 'chatgpt', 'consent_given' => true]);
     }
 
+    private function goalId(): int
+    {
+        return (int) DB::table('goals')->value('id');
+    }
+
     private function define(): void
     {
         $this->post('/sites/'.$this->site->id.'/goals', ['name' => 'Signup', 'type' => 'event', 'value' => 'signup'])->assertRedirect();
@@ -62,10 +67,10 @@ class GoalBackfillTest extends TestCase
         $this->assertSame(0, (int) DB::table('stats_goal_daily')->sum('conversions'));
 
         $this->assertSame(2, app(Goals::class)->rebuild(2));
-        $this->assertTrue(app(Goals::class)->backfilling(1, 1));
+        $this->assertTrue(app(Goals::class)->backfilling($this->goalId(), 1));
         $this->assertSame(2, app(Goals::class)->rebuild(2));
         $this->assertSame(0, app(Goals::class)->rebuild(2));
-        $this->assertFalse(app(Goals::class)->backfilling(1, 1));
+        $this->assertFalse(app(Goals::class)->backfilling($this->goalId(), 1));
         $this->assertSame(0, app(Goals::class)->rebuild(2));
 
         $this->assertSame(3, (int) DB::table('stats_goal_daily')->sum('conversions'));
@@ -116,7 +121,7 @@ class GoalBackfillTest extends TestCase
         app(Aggregator::class)->run();
         $this->define();
         $this->drain();
-        $this->put('/sites/'.$this->site->id.'/goals/1', ['name' => 'Signup', 'type' => 'path', 'value' => '/', 'threshold' => 2])->assertRedirect();
+        $this->put('/sites/'.$this->site->id.'/goals/'.$this->goalId(), ['name' => 'Signup', 'type' => 'path', 'value' => '/', 'threshold' => 2])->assertRedirect();
         $this->drain();
 
         $this->assertSame([1, 1], [(int) DB::table('stats_goal_daily')->where('version', 1)->sum('conversions'), (int) DB::table('stats_goal_daily')->where('version', 2)->sum('conversions')]);
@@ -138,10 +143,10 @@ class GoalBackfillTest extends TestCase
     {
         $this->event('s1', '10:05:00', 2);
         $this->define();
-        $this->delete('/sites/'.$this->site->id.'/goals/1');
+        $this->delete('/sites/'.$this->site->id.'/goals/'.$this->goalId());
 
         $this->assertSame(0, app(Goals::class)->rebuild());
-        $this->assertFalse(app(Goals::class)->backfilling(1, 1));
+        $this->assertFalse(app(Goals::class)->backfilling($this->goalId(), 1));
         $this->assertSame(0, DB::table('goal_sessions')->count());
     }
 }

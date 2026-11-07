@@ -46,7 +46,7 @@ class GoalCostTest extends TestCase
 
         $goal = array_filter($queries, fn (string $sql): bool => (bool) preg_match('/goal_sessions|stats_goal_daily|goal_versions/', $sql));
         $this->assertLessThanOrEqual(6, count($goal), 'Goal tables were queried '.count($goal).' times for 120 events: '.implode(' | ', $goal));
-        $this->assertSame(20, DB::table('goal_sessions')->where('goal_id', 1)->whereNotNull('converted_at')->count());
+        $this->assertSame(20, DB::table('goal_sessions')->where('goal_id', DB::table('goal_versions')->where('value', 'signup')->value('goal_id'))->whereNotNull('converted_at')->count());
     }
 
     public function test_a_site_without_goal_costs_one_definition_read(): void
