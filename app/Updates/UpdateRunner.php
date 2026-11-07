@@ -7,6 +7,7 @@ namespace App\Updates;
 use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -72,6 +73,9 @@ final class UpdateRunner
             $log('Unpacking into a staging folder');
             $release = $this->extractor->extract($archive, $work.'/staged');
             $target = $release['version'];
+            if (strcasecmp($release['repository'], (string) config('perysee.update.repository')) !== 0) {
+                throw new UpdateException('The archive was built for another repository than the one this instance updates from.');
+            }
             $this->status->put('running', ['to' => $target, 'step' => 'preflight']);
             if ($options->version !== null && Version::normalize($options->version) !== $target) {
                 throw new UpdateException("The archive contains {$target}, not the requested {$options->version}.");
@@ -211,7 +215,7 @@ final class UpdateRunner
     {
         $this->assertHttps($url);
         try {
-            $response = Http::withHeaders(['User-Agent' => 'Perysee/'.$this->feed->currentVersion()])->timeout(30)->get($url);
+            $response = $this->client(30)->get($url);
         } catch (ConnectionException) {
             throw new UpdateException('The release files cannot be downloaded from this server.');
         }
@@ -226,7 +230,7 @@ final class UpdateRunner
     {
         $this->assertHttps($url);
         try {
-            $response = Http::withHeaders(['User-Agent' => 'Perysee/'.$this->feed->currentVersion()])->timeout(900)->connectTimeout(10)->sink($path)->get($url);
+            $response = $this->client(900)->connectTimeout(10)->sink($path)->get($url);
         } catch (ConnectionException) {
             throw new UpdateException('The release archive cannot be downloaded from this server.');
         }
@@ -236,6 +240,16 @@ final class UpdateRunner
         if (filesize($path) > ArchiveExtractor::MAX_BYTES) {
             throw new UpdateException('The release archive is larger than expected.');
         }
+    }
+
+    /**
+     * A redirect from a release address may only lead to another HTTPS address: assertHttps checks the first URL only.
+     */
+    private function client(int $timeout): PendingRequest
+    {
+        return Http::withHeaders(['User-Agent' => 'Perysee/'.$this->feed->currentVersion()])
+            ->withOptions(['allow_redirects' => ['max' => 5, 'protocols' => ['https']]])
+            ->timeout($timeout);
     }
 
     private function assertHttps(string $url): void

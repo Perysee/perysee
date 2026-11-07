@@ -108,7 +108,7 @@ class SiteFaviconTest extends TestCase
     {
         $site = $this->site();
         Http::fake();
-        foreach (['127.0.0.1', '10.0.0.1', '169.254.169.254', '100.64.0.1', '198.18.0.1', '::1', '::ffff:127.0.0.1'] as $address) {
+        foreach (['127.0.0.1', '10.0.0.1', '169.254.169.254', '100.64.0.1', '198.18.0.1', '::1', '::ffff:127.0.0.1', '64:ff9b::7f00:1', '64:ff9b:1::1'] as $address) {
             Cache::store('file')->flush();
             $this->resolver(['93.184.216.34', $address]);
             $this->get('/sites/'.$site->id.'/favicon')->assertRedirect('/site-icon.svg');
