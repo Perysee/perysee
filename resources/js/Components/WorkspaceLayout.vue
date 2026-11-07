@@ -33,6 +33,7 @@ const title = computed(
                   }[p.value.section]
                 : p.value.website?.name || "Overview",
             "sites.tracking": "Tracking setup",
+            "sites.verify": "Verify installation",
             "sites.sharing": "Sharing",
             "sites.team": "Team",
             invitation: "Invitation",
@@ -150,7 +151,7 @@ const configNav = computed(() =>
                   label: "Tracking setup",
                   icon: "i-tabler-code",
                   to: p.value.siteLinks.tracking,
-                  active: p.value.screen === "sites.tracking",
+                  active: ["sites.tracking", "sites.verify"].includes(p.value.screen),
               },
               ...(p.value.canShare
                   ? [

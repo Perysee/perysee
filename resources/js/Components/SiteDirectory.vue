@@ -110,6 +110,16 @@ const columns = [
                             class="mt-1"
                             >Demonstration data</UBadge
                         >
+                        <div v-if="row.original.silent" class="mt-1">
+                            <UButton
+                                :to="row.original.verify_url"
+                                icon="i-tabler-alert-triangle"
+                                label="Silent · Verify"
+                                color="warning"
+                                variant="subtle"
+                                size="xs"
+                            />
+                        </div>
                     </div>
                 </div></template
             >

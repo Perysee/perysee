@@ -33,6 +33,7 @@ const InstallerPage = defineAsyncComponent(
 const TrackingPage = defineAsyncComponent(
     () => import("../Components/TrackingPage.vue"),
 );
+const TrackingVerifyPage = defineAsyncComponent(() => import("../Components/TrackingVerifyPage.vue"));
 const TeamPage = defineAsyncComponent(() => import("../Components/TeamPage.vue"));
 const InvitationPage = defineAsyncComponent(() => import("../Components/InvitationPage.vue"));
 const ModulesPage = defineAsyncComponent(
@@ -97,6 +98,7 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
             v-bind="p"
         />
         <TrackingPage v-else-if="p.screen === 'sites.tracking'" v-bind="p" />
+        <TrackingVerifyPage v-else-if="p.screen === 'sites.verify'" v-bind="p" />
         <SharingPage v-else-if="p.screen === 'sites.sharing'" v-bind="p" />
         <TeamPage v-else-if="p.screen === 'sites.team'" v-bind="p" />
         <InvitationPage v-else-if="p.screen === 'invitation'" v-bind="p" />
