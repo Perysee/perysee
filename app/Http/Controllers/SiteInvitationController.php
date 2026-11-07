@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\InviteMemberRequest;
+use App\Mail\InstanceMailer;
 use App\Mail\SiteInvitationMail;
 use App\Models\SiteInvitation;
 use App\Models\Website;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 
 class SiteInvitationController extends Controller
@@ -52,16 +52,17 @@ class SiteInvitationController extends Controller
      */
     private function delivered(Website $website, SiteInvitation $invitation, string $token): RedirectResponse
     {
+        $mailer = app(InstanceMailer::class);
         $url = route('invitations.show', $token);
         $back = redirect()->route('sites.team', $website);
-        if (! in_array(config('mail.default'), ['log', 'array'], true)) {
+        if ($mailer->configured()) {
             try {
-                Mail::to($invitation->email)->send(new SiteInvitationMail($url, $website->name, $invitation->role, auth()->user()?->name, $invitation->expires_at->toFormattedDateString(), config('app.name')));
+                $mailer->send($invitation->email, new SiteInvitationMail($url, $website->name, $invitation->role, auth()->user()?->name, $invitation->expires_at->toFormattedDateString(), config('app.name')));
                 $invitation->forceFill(['last_sent_at' => now('UTC')])->save();
 
                 return $back->with('status', __('Invitation sent to :email.', ['email' => $invitation->email]));
-            } catch (\Throwable $exception) {
-                report($exception);
+            } catch (\Throwable) {
+                // InstanceMailer already reported the failure, without any credential.
                 $back->with('error', __('The e-mail could not be sent. Share the invitation link yourself.'));
             }
         }
