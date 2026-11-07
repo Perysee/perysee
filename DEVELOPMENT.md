@@ -2,6 +2,10 @@
 
 Guide de développement local, de test et d’exploitation de Perysee Core. Les procédures de release et de distribution sont maintenues par l’équipe dans un dépôt privé.
 
+## Branches et releases
+
+Le dépôt suit un gitflow : `develop` reçoit le travail (`feat/`, `fix/`, `chore/`, `docs/`), `main` ne porte que les releases publiées. Une release part de `develop` (workflow `Prepare release`, PR `release/vX.Y.Z` vers `main`, fusionnée en merge commit), un hotfix part de `main`, et `main` est ensuite refusionné dans `develop`. Les releases et hotfix se fusionnent en merge commit, jamais en squash.
+
 ## Publier un module gratuit dans le catalogue
 
 Le catalogue public est celui de l'API (`GET /api/v1/catalog/modules`, dépôt `Perysee/web`). Les modules officiels vivent dans le dépôt privé `Perysee/perysee-modules` (dossier `perysee-modules/` de l'espace de travail), gratuits comme payants. L'API distribue leurs archives : elle lit la release privée avec un jeton en lecture seule et renvoie au Core une adresse GitHub temporaire, sans rien stocker. Chaque entrée porte une signature Ed25519 faite **hors serveur** ; l'adresse signée est celle de l'API (`/api/v1/modules/<id>/download`), donc stable. Un module payant exige un jeton dont la licence le couvre.
