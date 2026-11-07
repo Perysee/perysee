@@ -44,6 +44,11 @@ class PruneTracking extends Command
 
                 return DB::table('events')->whereIn('id', $ids)->delete();
             });
+            // The goal ledger only deduplicates live sessions; the aggregated goal counters are kept like the other statistics.
+            $keys = ['website_id', 'goal_id', 'version', 'session_key'];
+            foreach (DB::table('goal_sessions')->where('last_hit_at', '<', now('UTC')->subDays($days))->orderBy('last_hit_at')->limit($limit)->get($keys) as $row) {
+                DB::table('goal_sessions')->where((array) $row)->delete();
+            }
             $this->info("Deleted {$deleted} expired tracking events.");
 
             return self::SUCCESS;

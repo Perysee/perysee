@@ -107,7 +107,7 @@ const inSite = () =>
         currentUrl: "/sites/1",
         website: { id: 1, name: "Acme", domain: "acme.test" },
         canUpdate: true,
-        siteLinks: Object.fromEntries(["show", "pages", "sources", "campaigns", "devices", "countries", "sessions", "events", "funnels", "journeys", "realtime", "tracking", "edit", "favicon"].map((key) => [key, `/sites/1${key === "show" ? "" : `/${key}`}`])),
+        siteLinks: Object.fromEntries(["show", "pages", "sources", "campaigns", "devices", "countries", "sessions", "events", "funnels", "goals", "journeys", "realtime", "tracking", "edit", "favicon"].map((key) => [key, `/sites/1${key === "show" ? "" : `/${key}`}`])),
     });
 
 test("Home is the first entry of the menu, inside a site as well, so there is always a way back", async () => {

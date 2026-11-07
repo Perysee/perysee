@@ -41,6 +41,8 @@ const ModuleSettingsPage = defineAsyncComponent(
 const SharingPage = defineAsyncComponent(() => import("../Components/SharingPage.vue"));
 const FunnelsPage =defineAsyncComponent(() => import("../Components/FunnelsPage.vue"));
 const JourneyPage = defineAsyncComponent(() => import("../Components/JourneyPage.vue"));
+const GoalsPage = defineAsyncComponent(() => import("../Components/GoalsPage.vue"));
+const GoalReport = defineAsyncComponent(() => import("../Components/GoalReport.vue"));
 const page = usePage();
 const p = computed(() => page.props);
 const failedModuleFiles = ref([]);
@@ -94,6 +96,8 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
         <SharingPage v-else-if="p.screen === 'sites.sharing'" v-bind="p" />
         <FunnelsPage v-else-if="p.screen === 'funnels'" v-bind="p" />
         <JourneyPage v-else-if="['funnel.report','journeys'].includes(p.screen)" :key="p.funnel?.id || 'journeys'" v-bind="p" />
+        <GoalsPage v-else-if="p.screen === 'goals'" v-bind="p" />
+        <GoalReport v-else-if="p.screen === 'goal.report'" :key="p.goal?.id" v-bind="p" />
         <HealthPage v-else-if="p.screen === 'health'" v-bind="p" />
         <ModulesPage v-else-if="p.screen === 'modules'" v-bind="p" />
         <ModuleSettingsPage v-else-if="p.screen === 'modules.settings'" v-bind="p" />

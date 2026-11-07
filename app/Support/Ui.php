@@ -80,6 +80,7 @@ class Ui
             $links[$section] = route('sites.section', [$site, $section]);
         }
         $links['funnels'] = route('sites.funnels.index', $site);
+        $links['goals'] = route('sites.goals.index', $site);
         $links['journeys'] = route('sites.journeys', $site);
         $links['demo'] = $site->is_demo && app()->environment('local') ? route('demo.show', $site) : null;
 

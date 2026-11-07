@@ -35,6 +35,8 @@ const title = computed(
             "sites.tracking": "Tracking setup",
             "sites.sharing": "Sharing",
             funnels: "Funnels",
+            goals: "Goals",
+            "goal.report": p.value.goal?.name || "Goal",
             "funnel.report": p.value.funnel?.name || "Funnel",
             journeys: "Journeys",
             dashboard: "Home",
@@ -131,7 +133,7 @@ const nav = computed(() => {
             keywords,
             to:
                 queryUrl(p.value.siteLinks[key === "overview" ? "show" : key], key === "realtime" ? {} : {...values, ...Object.fromEntries(dates)}),
-            active: key === "funnels" ? ["funnels","funnel.report"].includes(p.value.screen) : key === "journeys" ? p.value.screen === "journeys" : p.value.screen === "sites.show" && (p.value.section || "overview") === key,
+            active: key === "goals" ? ["goals","goal.report"].includes(p.value.screen) : key === "funnels" ? ["funnels","funnel.report"].includes(p.value.screen) : key === "journeys" ? p.value.screen === "journeys" : p.value.screen === "sites.show" && (p.value.section || "overview") === key,
         })),
         ...(moduleEntries.length ? [{ label: "Modules", type: "label" }, ...moduleEntries] : []),
         ];
