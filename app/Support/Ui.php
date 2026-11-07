@@ -36,7 +36,7 @@ class Ui
         if (isset($data['period'], $site)) {
             $data['today'] = now($site->timezone)->toDateString();
         }
-        if ($screen === 'sites.tracking') {
+        if (in_array($screen, ['sites.tracking', 'sites.verify'], true)) {
             $data['snippet'] = '<script defer crossorigin="anonymous" referrerpolicy="no-referrer" src="'.route('tracker.script').'" data-site="'.$site->public_id.'" data-mode="'.$site->tracking_mode.'" data-consent-required="'.($site->consent_required ? 'true' : 'false').'"'.($site->excluded_paths ? ' data-exclude-paths="'.e(implode(',', $site->excluded_paths)).'"' : '').'></script>';
         }
         if ($screen === 'install' && $data['authorized'] && ! $data['migrated']) {
@@ -84,6 +84,9 @@ class Ui
         $links['funnels'] = route('sites.funnels.index', $site);
         $links['goals'] = route('sites.goals.index', $site);
         $links['journeys'] = route('sites.journeys', $site);
+        // Installation check
+        $links['verify'] = route('sites.verify', $site);
+        $links['probe'] = route('sites.verify.probe', $site);
         $links['demo'] = $site->is_demo && app()->environment('local') ? route('demo.show', $site) : null;
 
         return $links;

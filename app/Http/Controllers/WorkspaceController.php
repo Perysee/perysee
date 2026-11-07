@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Diagnostics\SiteActivity;
 use App\Analytics\InstanceHealth;
 use App\Analytics\Reporting\Reports;
 use App\Models\Website;
@@ -15,6 +16,7 @@ class WorkspaceController extends Controller
     public function dashboard(Request $request, Reports $reports): Response
     {
         $sites = $request->user()->websites()->whereNull('deleting_at')->orderBy('name')->paginate(20);
+        SiteActivity::annotate($sites); // installation check: last event and silent flag
         $summaries = [];
         $charts = [];
         $sitePeriods = [];

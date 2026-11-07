@@ -17,3 +17,6 @@ Schedule::command('perysee:modules catalog --refresh-only')->dailyAt('04:43');
 
 // read-api: expired or revoked API tokens, kept out of the idle maintenance pass on purpose
 Schedule::command('perysee:prune-api-tokens')->hourly()->withoutOverlapping();
+
+// Installation check: collector diagnostics expire after seven days.
+Schedule::command('perysee:prune-diagnostics')->hourly()->withoutOverlapping();
