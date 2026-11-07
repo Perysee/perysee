@@ -53,8 +53,8 @@ class MailSettingsPageTest extends TestCase
 
         $response = $this->get('/settings/mail');
         $response->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->where('screen', 'settings.mail')->where('mail.state', 'saved')->where('mail.host', 'smtp.example.com')->where('mail.password_set', true)
-            ->where('mail.source.host', 'saved')->where('recipient', $admin->email)->where('links', fn ($links) => ($links['settings.mail'] ?? null) === '/settings/mail')->where('testResult', null)->missing('mail.password'));
+            ->where('screen', 'settings.mail')->where('mail.state', 'saved')->where('mail.saved', true)->where('mail.host', 'smtp.example.com')->where('mail.password_set', true)
+            ->where('mail.source.host', 'saved')->where('recipient', $admin->email)->where('links', fn ($links) => ($links['settings.mail'] ?? null) === '/settings/mail' && ($links['settings.mail.test'] ?? null) === '/settings/mail/test')->where('testResult', null)->missing('mail.password'));
         $this->assertStringNotContainsString(self::SECRET, $response->getContent());
         $this->assertStringNotContainsString(self::SECRET, json_encode(session()->all()));
     }

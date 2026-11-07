@@ -52,6 +52,7 @@ class MailSettings
 
         return [
             'state' => $this->configured() ? 'saved' : (self::environmentMailer() ? 'environment' : 'none'),
+            'saved' => $saved !== null,
             'enabled' => (bool) ($saved['enabled'] ?? false),
             'host' => $values['host'],
             'port' => $values['port'],

@@ -44,6 +44,7 @@ const title = computed(
             dashboard: "Home",
             health: "Instance health",
             settings: "Instance settings",
+            "settings.mail": "Mail",
             modules: "Modules",
             "modules.settings": "Module settings",
             "auth.login": "Sign in",
@@ -192,6 +193,12 @@ const configNav = computed(() =>
                             icon: "i-tabler-settings",
                             to: p.value.links.settings,
                             active: p.value.screen === "settings",
+                        },
+                        {
+                            label: "Mail",
+                            icon: "i-tabler-mail",
+                            to: p.value.links["settings.mail"],
+                            active: p.value.screen === "settings.mail",
                         },
                         {
                             label: "Modules",

@@ -23,6 +23,7 @@ const SiteForm = defineAsyncComponent(
 const HealthPage = defineAsyncComponent(
     () => import("../Components/HealthPage.vue"),
 );
+const MailSettingsPage = defineAsyncComponent(() => import("../Components/MailSettingsPage.vue"));
 const AccountPage = defineAsyncComponent(
     () => import("../Components/AccountPage.vue"),
 );
@@ -104,6 +105,7 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
         <GoalsPage v-else-if="p.screen === 'goals'" v-bind="p" />
         <GoalReport v-else-if="p.screen === 'goal.report'" :key="p.goal?.id" v-bind="p" />
         <HealthPage v-else-if="p.screen === 'health'" v-bind="p" />
+        <MailSettingsPage v-else-if="p.screen === 'settings.mail'" v-bind="p" />
         <ModulesPage v-else-if="p.screen === 'modules'" v-bind="p" />
         <ModuleSettingsPage v-else-if="p.screen === 'modules.settings'" v-bind="p" />
         <AccountPage v-else-if="p.screen === 'auth.password'" v-bind="p" />
