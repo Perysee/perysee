@@ -45,14 +45,20 @@ class InstallCommandTest extends TestCase
         ], $overrides);
     }
 
+    /** The database password: SQLite replaces the connection, MariaDB needs the real one of the test database. */
+    private function databasePassword(): string
+    {
+        return DB::getDriverName() === 'sqlite' ? 'test-password' : (string) config('database.connections.mariadb.password', '');
+    }
+
     public function test_a_non_interactive_installation_migrates_creates_the_administrator_and_locks(): void
     {
-        putenv('PERYSEE_DB_PASSWORD=test-password');
+        putenv('PERYSEE_DB_PASSWORD='.$this->databasePassword());
         putenv('PERYSEE_ADMIN_PASSWORD=Strong-password-123!');
 
         $this->artisan('perysee:install', $this->installOptions() + ['--no-interaction' => true])
             ->expectsOutputToContain('Perysee is installed')
-            ->doesntExpectOutputToContain('test-password')
+            ->doesntExpectOutputToContain($this->databasePassword())
             ->doesntExpectOutputToContain('Strong-password-123!')
             ->assertSuccessful();
 
@@ -89,6 +95,8 @@ class InstallCommandTest extends TestCase
 
     public function test_a_generated_administrator_password_is_shown_once_when_none_is_supplied(): void
     {
+        putenv('PERYSEE_DB_PASSWORD='.$this->databasePassword());
+
         $this->artisan('perysee:install', $this->installOptions() + ['--no-interaction' => true])
             ->expectsOutputToContain('Administrator password (shown once)')
             ->assertSuccessful();
