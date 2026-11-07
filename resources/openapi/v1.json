@@ -1218,7 +1218,7 @@
                   },
                   "breakdown": {
                     "type": "object",
-                    "description": "Conversions by source, campaign, country and device."
+                    "description": "Conversions by source, campaign, country and device. Only the breakdowns whose scope the token holds are present (sources, campaigns, countries, devices); a token with the goals scope alone gets an empty object."
                   },
                   "coverage": {
                     "type": "object"
