@@ -33,6 +33,7 @@ return [
     ],
     'raw_retention_days' => (int) env('PERYSEE_RAW_RETENTION_DAYS', 90),
     'redis_enabled' => (bool) env('PERYSEE_REDIS_ENABLED', false),
-    'landing_url' => env('PERYSEE_LANDING_URL', 'http://localhost:3000'),
-    'docs_url' => env('PERYSEE_DOCS_URL', 'http://localhost:3001'),
+    'landing_url' => env('PERYSEE_LANDING_URL', 'https://perysee.com'),
+    'docs_url' => env('PERYSEE_DOCS_URL', 'https://docs.perysee.com'),
+    'repository_url' => env('PERYSEE_REPOSITORY_URL', 'https://github.com/Perysee/perysee'),
 ];
