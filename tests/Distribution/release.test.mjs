@@ -217,7 +217,7 @@ signal.alarm(20)
 pid, master = pty.fork()
 if pid == 0:
     os.execv('/bin/bash', ['bash', '-c', 'cat "$PERYSEE_TEST_BOOTSTRAP" | bash'])
-os.write(master, (os.environ['PERYSEE_TEST_TARGET'] + '\\nhttps://stats.example.com\\nyes\\n').encode())
+os.write(master, ('3\\n' + os.environ['PERYSEE_TEST_TARGET'] + '\\nhttps://stats.example.com\\nyes\\n').encode())
 while True:
     try:
         data = os.read(master, 65536)
@@ -233,6 +233,7 @@ sys.exit(os.waitstatus_to_exitcode(status))
         env: { ...bootstrapEnvironment(f), PERYSEE_TEST_BOOTSTRAP: join(scripts, 'install.sh'), PERYSEE_TEST_TARGET: target } });
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.ok(existsSync(join(target, 'artisan')));
+    assert.match(result.stdout, /How do you want to install Perysee\?/);
     assert.match(result.stdout, /Application directory/);
     assert.match(result.stdout, /https:\/\/stats.example.com\/install/);
 });
@@ -438,6 +439,38 @@ test('the Docker mode never overwrites a used folder and requires an HTTPS addre
     const plain = spawnSync('bash', [join(scripts, 'install.sh'), '--mode', 'docker', '--url', 'http://stats.example.com', '--target', join(f.root, 'x'), '--yes'], { encoding: 'utf8', env, input: '' });
     assert.notEqual(plain.status, 0);
     assert.match(plain.stderr, /HTTPS/);
+    assert.deepEqual(dockerCalls(f).filter((call) => call.includes('up')), []);
+});
+test('without --mode and with a terminal, a menu chooses the mode and the machine decides the default', (t) => {
+    const f = fixture(t);
+    build(f);
+    const env = dockerEnvironment(f);
+    const answers = join(f.root, 'answers');
+    env.PERYSEE_TTY = answers;
+    const start = (name) => spawnSync('bash', [join(scripts, 'install.sh'), '--target', join(f.root, name)], { encoding: 'utf8', env, input: '' });
+
+    writeFileSync(answers, '2\nhttps://stats.example.com\nowner@example.com\nyes\n');
+    const chosen = start('chosen');
+    assert.equal(chosen.status, 0, chosen.stderr || chosen.stdout);
+    assert.match(chosen.stdout, /How do you want to install Perysee\?/);
+    assert.ok(existsSync(join(f.root, 'chosen/compose.yaml')));
+
+    writeFileSync(answers, '\nhttps://stats.example.com\nowner@example.com\nyes\n');
+    const suggested = start('suggested');
+    assert.equal(suggested.status, 0, suggested.stderr || suggested.stdout);
+    assert.ok(existsSync(join(f.root, 'suggested/compose.yaml')), 'docker is detected and suggested');
+});
+test('an unknown menu choice stops before anything is downloaded or written', (t) => {
+    const f = fixture(t);
+    build(f);
+    const env = dockerEnvironment(f);
+    env.PERYSEE_TTY = join(f.root, 'answers');
+    writeFileSync(env.PERYSEE_TTY, '9\n');
+    const target = join(f.root, 'nothing');
+    const result = spawnSync('bash', [join(scripts, 'install.sh'), '--target', target], { encoding: 'utf8', env, input: '' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unknown choice/);
+    assert.equal(existsSync(target), false);
     assert.deepEqual(dockerCalls(f).filter((call) => call.includes('up')), []);
 });
 test('the Docker mode asks for what is missing, keeps the password prompt interactive and can be cancelled', (t) => {

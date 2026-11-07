@@ -71,6 +71,48 @@ verify_download() {
     fi
 }
 
+# The mode that fits this machine, suggested as the menu's default: a cPanel account has the uapi command, a working
+# "docker compose" means Docker, and anything else is a manual installation.
+detect_mode() {
+    if command -v uapi >/dev/null 2>&1 || [[ -x "${PERYSEE_UAPI_PATH:-/usr/local/cpanel/bin/uapi}" ]]; then
+        echo cpanel
+    elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+        echo docker
+    else
+        echo manual
+    fi
+}
+
+# Opens the terminal on file descriptor 3 (once), for questions that must work under curl | bash. PERYSEE_TTY lets
+# tests supply the answers. Fails quietly when there is no terminal.
+open_terminal() {
+    { : <&3; } 2>/dev/null && return 0
+    local terminal="${PERYSEE_TTY:-/dev/tty}"
+    if ( : < "$terminal" ) 2>/dev/null; then
+        exec 3< "$terminal"
+        return 0
+    fi
+
+    return 1
+}
+
+# select_mode <variable>: asks how to install and stores cpanel, docker or manual in the variable.
+select_mode() {
+    local suggestion choice
+    suggestion="$(detect_mode)"
+    echo 'How do you want to install Perysee?'
+    echo '  1) cPanel  - creates the subdomain, database, PHP version and cron through UAPI (needs SSH on the account)'
+    echo '  2) Docker  - builds and runs Perysee, its scheduler and MariaDB with Docker Compose'
+    echo '  3) Manual  - extracts the files; you prepare the web server and the database yourself'
+    prompt "Choice [$suggestion]: " choice
+    case "${choice:-$suggestion}" in
+        1 | cpanel) printf -v "$1" '%s' cpanel ;;
+        2 | docker) printf -v "$1" '%s' docker ;;
+        3 | manual) printf -v "$1" '%s' manual ;;
+        *) fail "Unknown choice: ${choice}. Answer 1, 2 or 3 (or pass --mode cpanel, docker or manual)." ;;
+    esac
+}
+
 # Docker needs no PHP on the host: the image is built from the verified release, here, and nothing is pulled from
 # a Perysee registry. Writes <target>/.env with generated secrets (never an administrator password).
 docker_install() {
@@ -97,8 +139,7 @@ docker_install() {
         esac
     done
     if ((yes == 0)); then
-        # The questions come from the terminal even under curl | bash. PERYSEE_TTY lets tests supply the answers.
-        exec 3< "${PERYSEE_TTY:-/dev/tty}" || fail 'No terminal to ask questions. Use --yes with --url and --admin-email.'
+        open_terminal || fail 'No terminal to ask questions. Use --yes with --url and --admin-email.'
     fi
     command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1 \
         || fail 'Perysee needs Docker with the compose plugin (the "docker compose" command). Install Docker Engine or Docker Desktop first.'
@@ -204,6 +245,11 @@ main() {
         fi
         previous="$argument"
     done
+    # Without --mode, a person at a terminal chooses; unattended runs (--yes) keep the manual installation.
+    if [[ -z "$mode" ]] && [[ " $* " != *' --yes '* ]] && open_terminal; then
+        select_mode mode
+        set -- "$@" --mode "$mode"
+    fi
     if [[ "$mode" == 'docker' ]]; then
         docker_install "$download_base" "$@"
         return 0

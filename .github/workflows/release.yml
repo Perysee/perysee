@@ -71,6 +71,22 @@ jobs:
     needs: [plan, checks]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      # A throwaway database for the terminal-installation smoke test of the production ZIP below.
+      mariadb:
+        image: mariadb:11.4.8
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-only
+          MARIADB_DATABASE: perysee_smoke
+          MARIADB_USER: perysee_smoke
+          MARIADB_PASSWORD: ci-smoke-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
       - uses: actions/checkout@v6
         with:
@@ -105,6 +121,21 @@ jobs:
           test "$(php -r 'echo json_decode(file_get_contents("release.json"))->version;')" = "${{ needs.plan.outputs.tag }}"
           # The config file calls env() and storage_path(), which only exist inside Laravel: read the literal.
           test "$(sed -n "s/^ *'version' => '\([^']*\)',.*/\1/p" config/perysee.php)" = "${{ needs.plan.outputs.version }}"
+      - name: Smoke-test the terminal installation of the production ZIP
+        env:
+          PERYSEE_DB_PASSWORD: ci-smoke-only
+          PERYSEE_ADMIN_PASSWORD: Smoke-Test-Password-123
+        run: |
+          cd "$RUNNER_TEMP/perysee-smoke"
+          php artisan perysee:install --url https://stats.example.com --db-host 127.0.0.1 --db-port 3306 --db-name perysee_smoke --db-user perysee_smoke --admin-name Smoke --admin-email smoke@example.com --no-interaction
+          test -f storage/app/private/installation/installed
+          test ! -f storage/app/private/installation/secret
+          test -f .env
+          # An installed instance is never installed again.
+          if php artisan perysee:install --url https://stats.example.com --db-host 127.0.0.1 --db-port 3306 --db-name perysee_smoke --db-user perysee_smoke --admin-name Other --admin-email other@example.com --no-interaction; then
+            echo "::error::A second installation was accepted."
+            exit 1
+          fi
       - name: Smoke-test the Docker image built from the release files
         env:
           RELEASE_VERSION: ${{ needs.plan.outputs.tag }}
