@@ -680,6 +680,10 @@ summary {
     color: var(--ui-text-muted);
     white-space: normal;
 }
+.metric-cell > .metric-reason {
+    display: block;
+    margin-top: 8px;
+}
 .metric-cell .metric-variation {
     display: block;
     margin-top: 8px;

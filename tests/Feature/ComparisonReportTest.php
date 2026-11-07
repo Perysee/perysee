@@ -330,4 +330,27 @@ class ComparisonReportTest extends TestCase
         $compared = $this->get('/sites/'.$site->id.'/export'.$range.'&compare=previous')->assertOk()->streamedContent();
         $this->assertSame($plain, $compared);
     }
+
+    public function test_dashboard_comparison_respects_reliability(): void
+    {
+        $site = $this->memberSite();
+        $user = auth()->user();
+        $rebuilding = Website::factory()->create(['timezone' => 'UTC']);
+        $rebuilding->members()->attach($user, ['role' => 'owner']);
+        $this->day($site, '2026-10-20', 10);
+        $this->day($site, '2026-10-13', 4);
+        DB::table('events')->insert(['website_id' => $rebuilding->id, 'received_at' => '2026-10-24 10:00:00', 'event_type' => 1, 'path' => '/', 'consent_given' => true]);
+
+        $queries = $this->queriesDuring(fn () => $this->get('/dashboard?from=2026-10-18&to=2026-10-24&compare=previous')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('comparisons.'.$site->id.'.totals.pageviews', 4)
+            ->where('comparisons.'.$site->id.'.reliability.pageviews.percent_allowed', true)
+            ->missing('comparisons.'.$site->id.'.series')
+            ->where('comparisons.'.$rebuilding->id.'.totals', null)
+            ->where('comparisons.'.$rebuilding->id.'.reliability.pageviews.reason', 'rebuilding')));
+        $previousReads = array_filter($queries, fn (array $query): bool => in_array('2026-10-11', $query['bindings'], true));
+        $this->assertCount(1, $previousReads, 'Only the site that is not rebuilding reads its previous daily rows.');
+
+        $this->get('/dashboard?from='.now('UTC')->subDays(6)->toDateString().'&to='.now('UTC')->toDateString().'&compare=previous')->assertInertia(fn (Assert $page) => $page
+            ->where('comparisons.'.$site->id.'.reliability.pageviews.reason', 'current_period'));
+    }
 }

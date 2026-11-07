@@ -69,12 +69,18 @@ class Reports
      *
      * @param  array<string, mixed>  $period
      * @param  array<string, mixed>|null  $current  the overview of $period when the caller already has it
+     * @param  bool  $totalsOnly  skip the series, and skip a site whose statistics are being rebuilt altogether
      * @return array<string, mixed>
      */
-    public function comparison(Website $site, array $period, ?array $current = null): array
+    public function comparison(Website $site, array $period, ?array $current = null, bool $totalsOnly = false): array
     {
         $current ??= $this->overview($site, $period);
         $previous = $this->previousPeriod($period, $site);
+        if ($totalsOnly && ($current['freshness']['pending'] ?? false)) {
+            $reliability = array_fill_keys(['pageviews', 'sessions', 'custom_events'], ['percent_allowed' => false, 'reason' => 'rebuilding']);
+
+            return ['period' => ['from' => $previous['from'], 'to' => $previous['to']], 'totals' => null, 'reliability' => $reliability];
+        }
         $known = [
             'rows' => DB::table('stats_daily')->where('website_id', $site->id)->whereBetween('stat_date', [$previous['from'], $previous['to']])->get(),
             'history' => $this->measurementPeriods($site, $previous),
@@ -85,7 +91,7 @@ class Reports
         return [
             'period' => ['from' => $previous['from'], 'to' => $previous['to']],
             'totals' => $overview['totals'],
-            'series' => $this->alignSeries($site, $previous, $period, $this->series($site, $previous, $known)),
+            'series' => $totalsOnly ? [] : $this->alignSeries($site, $previous, $period, $this->series($site, $previous, $known)),
             'availability' => $overview['availability'],
             'coverage' => $overview['coverage'],
             'freshness' => $overview['freshness'],
