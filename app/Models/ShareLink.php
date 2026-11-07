@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Analytics\Reporting\ReportSections;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Hash;
@@ -12,15 +13,7 @@ use Illuminate\Support\Facades\Hash;
 class ShareLink extends Model
 {
     /** Sections a link can expose, and the dimension reports each one allows. */
-    public const SECTIONS = [
-        'overview' => [],
-        'pages' => ['path'],
-        'sources' => ['source'],
-        'campaigns' => ['campaign'],
-        'devices' => ['device', 'device_brand', 'browser'],
-        'countries' => ['country'],
-        'events' => ['event'],
-    ];
+    public const SECTIONS = ReportSections::SECTIONS;
 
     protected $guarded = [];
 
@@ -68,7 +61,7 @@ class ShareLink extends Model
     /** Dimension reports the link may serve. */
     public function dimensions(): array
     {
-        return array_values(array_unique(array_merge([], ...array_map(fn (string $section): array => self::SECTIONS[$section] ?? [], $this->sections ?? []))));
+        return ReportSections::dimensions($this->sections ?? []);
     }
 
     public function allows(string $section): bool
