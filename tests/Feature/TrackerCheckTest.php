@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
+use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -40,7 +42,7 @@ class TrackerCheckTest extends TestCase
         DB::table('collection_diagnostics')->insert(['website_id' => $site instanceof Website ? $site->id : $site, 'bucket_start' => $bucket, 'cause' => $cause, 'hits' => $hits, 'sample_host' => $host, 'first_at' => $at->format('Y-m-d H:i:s'), 'last_at' => $at->format('Y-m-d H:i:s')]);
     }
 
-    private function check(Website $site, User $user): Assert|\Illuminate\Testing\TestResponse
+    private function check(Website $site, User $user): Assert|TestResponse
     {
         return $this->actingAs($user)->get('/sites/'.$site->id.'/tracking/verify');
     }
@@ -226,7 +228,7 @@ class TrackerCheckTest extends TestCase
         $this->check($site, $user)->assertInertia(fn (Assert $page) => $page
             ->where('siteLinks.verify', '/sites/'.$site->id.'/tracking/verify')->where('siteLinks.probe', '/sites/'.$site->id.'/tracking/probe')
             ->where('siteLinks.tracking', '/sites/'.$site->id.'/tracking')->where('collectorRoot', fn (string $root) => str_starts_with($root, 'http')));
-        $response = $this->actingAs($user)->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'Workspace', 'X-Inertia-Partial-Data' => 'check', 'X-Requested-With' => 'XMLHttpRequest', 'X-Inertia-Version' => \Inertia\Inertia::getVersion()])->get('/sites/'.$site->id.'/tracking/verify')->assertOk();
+        $response = $this->actingAs($user)->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'Workspace', 'X-Inertia-Partial-Data' => 'check', 'X-Requested-With' => 'XMLHttpRequest', 'X-Inertia-Version' => Inertia::getVersion()])->get('/sites/'.$site->id.'/tracking/verify')->assertOk();
         $this->assertArrayHasKey('check', $response->json('props'));
         $this->assertArrayNotHasKey('snippet', $response->json('props'));
     }
@@ -240,7 +242,7 @@ class TrackerCheckTest extends TestCase
         DB::listen(function ($query) use (&$queries): void {
             $queries[] = strtolower($query->sql);
         });
-        $this->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'Workspace', 'X-Inertia-Partial-Data' => 'check', 'X-Requested-With' => 'XMLHttpRequest', 'X-Inertia-Version' => \Inertia\Inertia::getVersion()])->get('/sites/'.$site->id.'/tracking/verify')->assertOk();
+        $this->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'Workspace', 'X-Inertia-Partial-Data' => 'check', 'X-Requested-With' => 'XMLHttpRequest', 'X-Inertia-Version' => Inertia::getVersion()])->get('/sites/'.$site->id.'/tracking/verify')->assertOk();
 
         $this->assertEmpty(array_filter($queries, fn (string $sql): bool => (bool) preg_match('/^(insert|update|delete)/', $sql)));
         $checkQueries = array_filter($queries, fn (string $sql): bool => str_contains($sql, '"events"') || str_contains($sql, '`events`') || str_contains($sql, 'collection_diagnostics'));

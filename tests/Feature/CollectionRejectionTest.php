@@ -8,6 +8,7 @@ use App\Installation\InstallationState;
 use App\Models\Website;
 use App\Support\Coordination;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
@@ -33,7 +34,7 @@ class CollectionRejectionTest extends TestCase
         return $this->withHeader('Origin', $origin ?? 'https://'.$site->domain)->postJson('/api/collect', $this->payload($site, $extra));
     }
 
-    private function rows(?Website $site = null): \Illuminate\Support\Collection
+    private function rows(?Website $site = null): Collection
     {
         return DB::table('collection_diagnostics')->when($site, fn ($query) => $query->where('website_id', $site->id))->get();
     }

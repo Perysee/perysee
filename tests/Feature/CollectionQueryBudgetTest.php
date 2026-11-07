@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Installation\InstallationState;
 use App\Models\Website;
+use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 /**
@@ -73,7 +75,7 @@ class CollectionQueryBudgetTest extends TestCase
     {
         $site = Website::factory()->create(['first_collected_at' => now('UTC')]);
         $transactions = 0;
-        \Illuminate\Support\Facades\Event::listen(\Illuminate\Database\Events\TransactionBeginning::class, function () use (&$transactions): void {
+        Event::listen(TransactionBeginning::class, function () use (&$transactions): void {
             $transactions++;
         });
         $this->withHeader('Origin', 'https://'.$site->domain)->postJson('/api/collect', $this->payload($site))->assertNoContent();
