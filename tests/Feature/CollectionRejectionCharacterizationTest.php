@@ -19,6 +19,8 @@ class CollectionRejectionCharacterizationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // The frozen body is the production one: a debug environment would add the exception details to it.
+        config(['app.debug' => false]);
         app(InstallationState::class)->exclusive(fn () => app(InstallationState::class)->complete());
     }
 
