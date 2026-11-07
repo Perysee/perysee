@@ -41,4 +41,44 @@ class ReportPresenter
     {
         return $this->reports->series($site, $period);
     }
+
+    /**
+     * The overview as the read API returns it: what a share link shows, plus whether data is still being processed,
+     * the history of measurement modes, and the coverage of cross-filtered statistics when filters apply.
+     *
+     * @param  array<string, mixed>  $report  a result of Reports::overview()
+     */
+    public function apiOverviewOf(array $report): array
+    {
+        $data = $this->overviewOf($report);
+        $data['freshness']['pending'] = (bool) ($report['freshness']['pending'] ?? false);
+        $data['measurement_periods'] = array_map(fn (array $entry): array => ['started_at' => $entry['started_at'], 'ended_at' => $entry['ended_at'], 'mode' => $entry['mode']], $report['measurement_periods'] ?? []);
+        if (isset($report['segment_coverage'])) {
+            $data['segment_coverage'] = array_intersect_key($report['segment_coverage'], array_flip(['status', 'missing_sessions', 'unmeasured_dimensions']));
+        }
+
+        return $data;
+    }
+
+    /**
+     * The comparison block with the server verdict on percentages. The client never computes one itself.
+     *
+     * @param  array<string, mixed>  $comparison  a result of Reports::comparison()
+     */
+    public function apiComparisonOf(array $comparison): array
+    {
+        return ['period' => $comparison['period'], 'totals' => $comparison['totals'], 'coverage' => $comparison['coverage'] ?? null, 'availability' => $comparison['availability'] ?? null, 'reliability' => $comparison['reliability']];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $series
+     * @return list<array<string, mixed>>
+     */
+    public function apiPoints(array $series): array
+    {
+        return array_map(fn (array $point): array => [
+            'date' => $point['date'], 'label' => $point['label'], 'pageviews' => $point['pageviews'], 'custom_events' => $point['custom_events'],
+            'sessions' => $point['sessions'], 'session_availability' => $point['session_availability'] ?? null,
+        ], $series);
+    }
 }
