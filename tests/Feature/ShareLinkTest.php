@@ -7,6 +7,7 @@ use App\Models\ShareLink;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -142,6 +143,51 @@ class ShareLinkTest extends TestCase
         $this->put('/sites/'.$site->id.'/sharing/'.$link->id, ['remove_password' => true])->assertRedirect();
         $this->assertNull($link->fresh()->password_hash);
         $this->assertSame(3, $link->fresh()->secret_version);
+    }
+
+    public function test_sixth_wrong_password_is_throttled_per_link_and_per_ip(): void
+    {
+        [, , $token] = $this->link(['overview'], 'correct horse');
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->post('/s/'.$token.'/unlock', ['password' => 'wrong '.$attempt])->assertSessionHasErrors(['password' => 'The password is not correct.']);
+        }
+        // The correct password no longer helps once the link is locked out.
+        $this->post('/s/'.$token.'/unlock', ['password' => 'correct horse'])->assertSessionHasErrors(['password' => 'Too many attempts. Try again later.']);
+        $this->get('/s/'.$token)->assertInertia(fn (Assert $page) => $page->component('Share/Unlock'));
+
+        // Per IP: 20 attempts an hour across links, whatever the links.
+        Cache::flush();
+        $links = [];
+        for ($index = 0; $index < 22; $index++) {
+            $links[] = $this->link(['overview'], 'secret-'.$index)[2];
+        }
+        for ($index = 0; $index < 20; $index++) {
+            $this->post('/s/'.$links[$index].'/unlock', ['password' => 'nope'])->assertSessionHasErrors(['password' => 'The password is not correct.']);
+        }
+        $this->post('/s/'.$links[20].'/unlock', ['password' => 'secret-20'])->assertSessionHasErrors(['password' => 'Too many attempts. Try again later.']);
+    }
+
+    public function test_throttle_uses_the_forwarded_address_only_from_a_trusted_proxy(): void
+    {
+        $tokens = [];
+        for ($index = 0; $index < 22; $index++) {
+            $tokens[] = $this->link(['overview'], 'secret-'.$index)[2];
+        }
+        // Untrusted proxy: the header is ignored, so changing it does not escape the limit.
+        config(['perysee.trusted_proxies' => []]);
+        for ($index = 0; $index < 20; $index++) {
+            $this->withHeaders(['X-Forwarded-For' => '10.0.0.'.$index])->post('/s/'.$tokens[$index].'/unlock', ['password' => 'nope']);
+        }
+        $this->withHeaders(['X-Forwarded-For' => '203.0.113.99'])->post('/s/'.$tokens[20].'/unlock', ['password' => 'secret-20'])->assertSessionHasErrors(['password' => 'Too many attempts. Try again later.']);
+
+        // Trusted proxy: each forwarded client has its own allowance.
+        Cache::flush();
+        config(['perysee.trusted_proxies' => ['127.0.0.1']]);
+        for ($index = 0; $index < 20; $index++) {
+            $this->withHeaders(['X-Forwarded-For' => '198.51.100.7'])->post('/s/'.$tokens[$index].'/unlock', ['password' => 'nope']);
+        }
+        $this->withHeaders(['X-Forwarded-For' => '198.51.100.7'])->post('/s/'.$tokens[20].'/unlock', ['password' => 'secret-20'])->assertSessionHasErrors(['password' => 'Too many attempts. Try again later.']);
+        $this->withHeaders(['X-Forwarded-For' => '198.51.100.8'])->post('/s/'.$tokens[21].'/unlock', ['password' => 'secret-21'])->assertSessionHasNoErrors()->assertRedirect('/s/'.$tokens[21]);
     }
 
     public function test_only_an_owner_manages_links_and_never_those_of_another_site(): void

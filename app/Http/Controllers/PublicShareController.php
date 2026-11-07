@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Analytics\Reporting\Reports;
 use App\Models\ShareLink;
 use App\Models\Website;
+use App\Support\Coordination;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -59,13 +61,19 @@ class PublicShareController extends Controller
         return response()->json($data)->header('Cache-Control', 'no-store, private');
     }
 
-    public function unlock(Request $request, string $token): RedirectResponse
+    public function unlock(Request $request, string $token, Coordination $coordination): RedirectResponse
     {
         [$link] = $this->context($request);
         $data = $request->validate(['password' => ['required', 'string', 'max:128']]);
+        // Every attempt counts, per link and per client address; a good password forgives the link's count.
+        $linkKey = 'share:password:link:'.$link->id;
+        if (! $coordination->throttle($linkKey, 5, 900) || ! $coordination->throttle('share:password:ip:'.sha1((string) $request->ip()), 20, 3600)) {
+            throw ValidationException::withMessages(['password' => 'Too many attempts. Try again later.']);
+        }
         if ($link->password_hash === null || ! Hash::check($data['password'], $link->password_hash)) {
             throw ValidationException::withMessages(['password' => 'The password is not correct.']);
         }
+        RateLimiter::clear($linkKey);
         $request->session()->put('share_unlocked.'.$link->id, $link->secret_version);
 
         // Back to the clean address, so the token is never part of a form submission result.
