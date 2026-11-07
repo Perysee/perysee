@@ -20,6 +20,17 @@ class ResolveShareLink
 
     public function handle(Request $request, Closure $next): Response
     {
+        $response = $this->resolve($request, $next);
+        // Whatever the outcome: no caching, no referrer carrying the token, no indexing.
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
+
+        return $response;
+    }
+
+    private function resolve(Request $request, Closure $next): Response
+    {
         $token = (string) $request->route('token');
         $link = strlen($token) <= 64 ? ShareLink::with('website')->where('token_hash', ShareLink::hashToken($token))->first() : null;
         $site = $link?->website;

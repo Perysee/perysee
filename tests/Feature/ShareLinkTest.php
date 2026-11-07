@@ -145,6 +145,30 @@ class ShareLinkTest extends TestCase
         $this->assertSame(3, $link->fresh()->secret_version);
     }
 
+    public function test_share_responses_are_no_store_noreferrer_noindex(): void
+    {
+        [, , $token] = $this->link();
+        [, , $locked] = $this->link(['overview'], 'correct horse');
+        $responses = [
+            $this->get('/s/'.$token),
+            $this->getJson('/s/'.$token.'/api/overview'),
+            $this->get('/s/'.$locked),
+            $this->post('/s/'.$locked.'/unlock', ['password' => 'correct horse']),
+            $this->post('/s/'.$locked.'/unlock', ['password' => 'wrong']),
+            $this->get('/s/'.str_repeat('b', 43)),
+            $this->getJson('/s/'.str_repeat('b', 43).'/api/overview'),
+        ];
+        foreach ($responses as $response) {
+            $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+            $this->assertSame('no-referrer', $response->headers->get('Referrer-Policy'));
+            $this->assertSame('noindex, nofollow', $response->headers->get('X-Robots-Tag'));
+            $this->assertSame('DENY', $response->headers->get('X-Frame-Options'));
+            $this->assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
+        }
+        // The rest of the application keeps its policy.
+        $this->get('/login')->assertHeader('Referrer-Policy', 'same-origin');
+    }
+
     public function test_sixth_wrong_password_is_throttled_per_link_and_per_ip(): void
     {
         [, , $token] = $this->link(['overview'], 'correct horse');
