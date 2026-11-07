@@ -49,7 +49,7 @@ class Diagnostics
 
     private function extensions(): array
     {
-        $extensions = ['ctype', 'curl', 'dom', 'fileinfo', 'filter', 'hash', 'mbstring', 'openssl', 'pcre', 'pdo', 'pdo_mysql', 'session', 'tokenizer', 'xml'];
+        $extensions = ['ctype', 'curl', 'dom', 'fileinfo', 'filter', 'hash', 'iconv', 'mbstring', 'openssl', 'pcre', 'pdo', 'pdo_mysql', 'session', 'tokenizer', 'xml', 'xmlwriter'];
         $missing = array_values(array_filter($extensions, fn (string $extension) => ! extension_loaded($extension)));
 
         return ['label' => $missing ? 'Missing extensions: '.implode(', ', $missing) : 'Required PHP extensions', 'ok' => $missing === []];
