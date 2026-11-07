@@ -114,7 +114,9 @@ const columns = [
                             <UButton
                                 :to="row.original.verify_url"
                                 icon="i-tabler-alert-triangle"
-                                label="Silent · Verify"
+                                label="Silent"
+                                title="No recent event: verify the installation"
+                                :aria-label="'Silent: verify the installation of ' + row.original.name"
                                 color="warning"
                                 variant="subtle"
                                 size="xs"
