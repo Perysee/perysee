@@ -98,7 +98,7 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
         // Installation check
         Route::get('/sites/{website}/tracking/verify', [TrackingCheckController::class, 'show'])->name('sites.verify');
-        Route::post('/sites/{website}/tracking/probe', [TrackingCheckController::class, 'probeToken'])->middleware('throttle:6,1')->name('sites.verify.probe');
+        Route::post('/sites/{website}/tracking/probe', [TrackingCheckController::class, 'probeToken'])->middleware('throttle:6,1,tracker-probe')->name('sites.verify.probe');
         Route::get('/sites/{website}/team', [SiteMemberController::class, 'index'])->name('sites.team');
         Route::delete('/sites/{website}/team/me', [SiteMemberController::class, 'leave'])->name('sites.team.leave');
         Route::put('/sites/{website}/team/{member}', [SiteMemberController::class, 'update'])->whereNumber('member')->name('sites.team.update');
