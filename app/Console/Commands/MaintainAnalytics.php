@@ -84,6 +84,11 @@ class MaintainAnalytics extends Command
                     DB::table('journey_reports')->where('id', $id)->delete();
                 }
             }
+            // Invitations that expired, were accepted or were revoked more than 30 days ago are of no use any more.
+            $invitationCutoff = now('UTC')->subDays(30);
+            DB::table('site_invitations')
+                ->whereIn('id', DB::table('site_invitations')->where(fn ($query) => $query->where('expires_at', '<', $invitationCutoff)->orWhere('accepted_at', '<', $invitationCutoff)->orWhere('revoked_at', '<', $invitationCutoff))->orderBy('id')->limit($limit)->pluck('id'))
+                ->delete();
             $this->call('perysee:prune-tracking', ['--limit' => $limit]);
 
             return self::SUCCESS;

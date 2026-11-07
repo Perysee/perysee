@@ -34,6 +34,8 @@ const title = computed(
                 : p.value.website?.name || "Overview",
             "sites.tracking": "Tracking setup",
             "sites.sharing": "Sharing",
+            "sites.team": "Team",
+            invitation: "Invitation",
             funnels: "Funnels",
             goals: "Goals",
             "goal.report": p.value.goal?.name || "Goal",
@@ -159,6 +161,12 @@ const configNav = computed(() =>
                         },
                     ]
                   : []),
+              {
+                  label: "Team",
+                  icon: "i-tabler-users",
+                  to: p.value.siteLinks.team,
+                  active: p.value.screen === "sites.team",
+              },
               ...(p.value.canUpdate
                   ? [
                         {

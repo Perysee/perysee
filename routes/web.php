@@ -9,13 +9,17 @@ use App\Http\Controllers\GuideController;
 use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\InstanceHealthController;
 use App\Http\Controllers\InstanceUpdateController;
+use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\ModuleAssetController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\ShareLinkController;
 use App\Http\Controllers\SiteFaviconController;
+use App\Http\Controllers\SiteInvitationController;
+use App\Http\Controllers\SiteMemberController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Middleware\EnsureInstalled;
+use App\Http\Middleware\ThrottleInvitationLinks;
 use App\Installation\InstallationState;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +29,10 @@ Route::post('/install/unlock', [InstallationController::class, 'unlock'])->name(
 Route::post('/install/database', [InstallationController::class, 'database'])->name('install.database');
 Route::post('/install/administrator', [InstallationController::class, 'administrator'])->name('install.administrator');
 Route::middleware(EnsureInstalled::class)->group(function (): void {
+    Route::middleware(ThrottleInvitationLinks::class)->group(function (): void {
+        Route::get('/invitations/{token}', [InvitationAcceptanceController::class, 'show'])->name('invitations.show');
+        Route::post('/invitations/{token}', [InvitationAcceptanceController::class, 'accept'])->name('invitations.accept');
+    });
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [AuthController::class, 'create'])->name('login');
         Route::post('/login', [AuthController::class, 'store'])->name('login.store');
@@ -77,6 +85,13 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::put('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'update'])->name('sites.sharing.update');
         Route::delete('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'destroy'])->name('sites.sharing.destroy');
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
+        Route::get('/sites/{website}/team', [SiteMemberController::class, 'index'])->name('sites.team');
+        Route::delete('/sites/{website}/team/me', [SiteMemberController::class, 'leave'])->name('sites.team.leave');
+        Route::put('/sites/{website}/team/{member}', [SiteMemberController::class, 'update'])->whereNumber('member')->name('sites.team.update');
+        Route::delete('/sites/{website}/team/{member}', [SiteMemberController::class, 'destroy'])->whereNumber('member')->name('sites.team.destroy');
+        Route::post('/sites/{website}/invitations', [SiteInvitationController::class, 'store'])->name('sites.invitations.store');
+        Route::post('/sites/{website}/invitations/{invitation}/resend', [SiteInvitationController::class, 'resend'])->whereNumber('invitation')->name('sites.invitations.resend');
+        Route::delete('/sites/{website}/invitations/{invitation}', [SiteInvitationController::class, 'revoke'])->whereNumber('invitation')->name('sites.invitations.revoke');
         Route::get('/sites/{website}/{section}', [WorkspaceController::class, 'sitePage'])->whereIn('section', ['countries', 'pages', 'events', 'sessions', 'realtime', 'sources', 'campaigns', 'devices', 'pixels'])->name('sites.section');
         Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
         Route::get('/account/password', [AuthController::class, 'editPassword'])->name('password.edit');

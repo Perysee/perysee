@@ -33,6 +33,11 @@ class Website extends Model
         return $this->hasMany(ShareLink::class);
     }
 
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(SiteInvitation::class);
+    }
+
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'site_members')->withPivot('role')->withTimestamps();
