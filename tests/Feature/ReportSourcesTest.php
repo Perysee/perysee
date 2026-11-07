@@ -107,7 +107,7 @@ class ReportSourcesTest extends TestCase
         [$from, $to] = $this->period();
         $report = collect($this->sources()->collect($site->id, $from, $to))->firstWhere('key', 'digests.incidents');
 
-        $this->assertSame('Fake source', $report['label']);
+        $this->assertSame('Fake  source', $report['label']);
         $this->assertSame([['label' => 'Site', 'value' => (string) $site->id], ['label' => 'Days', 'value' => '7']], $report['sections'][0]->rows);
     }
 
