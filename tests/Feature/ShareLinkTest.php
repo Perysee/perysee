@@ -30,6 +30,31 @@ class ShareLinkTest extends TestCase
         return [$site, $owner];
     }
 
+    /** @return array{0: Website, 1: ShareLink, 2: string} */
+    private function link(array $sections = ['overview'], ?string $password = null, mixed $expires = null, ?Website $site = null): array
+    {
+        $site ??= Website::factory()->create(['name' => 'Public blog']);
+        [$link, $token] = ShareLink::issue($site, null, 'Test', $sections, $password, $expires);
+
+        return [$site, $link, $token];
+    }
+
+    public function test_valid_token_shows_overview_without_login(): void
+    {
+        [$site, , $token] = $this->link();
+        DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => now('UTC')->toDateString(), 'pageviews' => 42]);
+
+        $this->get('/s/'.$token)->assertOk()->assertInertia(function (Assert $page) use ($site): void {
+            $page->component('Share/Show')
+                ->where('site', ['name' => 'Public blog', 'domain' => $site->domain, 'timezone' => 'UTC'])
+                ->where('report.totals.pageviews', 42)
+                ->where('sections', ['overview']);
+            $keys = array_keys($page->toArray()['props']);
+            sort($keys);
+            $this->assertSame(['assets', 'currentUrl', 'dimension', 'dimensionOptions', 'dimensionReport', 'errors', 'flash', 'period', 'report', 'sections', 'series', 'site', 'today'], $keys);
+        })->assertDontSee($site->public_id);
+    }
+
     public function test_owner_creates_link_and_only_hash_is_stored(): void
     {
         [$site, $owner] = $this->siteWithOwner();
