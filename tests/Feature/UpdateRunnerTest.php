@@ -7,6 +7,7 @@ use App\Updates\UpdateOptions;
 use App\Updates\UpdateRunner;
 use App\Updates\UpdateStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 use ZipArchive;
@@ -49,7 +50,7 @@ class UpdateRunnerTest extends TestCase
         return "<?php\n\$arguments = \$argv;\nif (in_array('perysee:update:finalize', \$arguments, true)) {\n    echo \"finalizing {$label}\\n\";\n    if ({$finalize} === 0) { @unlink({$down}); }\n    exit({$finalize});\n}\nif (in_array('up', \$arguments, true)) { @unlink({$down}); }\nexit(0);\n";
     }
 
-    private function release(string $version, int $finalize): string
+    private function release(string $version, int $finalize, string $repository = 'Perysee/perysee'): string
     {
         $path = $this->installationDirectory.'/perysee.zip';
         @unlink($path);
@@ -59,7 +60,7 @@ class UpdateRunnerTest extends TestCase
             'artisan' => $this->fakeArtisan('new', $finalize), 'app/Marker.php' => 'new', 'config/perysee.php' => "<?php return ['version' => '{$version}'];",
             'public/index.php' => '<?php // front', 'public/build/manifest.json' => '{}', 'vendor/autoload.php' => '<?php',
             'vendor/composer/platform_check.php' => '<?php if (!(PHP_VERSION_ID >= 80300)) {}',
-            'release.json' => json_encode(['version' => "v{$version}", 'repository' => 'Perysee/perysee']),
+            'release.json' => json_encode(['version' => "v{$version}", 'repository' => $repository]),
         ] as $name => $contents) {
             $zip->addFromString('perysee/'.$name, $contents);
         }
@@ -137,6 +138,30 @@ class UpdateRunnerTest extends TestCase
         $this->assertSame('APP_KEY=base64:keep', file_get_contents($this->live.'/.env'));
         $this->assertFileDoesNotExist($this->live.'/storage/framework/down');
         $this->assertSame('failed', $this->app->make(UpdateStatus::class)->current()['state']);
+    }
+
+    public function test_an_archive_built_for_another_repository_is_refused_before_any_change(): void
+    {
+        $this->archive = $this->release('9.9.9', finalize: 0, repository: 'Someone/else');
+        $this->publish($this->archive);
+
+        try {
+            $this->runUpdate(new UpdateOptions);
+            $this->fail('The update should have failed.');
+        } catch (UpdateException $exception) {
+            $this->assertStringContainsString('another repository', $exception->getMessage());
+        }
+
+        $this->assertSame('old', file_get_contents($this->live.'/app/Marker.php'));
+    }
+
+    public function test_release_downloads_follow_redirects_over_https_only(): void
+    {
+        $client = new \ReflectionMethod(UpdateRunner::class, 'client');
+        $options = (new \ReflectionProperty(PendingRequest::class, 'options'))
+            ->getValue($client->invoke($this->app->make(UpdateRunner::class), 30));
+
+        $this->assertSame(['https'], $options['allow_redirects']['protocols']);
     }
 
     public function test_a_tampered_archive_is_refused_before_any_change(): void

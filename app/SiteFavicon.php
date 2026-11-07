@@ -158,7 +158,13 @@ class SiteFavicon
         $packed = @inet_pton($address);
 
         return filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_GLOBAL_RANGE)
-            && ! ($packed && strlen($packed) === 16 && substr($packed, 0, 12) === str_repeat("\0", 10)."\xff\xff");
+            && ! ($packed && strlen($packed) === 16 && (
+                substr($packed, 0, 12) === str_repeat("\0", 10)."\xff\xff"
+                // NAT64 (64:ff9b::/96 and 64:ff9b:1::/48) carries an IPv4 address that a gateway may route to an internal host,
+                // and PHP counts these prefixes as global.
+                || substr($packed, 0, 12) === "\x00\x64\xff\x9b".str_repeat("\0", 8)
+                || substr($packed, 0, 6) === "\x00\x64\xff\x9b\x00\x01"
+            ));
     }
 
     /** @return array<int, string> */
