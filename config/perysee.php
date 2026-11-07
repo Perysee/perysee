@@ -17,6 +17,8 @@ return [
         'window' => 600,
         'threshold' => ['stable' => 20, 'beta' => 10, 'experimental' => 5],
     ],
+    // Domain events (module events): after this many milliseconds spent delivering one event, the listeners left are skipped.
+    'module_events' => ['budget_ms' => 2000],
     'modules_backup_path' => env('PERYSEE_MODULES_BACKUP_PATH', storage_path('app/modules-backup')),
     // The public catalog of free official modules. PERYSEE_MODULE_CATALOG=false turns every call to it off.
     'module_catalog' => [
@@ -37,8 +39,17 @@ return [
     'raw_retention_days' => (int) env('PERYSEE_RAW_RETENTION_DAYS', 90),
     // How long the identifier of an order is remembered to ignore a reloaded confirmation page (ADR 008).
     'order_dedup_days' => (int) env('PERYSEE_ORDER_DEDUP_DAYS', 30),
+    // A site that has received events but none for this many days is flagged as silent.
+    'silent_site_days' => (int) env('PERYSEE_SILENT_SITE_DAYS', 3),
     'redis_enabled' => (bool) env('PERYSEE_REDIS_ENABLED', false),
     'landing_url' => env('PERYSEE_LANDING_URL', 'https://perysee.com'),
     'docs_url' => env('PERYSEE_DOCS_URL', 'https://docs.perysee.com'),
     'repository_url' => env('PERYSEE_REPOSITORY_URL', 'https://github.com/Perysee/perysee'),
+    // Read API (/api/v1): requests a minute per token (an owner picks within min..max) and an optional ceiling on a token's lifetime.
+    'api' => [
+        'default_rate' => 60,
+        'min_rate' => 10,
+        'max_rate' => (int) env('PERYSEE_API_MAX_RATE', 300),
+        'max_expiry_days' => env('PERYSEE_API_MAX_EXPIRY_DAYS') !== null ? (int) env('PERYSEE_API_MAX_EXPIRY_DAYS') : null,
+    ],
 ];

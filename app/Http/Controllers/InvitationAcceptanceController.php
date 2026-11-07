@@ -6,6 +6,9 @@ use App\Http\Requests\AcceptInvitationRequest;
 use App\Models\SiteInvitation;
 use App\Models\User;
 use App\Models\Website;
+use App\Modules\Events\DomainEvents;
+use App\Modules\Events\InvitationAccepted;
+use App\Support\AccessLog;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,7 +40,8 @@ class InvitationAcceptanceController extends Controller
 
     public function accept(AcceptInvitationRequest $request, string $token): RedirectResponse
     {
-        $outcome = DB::transaction(function () use ($request, $token): Website|RedirectResponse {
+        $joined = null;
+        $outcome = DB::transaction(function () use ($request, $token, &$joined): Website|RedirectResponse {
             $invitation = SiteInvitation::pending()->where('token_hash', SiteInvitation::hashToken($token))->lockForUpdate()->first();
             abort_if(! $invitation, 404);
             $website = Website::whereKey($invitation->website_id)->lockForUpdate()->first();
@@ -47,6 +51,7 @@ class InvitationAcceptanceController extends Controller
             $failures = 'invitation-fail:'.$invitation->id;
             abort_if(RateLimiter::tooManyAttempts($failures, 5), 404);
             $user = $request->user();
+            $created = false;
             if ($user) {
                 // Never say which address was invited.
                 if (mb_strtolower($user->email) !== $invitation->email) {
@@ -60,6 +65,7 @@ class InvitationAcceptanceController extends Controller
                 return redirect()->route('login');
             } else {
                 $user = User::create(['name' => $request->validated('name'), 'email' => $invitation->email, 'password' => $request->validated('password')]);
+                $created = true;
                 // The address counts as verified only when a message really reached it.
                 if ($invitation->last_sent_at) {
                     $user->forceFill(['email_verified_at' => now()])->save();
@@ -72,6 +78,7 @@ class InvitationAcceptanceController extends Controller
                 $website->members()->updateExistingPivot($user->id, ['role' => 'owner']);
             }
             $invitation->forceFill(['accepted_at' => now('UTC')])->save();
+            $joined = [$website->id, $invitation->role, $created, $user->id];
             if (! $request->user()) {
                 Auth::login($user);
             }
@@ -82,6 +89,12 @@ class InvitationAcceptanceController extends Controller
             return $outcome;
         }
         $request->session()->regenerate();
+        // Module events (ADR 005): after the commit, delivered once the response is sent; ids only, no name or address.
+        $events = app(DomainEvents::class);
+        if ($joined !== null && $events->listening(InvitationAccepted::class)) {
+            $events->publishAfterResponse(new InvitationAccepted(...$joined));
+        }
+        AccessLog::record(AccessLog::INVITATION_ACCEPTED, $request->user(), $request, ['site_id' => $outcome->id]);
 
         return redirect()->route('sites.show', $outcome);
     }

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Diagnostics\SiteActivity;
 use App\Analytics\InstanceHealth;
 use App\Analytics\Reporting\Reports;
 use App\Models\Website;
+use App\Modules\Events\SchedulerWatch;
 use App\Support\Ui;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -15,6 +17,7 @@ class WorkspaceController extends Controller
     public function dashboard(Request $request, Reports $reports): Response
     {
         $sites = $request->user()->websites()->whereNull('deleting_at')->orderBy('name')->paginate(20);
+        SiteActivity::annotate($sites); // installation check: last event and silent flag
         $summaries = [];
         $charts = [];
         $sitePeriods = [];
@@ -32,6 +35,10 @@ class WorkspaceController extends Controller
         $attention = $request->user()->is_admin
             ? array_map(fn (array $item): array => $item + ['link' => route('health', [], false)], app(InstanceHealth::class)->attention())
             : [];
+
+        if ($attention !== []) {
+            app(SchedulerWatch::class)->pageLoaded($attention);
+        }
 
         return Ui::render('dashboard', compact('sites', 'summaries', 'charts', 'sitePeriods', 'comparisons', 'attention'));
     }

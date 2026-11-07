@@ -33,7 +33,9 @@ const title = computed(
                   }[p.value.section]
                 : p.value.website?.name || "Overview",
             "sites.tracking": "Tracking setup",
+            "sites.verify": "Verify installation",
             "sites.sharing": "Sharing",
+            "sites.api-tokens": "API access",
             "sites.team": "Team",
             invitation: "Invitation",
             funnels: "Funnels",
@@ -151,7 +153,7 @@ const configNav = computed(() =>
                   label: "Tracking setup",
                   icon: "i-tabler-code",
                   to: p.value.siteLinks.tracking,
-                  active: p.value.screen === "sites.tracking",
+                  active: ["sites.tracking", "sites.verify"].includes(p.value.screen),
               },
               ...(p.value.canShare
                   ? [
@@ -160,6 +162,16 @@ const configNav = computed(() =>
                             icon: "i-tabler-share",
                             to: p.value.siteLinks.sharing,
                             active: p.value.screen === "sites.sharing",
+                        },
+                    ]
+                  : []),
+              ...(p.value.canManageApiTokens
+                  ? [
+                        {
+                            label: "API access",
+                            icon: "i-tabler-key",
+                            to: p.value.siteLinks["api-tokens"],
+                            active: p.value.screen === "sites.api-tokens",
                         },
                     ]
                   : []),
@@ -200,6 +212,12 @@ const configNav = computed(() =>
                             icon: "i-tabler-mail",
                             to: p.value.links["settings.mail"],
                             active: p.value.screen === "settings.mail",
+                        },
+                        {
+                            label: "Security",
+                            icon: "i-tabler-shield-lock",
+                            to: p.value.links["settings.security"],
+                            active: p.value.screen === "settings.security",
                         },
                         {
                             label: "Modules",
@@ -244,6 +262,11 @@ const accountMenu = computed(() => [
             label: "Password",
             to: p.value.links["password.edit"],
             icon: "i-tabler-key",
+        },
+        {
+            label: "Security",
+            to: p.value.links["account.security"],
+            icon: "i-tabler-shield-lock",
         },
         ...(p.value.auth?.is_admin
             ? [

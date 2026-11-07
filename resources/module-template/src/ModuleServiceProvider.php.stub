@@ -20,5 +20,12 @@ class ModuleServiceProvider extends ModuleProvider
 
         // Optional: override the instance name, logo address and accent color.
         // $this->brand(fn (): array => ['name' => '{{name}}']);
+
+        // Optional: react to a moment of the Core. The listener receives a read-only event with a payload of ids and
+        // counters, runs only while this module is enabled, and its failures never reach the Core. This needs
+        // "core": "0.4.0" or later in module.json, so that an older Perysee refuses to enable the module.
+        // $this->listen(\App\Modules\Events\ModuleQuarantined::class, function (\App\Modules\Events\ModuleQuarantined $event): void {
+        //     \Illuminate\Support\Facades\Log::info('Module quarantined: '.$event->moduleId);
+        // });
     }
 }

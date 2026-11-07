@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Diagnostics\SiteActivity;
 use App\Analytics\Reporting\Reports;
 use App\Http\Requests\SaveWebsiteRequest;
 use App\Models\Website;
@@ -28,7 +29,10 @@ class WebsiteController extends Controller
             });
         }
 
-        return Ui::render('sites.index', ['websites' => $query->orderBy('name')->paginate(20)->withQueryString(), 'search' => $search]);
+        $websites = $query->orderBy('name')->paginate(20)->withQueryString();
+        SiteActivity::annotate($websites); // installation check: last event and silent flag
+
+        return Ui::render('sites.index', ['websites' => $websites, 'search' => $search]);
     }
 
     public function create(): Response

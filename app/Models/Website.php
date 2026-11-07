@@ -33,6 +33,11 @@ class Website extends Model
         return $this->hasMany(ShareLink::class);
     }
 
+    public function apiTokens(): HasMany
+    {
+        return $this->hasMany(ApiToken::class);
+    }
+
     public function invitations(): HasMany
     {
         return $this->hasMany(SiteInvitation::class);

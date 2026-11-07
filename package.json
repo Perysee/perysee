@@ -9,6 +9,7 @@
     "test:tracker": "node --test tests/Tracker/*.test.mjs",
     "test:distribution": "node --test tests/Distribution/*.test.mjs",
     "test:charts": "node --test tests/Charts/*.test.mjs",
+    "test:security": "node --test tests/Security/*.test.mjs",
     "brand:sync": "node scripts/sync-brand.mjs",
     "brand:check": "node scripts/sync-brand.mjs --check"
   },

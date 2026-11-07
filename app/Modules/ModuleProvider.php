@@ -6,6 +6,12 @@ namespace App\Modules;
 
 use App\Http\Middleware\EnsureInstalled;
 use App\Http\Middleware\EnsureModuleActiveForSite;
+use App\Modules\Contracts\DomainEvent;
+use App\Modules\Contracts\NotificationChannel;
+use App\Modules\Contracts\ReportSource;
+use App\Modules\Events\DomainEvents;
+use App\Modules\Notifications\NotificationChannels;
+use App\Modules\Reports\ReportSources;
 use Closure;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
@@ -99,5 +105,55 @@ abstract class ModuleProvider extends ServiceProvider
     protected function healthCard(Closure $resolver): void
     {
         $this->app->make(ModuleExtensions::class)->healthCard($this->module->manifest->id, $resolver);
+    }
+
+    /**
+     * Subscribes to a domain event (see the catalog in `App\Modules\Events`). The listener receives the event, runs only
+     * while this module is enabled and, for an event about a site, only on the sites the module is active on. An exception
+     * in it is counted against this module and never reaches the Core or another module. Delivery is best effort
+     * (at most once, no ordering): do not rely on it for data that must not be lost.
+     *
+     * Available from the Perysee release in {@see ModuleApi::DOMAIN_EVENTS_SINCE}: `module.json` must require it in "core".
+     *
+     * @param  class-string<DomainEvent>  $event
+     * @param  Closure(DomainEvent): mixed|class-string  $listener  A closure, or the name of a class with an __invoke method.
+     */
+    protected function listen(string $event, Closure|string $listener): void
+    {
+        $this->requireDomainEvents('listen');
+        $this->app->make(DomainEvents::class)->listen($this->module->manifest->id, $event, $listener);
+    }
+
+    /**
+     * Declares a notification channel. $key is "{module id}.{name}". Other modules and the Core send through
+     * `NotificationChannels::send($key, $target, $notification)`.
+     *
+     * @param  NotificationChannel|class-string<NotificationChannel>  $channel
+     */
+    protected function notificationChannel(string $key, NotificationChannel|string $channel): void
+    {
+        $this->requireDomainEvents('notificationChannel');
+        $this->app->make(NotificationChannels::class)->register($this->module->manifest->id, $key, $channel);
+    }
+
+    /**
+     * Declares a source of figures for periodic reports. $key is "{module id}.{name}".
+     *
+     * @param  ReportSource|class-string<ReportSource>  $source
+     */
+    protected function reportSource(string $key, ReportSource|string $source): void
+    {
+        $this->requireDomainEvents('reportSource');
+        $this->app->make(ReportSources::class)->register($this->module->manifest->id, $key, $source);
+    }
+
+    /**
+     * A module that uses these methods must say so in its manifest, so that an older Core refuses to enable it.
+     */
+    private function requireDomainEvents(string $method): void
+    {
+        if (version_compare($this->module->manifest->core, ModuleApi::DOMAIN_EVENTS_SINCE, '<')) {
+            throw new InvalidManifest("Module {$this->module->manifest->id} calls {$method}(), which needs Perysee ".ModuleApi::DOMAIN_EVENTS_SINCE.' or later: set "core" to at least that version in module.json.');
+        }
     }
 }

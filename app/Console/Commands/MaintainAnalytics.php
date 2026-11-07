@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Analytics\InstanceHealth;
+use App\Modules\Events\SchedulerWatch;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -20,7 +21,8 @@ class MaintainAnalytics extends Command
 
             return self::FAILURE;
         }
-        $health->put('heartbeat', now('UTC')->toIso8601String());
+        // Records the heartbeat; a module listening to scheduler.heartbeat_missed also learns of a recovery (no extra query otherwise).
+        app(SchedulerWatch::class)->beat($health);
         $maria = in_array(DB::getDriverName(), ['mariadb', 'mysql'], true);
         $name = 'perysee:aggregate:'.substr(hash('sha256', DB::connection()->getDatabaseName()), 0, 32);
         if ($maria && (int) DB::selectOne('SELECT GET_LOCK(?, 0) AS acquired', [$name])->acquired !== 1) {
@@ -32,14 +34,14 @@ class MaintainAnalytics extends Command
             $site = DB::table('websites')->whereNotNull('deleting_at')->orderBy('id')->first();
             if ($site) {
                 $remaining = $limit;
-                foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions', 'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels', 'goal_sessions', 'stats_goal_daily', 'goal_versions', 'goals', 'stats_event_property_daily', 'event_order_ids'] as $table) {
+                foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions', 'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels', 'goal_sessions', 'stats_goal_daily', 'goal_versions', 'goals', 'stats_event_property_daily', 'event_order_ids', 'collection_diagnostics'] as $table) {
                     $query = DB::table($table)->where('website_id', $site->id);
                     $keys = match ($table) {
                         'stats_segment_daily', 'stats_segment_hourly' => ['bucket_start', 'segment_hash'], 'segment_events' => ['event_id'], 'segment_sessions' => ['session_key'],
                         'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels', 'goal_versions', 'goals' => ['id'],
                         'goal_sessions' => ['goal_id', 'version', 'session_key'], 'stats_goal_daily' => ['goal_id', 'version', 'bucket_start', 'segment_hash'],
                         'stats_event_property_daily' => ['stat_date', 'event_name', 'prop_key', 'value_hash'], 'event_order_ids' => ['order_hash'],
-                        'events' => ['id'], 'stats_daily' => ['stat_date'], 'stats_hourly' => ['bucket_start'],
+                        'collection_diagnostics' => ['bucket_start', 'cause'], 'events' => ['id'], 'stats_daily' => ['stat_date'], 'stats_hourly' => ['bucket_start'],
                         'stats_dimension_daily' => ['stat_date', 'dimension_type', 'dimension_hash'], 'measured_sessions' => ['session_key'], 'site_measurement_periods' => ['id'],
                     };
                     foreach ($keys as $key) {

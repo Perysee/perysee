@@ -1,0 +1,28 @@
+# 007. Two-factor authentication, open sessions and the access log
+
+Status: proposed
+
+## Context
+
+Signing in needed only a password. An owner of an instance had no way to ask for a second factor, to see which browsers were signed in to an account or to end one of them, or to see who tried to sign in. Perysee runs on shared hosting: the installer writes `SESSION_DRIVER=file` (sessions cannot be listed by user), there is no permanent worker and the client may have neither Composer nor Node.
+
+## Decision
+
+- **TOTP, with maintained libraries.** `pragmarx/google2fa` (MIT) provides the RFC 6238 computation and `bacon/bacon-qr-code` (BSD-2-Clause) draws the setup QR code as SVG on the server, so the secret never goes to a third party. Both support PHP 8.3 to 8.5 and add `dasprid/enum` and `paragonie/constant_time_encoding` (all permissive licences). The packages are in `vendor/`, which the release archive ships whole. They need the `iconv` and `xmlwriter` extensions: the installer checks both. No Fortify: the login stays our own controller.
+- **Own time-step check.** The library's `verifyKeyNewer()` answers `true` instead of the step on a first use, so it cannot drive replay protection. `App\Support\TwoFactor` compares the three steps of the window (previous, current, next) itself with `hash_equals`, and refuses any step at or below `user_two_factor.last_step`.
+- **Two steps, never half-authenticated.** `POST /login` validates the password; for an account with a confirmed second factor it does not sign anyone in. It stores `{user_id, expires_at (+5 min), fingerprint of the password hash}` in the session, regenerates the session id and redirects to `/login/two-factor`, a route of the `guest` group. Only a valid code calls `Auth::login()`, followed by another `session()->regenerate()`. A password change closes a pending challenge. Accounts without a second factor take the unchanged `Auth::attempt()` path.
+- **Brute force.** 5 wrong codes per minute for an account and address, and 10 per hour for an account from any address. Past either limit the challenge is closed and the password has to be typed again; a blocked account cannot open a new challenge until the hour ends. One message for every failure ("The code is not valid"), whether a code or a recovery code.
+- **Storage.** Four additive tables, none of them on `users`: `user_two_factor` (secret encrypted with the application key, `confirmed_at`, `last_step`), `user_recovery_codes` (8 codes of 10 characters, stored as HMAC-SHA256 keyed with the application key, spent by setting `used_at`), `user_sessions` and `access_log`. Verification and spending happen under a row lock (`lockForUpdate`), so one code cannot succeed twice in parallel.
+- **Open sessions without changing the session driver.** `user_sessions` holds the SHA-256 of the session id (to find the current session) and the id encrypted with the application key (to destroy the session through `Session::getHandler()->destroy()`). A middleware (`TrackSession`) writes a row when a session first appears and then at most every ten minutes, tracked in the session itself so that the other requests run no query. At most 200 sessions are revoked per action. A password change revokes the others, `recover-admin` empties the list. The screen says "Connected devices", not "sessions", to avoid confusion with visitor sessions.
+- **Required for everyone.** `require_two_factor` in the instance state (cached five minutes, dropped when changed). Applied by a middleware on the `auth` group with no grace period; the setup page and sign-out stay reachable. An administrator can only switch it on when they have the factor themselves, and nobody can turn their own factor off while it is required.
+- **Access log.** `AccessLog::record()` is the only writer. Events: `login.success` / `login.failed` (with method or stage), `twofactor.enabled` / `twofactor.disabled`, `invitation.accepted`, `share.created`, `session.revoked`. The address is truncated before storage (/24 for IPv4, /48 for IPv6), the browser is a label ("Firefox on Linux"), and a failed sign-in keeps the typed address only when it belongs to an account. No token, code or password is ever written. Entries are kept 90 days and purged by `perysee:prune-access-log`, scheduled hourly without overlap; the idle maintenance pass is untouched, so its query budget does not change. Users read their own entries, administrators read the instance's. There is no edit or delete route.
+- **Recovery.** Recovery codes first. An administrator without them runs `perysee:recover-admin --reset-2fa` on the server, which is logged as `twofactor.disabled` with `actor: cli`. There is no administrator action on another person's second factor yet.
+
+## Consequences
+
+- Losing or changing `APP_KEY` makes every secret and every stored session id unreadable: those accounts can only sign in with a recovery code (or `--reset-2fa` for an administrator). Back the key up.
+- Authenticator apps and the server need roughly synchronised clocks (the window is plus or minus 30 seconds).
+- The list of devices only knows sessions that made a request after this version was installed; a row is removed when its session expires (purge) or is revoked.
+- Rehashing a password at sign-in (cost changes) does not happen for accounts that use a second factor, since they do not go through `Auth::attempt()`.
+- The access log does not cover password changes, and an account whose phone and recovery codes are lost still needs database or shell access to recover (non-administrators have no `--reset-2fa` equivalent).
+- The new tables are in the database backup; the secrets are only useful with `APP_KEY`.

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Installation\InstallationState;
 use App\Models\User;
 use App\Modules\Manifest;
+use App\Modules\ModuleApi;
 use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -42,6 +43,10 @@ class MakeModuleTest extends TestCase
         }
         $this->assertStringContainsString('namespace Perysee\\Modules\\ScaffoldFiles;', file_get_contents($this->modulesPath.'/scaffold-files/src/ModuleServiceProvider.php'));
         $this->assertStringNotContainsString('{{', file_get_contents($this->modulesPath.'/scaffold-files/dist/module.js'));
+        $provider = file_get_contents($this->modulesPath.'/scaffold-files/src/ModuleServiceProvider.php');
+        $this->assertStringContainsString('// $this->listen(', $provider, 'The skeleton shows how to listen to a Core event.');
+        $this->assertStringContainsString('"core": "'.ModuleApi::DOMAIN_EVENTS_SINCE.'"', $provider);
+        $this->assertSame(1, $declared['api'], 'Events are an addition to module API 1.');
     }
 
     public function test_an_unsafe_id_or_an_existing_module_is_refused_without_writing_anything(): void
