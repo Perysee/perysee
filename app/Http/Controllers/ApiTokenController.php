@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Analytics\Reporting\ReportSections;
 use App\Models\ApiToken;
 use App\Models\Website;
+use App\Support\SecretPage;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,14 +49,18 @@ class ApiTokenController extends Controller
             'revoke_url' => route('sites.api-tokens.destroy', [$website, $token], false),
         ])->all();
 
-        // The page may carry a freshly created secret: it must not be cached or kept in history snapshots.
+        // The page may carry a freshly created secret: it must not be cached or kept readable in history.state.
+        $created = $request->session()->get('api_token_created');
+        if ($created !== null) {
+            SecretPage::guard();
+        }
         $response = Ui::render('sites.api-tokens', [
             'website' => $website,
             'apiTokens' => $tokens,
             'scopeOptions' => array_keys(ReportSections::SCOPES),
             'rateLimits' => $this->rates(),
             'apiBase' => url('/api/v1'),
-            'created' => $request->session()->get('api_token_created'),
+            'created' => $created,
         ])->toResponse($request);
         $response->headers->set('Cache-Control', 'no-store, private');
 

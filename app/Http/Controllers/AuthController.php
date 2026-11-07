@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\UserSession;
 use App\Rules\BcryptPassword;
 use App\Support\AccessLog;
+use App\Support\Coordination;
 use App\Support\SignInRecorder;
 use App\Support\TwoFactor;
 use App\Support\Ui;
@@ -23,6 +24,11 @@ class AuthController extends Controller
 {
     /** How long a correct password keeps the second-factor challenge open. */
     public const CHALLENGE_MINUTES = 5;
+
+    /** Failed sign-ins written to the access journal per hour. */
+    public const FAILED_LOGGED_PER_ACCOUNT = 30;
+
+    public const FAILED_LOGGED_PER_ADDRESS = 10;
 
     public function __construct(private readonly TwoFactor $twoFactor, private readonly UserSessions $sessions, private readonly SignInRecorder $signIns) {}
 
@@ -90,7 +96,14 @@ class AuthController extends Controller
     private function failed(string $key, string $email, ?User $candidate, Request $request): never
     {
         RateLimiter::hit($key, 60);
-        AccessLog::record(AccessLog::LOGIN_FAILED, $candidate, $request, ['stage' => 'password'], $email);
+        // The journal is capped so that an unauthenticated visitor cannot fill the table: per address for unknown
+        // accounts, per account for known ones, per hour.
+        $room = $candidate
+            ? app(Coordination::class)->throttle('accesslog:failed:user:'.$candidate->getKey(), self::FAILED_LOGGED_PER_ACCOUNT, 3600)
+            : app(Coordination::class)->throttle('accesslog:failed:ip:'.hash('sha256', (string) $request->ip()), self::FAILED_LOGGED_PER_ADDRESS, 3600);
+        if ($room) {
+            AccessLog::record(AccessLog::LOGIN_FAILED, $candidate, $request, ['stage' => 'password'], $email);
+        }
         throw ValidationException::withMessages(['email' => __('These credentials do not match our records.')]);
     }
 

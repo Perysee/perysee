@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\DB;
 /** Goal definitions and their reports, the same figures as the goal screens and their JSON. */
 class GoalController extends Controller
 {
+    /** The scope each conversion breakdown depends on. */
+    private const BREAKDOWN_SCOPES = ['source' => 'sources', 'campaign' => 'campaigns', 'country' => 'countries', 'device' => 'devices'];
+
     public function __construct(private GoalReports $goals, private Reports $reports) {}
 
     private function describe(object $goal, object $version): array
@@ -47,10 +50,14 @@ class GoalController extends Controller
         ApiScopes::requireForPeriod($request, $period);
         $report = $this->goals->report($site, (int) $definition->id, (int) $version->version, $period);
 
+        $report = array_intersect_key($report, array_flip(['mode', 'totals', 'series', 'breakdown', 'coverage']));
+        // A breakdown is a report by that dimension: the token needs the scope that opens it (a goals-only token gets none).
+        $report['breakdown'] = array_filter($report['breakdown'] ?? [], fn (string $dimension): bool => ApiScopes::token($request)->allows(self::BREAKDOWN_SCOPES[$dimension] ?? '-'), ARRAY_FILTER_USE_KEY);
+
         return response()->json(['data' => [
             'goal' => $this->describe($definition, $version),
             'period' => ['from' => $period['from'], 'to' => $period['to']],
-            'report' => array_intersect_key($report, array_flip(['mode', 'totals', 'series', 'breakdown', 'coverage'])),
+            'report' => $report,
         ], 'meta' => ['api_version' => 1]]);
     }
 }

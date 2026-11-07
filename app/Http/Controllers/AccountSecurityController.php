@@ -8,6 +8,7 @@ use App\Models\AccessLogEntry;
 use App\Models\UserSession;
 use App\Support\AccessLog;
 use App\Support\InstanceSecurity;
+use App\Support\SecretPage;
 use App\Support\TwoFactor;
 use App\Support\Ui;
 use App\Support\UserSessions;
@@ -55,6 +56,12 @@ class AccountSecurityController extends Controller
             ->through(fn (AccessLogEntry $entry): array => self::entry($entry));
         $log->withPath($request->getPathInfo());
 
+        $recoveryCodes = $request->session()->pull('recovery_codes');
+        if ($setup !== null || $recoveryCodes !== null) {
+            // The TOTP secret and the backup codes must not stay readable in history.state.
+            SecretPage::guard();
+        }
+
         return Ui::render('account.security', [
             'title' => 'Security',
             'twoFactor' => [
@@ -63,7 +70,7 @@ class AccountSecurityController extends Controller
                 'remaining_codes' => $enabled ? $this->twoFactor->remainingRecoveryCodes($user) : 0,
                 'setup' => $setup,
             ],
-            'recoveryCodes' => $request->session()->pull('recovery_codes'),
+            'recoveryCodes' => $recoveryCodes,
             'openSessions' => $user->userSessions()->orderByDesc('last_seen_at')->limit(50)->get()->map(fn (UserSession $row): array => [
                 'id' => $row->id,
                 'device' => $row->device,

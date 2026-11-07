@@ -7,6 +7,8 @@ use App\Models\ShareLink;
 use App\Models\SiteInvitation;
 use App\Models\User;
 use App\Models\Website;
+use App\Modules\ModuleLoader;
+use App\Modules\ModuleRegistry;
 use App\Support\InstanceSecurity;
 use App\Support\TwoFactor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -151,5 +153,42 @@ class RequiredTwoFactorTest extends TestCase
 
         $this->post('/login', ['email' => $user->email, 'password' => 'password'])->assertRedirect('/login/two-factor');
         $this->assertGuest();
+    }
+
+    public function test_the_routes_of_a_module_need_the_second_factor_too(): void
+    {
+        $modules = $this->installationDirectory.'/modules';
+        mkdir($modules.'/ext-twofactor/src', 0777, true);
+        config(['perysee.modules_path' => $modules, 'perysee.version' => '0.1.1']);
+        app()->forgetInstance(ModuleRegistry::class);
+        app()->forgetInstance(ModuleLoader::class);
+        file_put_contents($modules.'/ext-twofactor/module.json', json_encode(['id' => 'ext-twofactor', 'name' => 'Extension', 'version' => '1.0.0', 'core' => '0.1.0']));
+        file_put_contents($modules.'/ext-twofactor/routes.php', "<?php\n\nuse Illuminate\\Support\\Facades\\Route;\n\nRoute::get('/', fn () => 'module page')->name('index');");
+        file_put_contents($modules.'/ext-twofactor/src/ModuleServiceProvider.php', <<<'PHP'
+        <?php
+
+        namespace Perysee\Modules\ExtTwofactor;
+
+        use App\Modules\ModuleProvider;
+
+        class ModuleServiceProvider extends ModuleProvider
+        {
+            public function boot(): void
+            {
+                $this->loadModuleRoutes(__DIR__.'/../routes.php');
+            }
+        }
+        PHP);
+        app(ModuleRegistry::class)->enable('ext-twofactor');
+        app(ModuleLoader::class)->load();
+
+        $user = User::factory()->create();
+        $this->actingAs($user)->get('/modules/ext-twofactor')->assertOk();
+
+        $this->require();
+        $this->actingAs($user)->get('/modules/ext-twofactor')->assertRedirect('/account/security');
+
+        $this->enableTwoFactor($user);
+        $this->actingAs($user)->get('/modules/ext-twofactor')->assertOk()->assertSee('module page');
     }
 }

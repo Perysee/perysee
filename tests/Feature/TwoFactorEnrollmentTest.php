@@ -43,7 +43,10 @@ class TwoFactorEnrollmentTest extends TestCase
         $this->post('/account/security/two-factor', ['current_password' => 'password'])->assertRedirect('/account/security');
         $secret = UserTwoFactor::findOrFail($user->id)->secret;
 
-        $this->get('/account/security')->assertInertia(fn (Assert $page) => $page
+        $setupPage = $this->get('/account/security');
+        $this->assertTrue($setupPage->viewData('page')['encryptHistory'], 'The TOTP secret is not left readable in history.state.');
+        $this->assertTrue($setupPage->viewData('page')['clearHistory']);
+        $setupPage->assertInertia(fn (Assert $page) => $page
             ->where('twoFactor.enabled', false)
             ->where('twoFactor.setup.secret', trim(chunk_split($secret, 4, ' ')))
             ->where('twoFactor.setup.uri', fn ($uri) => str_starts_with($uri, 'otpauth://totp/') && str_contains($uri, 'secret='.$secret) && str_contains($uri, 'issuer='))
@@ -74,7 +77,10 @@ class TwoFactorEnrollmentTest extends TestCase
 
         $this->post('/account/security/two-factor/confirm', ['code' => $this->totp($secret)])->assertRedirect('/account/security');
         $this->assertTrue(app(TwoFactor::class)->enabled($user));
-        $this->get('/account/security')->assertInertia(fn (Assert $page) => $page
+        $codesPage = $this->get('/account/security');
+        $this->assertTrue($codesPage->viewData('page')['encryptHistory'], 'The backup codes are not left readable in history.state.');
+        $this->assertTrue($codesPage->viewData('page')['clearHistory']);
+        $codesPage->assertInertia(fn (Assert $page) => $page
             ->where('twoFactor.enabled', true)->where('twoFactor.remaining_codes', 8)->where('twoFactor.setup', null)
             ->has('recoveryCodes', 8)->where('recoveryCodes.0', fn ($code) => (bool) preg_match('/^[A-Z2-9]{5}-[A-Z2-9]{5}$/', $code)));
         $this->get('/account/security')->assertInertia(fn (Assert $page) => $page->where('recoveryCodes', null)->where('twoFactor.remaining_codes', 8));
