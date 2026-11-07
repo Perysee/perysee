@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\InviteMemberRequest;
+use App\Mail\SiteInvitationMail;
 use App\Models\SiteInvitation;
 use App\Models\Website;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 
 class SiteInvitationController extends Controller
@@ -44,11 +46,26 @@ class SiteInvitationController extends Controller
         return redirect()->route('sites.team', $website)->with('status', __('Invitation revoked.'));
     }
 
-    /** Hands the link to the owner: it is shown once, as the raw token is not kept. */
+    /**
+     * With a real mailer the invitation is mailed. Otherwise, or if sending fails, the invitation is kept and its link
+     * is handed to the owner once, as the raw token is not stored.
+     */
     private function delivered(Website $website, SiteInvitation $invitation, string $token): RedirectResponse
     {
-        return redirect()->route('sites.team', $website)
-            ->with('invitation_link', route('invitations.show', $token))
-            ->with('invitation_email', $invitation->email);
+        $url = route('invitations.show', $token);
+        $back = redirect()->route('sites.team', $website);
+        if (! in_array(config('mail.default'), ['log', 'array'], true)) {
+            try {
+                Mail::to($invitation->email)->send(new SiteInvitationMail($url, $website->name, $invitation->role, auth()->user()?->name, $invitation->expires_at->toFormattedDateString(), config('app.name')));
+                $invitation->forceFill(['last_sent_at' => now('UTC')])->save();
+
+                return $back->with('status', __('Invitation sent to :email.', ['email' => $invitation->email]));
+            } catch (\Throwable $exception) {
+                report($exception);
+                $back->with('error', __('The e-mail could not be sent. Share the invitation link yourself.'));
+            }
+        }
+
+        return $back->with('invitation_link', $url)->with('invitation_email', $invitation->email);
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Installation\InstallationState;
+use App\Mail\SiteInvitationMail;
 use App\Models\SiteInvitation;
 use App\Models\User;
 use App\Models\Website;
@@ -51,6 +52,34 @@ class TeamManagementTest extends TestCase
 
         $this->post('/sites/'.$site->id.'/invitations', ['email' => 'b@example.com', 'role' => 'admin'])->assertSessionHasErrors('role');
         $this->post('/sites/'.$site->id.'/invitations', ['email' => $owner->email, 'role' => 'viewer'])->assertSessionHasErrors('email');
+    }
+
+    public function test_a_configured_mailer_sends_the_invitation_and_a_failure_falls_back_to_the_link(): void
+    {
+        config(['mail.default' => 'smtp']);
+        Mail::fake();
+        [$site, $owner] = $this->siteWith('owner');
+        $this->actingAs($owner);
+
+        $this->post('/sites/'.$site->id.'/invitations', ['email' => 'a@example.com', 'role' => 'viewer'])->assertRedirect('/sites/'.$site->id.'/team');
+
+        Mail::assertSent(SiteInvitationMail::class, function (SiteInvitationMail $mail) use ($site): bool {
+            return $mail->hasTo('a@example.com') && str_contains($mail->url, '/invitations/') && $mail->siteName === $site->name;
+        });
+        $rendered = (new SiteInvitationMail('http://localhost/invitations/abc', 'My & site', 'owner', 'Ann', 'Nov 14, 2026', 'Perysee'))->render();
+        $this->assertStringContainsString('http://localhost/invitations/abc', $rendered);
+        $this->assertStringContainsString('My & site', $rendered);
+        $this->assertNull(session('invitation_link'), 'The link is not shown when the mail went out.');
+        $this->assertNotNull(SiteInvitation::where('email', 'a@example.com')->first()->last_sent_at);
+
+        Mail::shouldReceive('to->send')->andThrow(new \RuntimeException('SMTP is down'));
+        $this->post('/sites/'.$site->id.'/invitations', ['email' => 'b@example.com', 'role' => 'viewer'])->assertRedirect('/sites/'.$site->id.'/team');
+
+        $invitation = SiteInvitation::where('email', 'b@example.com')->first();
+        $this->assertNull($invitation->last_sent_at);
+        $this->assertSame($invitation->id, SiteInvitation::findPending(basename(session('invitation_link')))->id);
+        $this->assertNotEmpty(session('error'));
+        $this->assertStringNotContainsString('SMTP is down', session('error'));
     }
 
     public function test_resend_rotates_the_token_and_invalidates_the_old_link(): void
