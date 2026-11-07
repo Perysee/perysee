@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { router, useForm } from "@inertiajs/vue3";
 const props = defineProps(["website", "siteLinks", "shareLinks", "sectionOptions", "created"]);
 const names = { overview: "Overview", pages: "Pages", sources: "Sources", campaigns: "Campaigns", devices: "Devices & browsers", countries: "Countries", events: "Events" };
@@ -19,12 +19,16 @@ function editPassword(link) {
     passwordForm.clearErrors();
     editing.value = link.id;
 }
+function closePassword(link) {
+    editing.value = null;
+    nextTick(() => document.getElementById("password-button-" + link.id)?.focus());
+}
 function savePassword(link) {
     passwordForm.put(link.update_url, {
         preserveScroll: true,
         onSuccess: () => {
-            editing.value = null;
             passwordForm.reset();
+            closePassword(link);
         },
     });
 }
@@ -113,17 +117,17 @@ async function copy() {
                     </p>
                 </div>
                 <div v-if="link.status !== 'revoked'" class="flex flex-wrap items-center gap-2">
-                    <UButton :label="link.protected ? 'Change password' : 'Set password'" icon="i-tabler-lock" color="neutral" variant="ghost" size="sm" @click="editPassword(link)" />
+                    <UButton :id="'password-button-' + link.id" :label="link.protected ? 'Change password' : 'Set password'" icon="i-tabler-lock" color="neutral" variant="ghost" size="sm" @click="editPassword(link)" />
                     <UButton v-if="link.protected" label="Remove password" icon="i-tabler-lock-open" color="neutral" variant="ghost" size="sm" @click="removePassword(link)" />
                     <UButton label="Revoke" icon="i-tabler-trash" color="error" variant="ghost" size="sm" @click="revoke(link)" />
                 </div>
-                <form v-if="editing === link.id" class="basis-full space-y-3" @submit.prevent="savePassword(link)" @keydown.esc="editing = null">
+                <form v-if="editing === link.id" class="basis-full space-y-3" @submit.prevent="savePassword(link)" @keydown.esc.stop="closePassword(link)">
                     <UFormField label="New password" hint="8 to 128 characters. Anyone already signed in with this link is signed out." :error="passwordForm.errors.password">
-                        <UInput v-model="passwordForm.password" type="password" autocomplete="new-password" maxlength="128" class="w-full max-w-sm" />
+                        <UInput v-model="passwordForm.password" type="password" autocomplete="new-password" maxlength="128" autofocus class="w-full max-w-sm" />
                     </UFormField>
                     <div class="flex flex-wrap gap-2">
                         <UButton type="submit" label="Save password" :loading="passwordForm.processing" size="sm" />
-                        <UButton label="Cancel" color="neutral" variant="ghost" size="sm" @click="editing = null" />
+                        <UButton label="Cancel" color="neutral" variant="ghost" size="sm" @click="closePassword(link)" />
                     </div>
                 </form>
             </li>
