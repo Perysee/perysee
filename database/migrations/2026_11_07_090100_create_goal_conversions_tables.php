@@ -17,6 +17,7 @@ return new class extends Migration
                 $table->string('session_key', 64);
                 $table->unsignedInteger('hits')->default(0);
                 $table->dateTime('converted_at', 3)->nullable();
+                $table->dateTime('last_hit_at', 3)->nullable()->index();
                 $table->text('event_data')->nullable();
                 $table->primary(['website_id', 'goal_id', 'version', 'session_key'], 'goal_sessions_pk');
             });

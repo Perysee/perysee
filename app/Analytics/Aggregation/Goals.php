@@ -246,6 +246,12 @@ class Goals
                     $convertedAt = $event->received_at;
                 }
             }
+            $lastHit = $row->last_hit_at ?? null;
+            foreach ($mine as $event) {
+                if ($lastHit === null || $this->ms($event->received_at) > $this->ms($lastHit)) {
+                    $lastHit = $event->received_at;
+                }
+            }
             $data = $row->event_data ?? null;
             if ($convertedAt !== null) {
                 $data = json_encode($firstEvent, JSON_THROW_ON_ERROR);
@@ -259,11 +265,11 @@ class Goals
             $prior = $row?->converted_at;
             $moved = ($convertedAt === null) !== ($prior === null) || ($convertedAt !== null && $this->ms($convertedAt) !== $this->ms($prior));
             if (! $row || $count !== (int) $row->hits || $moved || $data !== $row->event_data) {
-                $writes[] = ['website_id' => $site->id, 'goal_id' => $goal->goal_id, 'version' => $goal->version, 'session_key' => $key, 'hits' => $count, 'converted_at' => $convertedAt, 'event_data' => $data];
+                $writes[] = ['website_id' => $site->id, 'goal_id' => $goal->goal_id, 'version' => $goal->version, 'session_key' => $key, 'hits' => $count, 'converted_at' => $convertedAt, 'last_hit_at' => $lastHit, 'event_data' => $data];
             }
         }
         foreach (array_chunk($writes, 200) as $chunk) {
-            DB::table('goal_sessions')->upsert($chunk, self::SESSION_KEY, ['hits', 'converted_at', 'event_data']);
+            DB::table('goal_sessions')->upsert($chunk, self::SESSION_KEY, ['hits', 'converted_at', 'last_hit_at', 'event_data']);
         }
         $this->flushDeltas($deltas);
     }
