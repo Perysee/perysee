@@ -8,6 +8,7 @@ use App\Http\Controllers\GuideController;
 use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\InstanceHealthController;
 use App\Http\Controllers\InstanceUpdateController;
+use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\ModuleAssetController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\SiteFaviconController;
@@ -25,7 +26,8 @@ Route::post('/install/unlock', [InstallationController::class, 'unlock'])->name(
 Route::post('/install/database', [InstallationController::class, 'database'])->name('install.database');
 Route::post('/install/administrator', [InstallationController::class, 'administrator'])->name('install.administrator');
 Route::middleware(EnsureInstalled::class)->group(function (): void {
-    Route::get('/invitations/{token}', fn (string $token) => abort(404))->where('token', '[a-f0-9]{64}')->name('invitations.show');
+    Route::get('/invitations/{token}', [InvitationAcceptanceController::class, 'show'])->name('invitations.show');
+    Route::post('/invitations/{token}', [InvitationAcceptanceController::class, 'accept'])->name('invitations.accept');
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [AuthController::class, 'create'])->name('login');
         Route::post('/login', [AuthController::class, 'store'])->name('login.store');
