@@ -32,6 +32,9 @@ class HandleInertiaRequests extends Middleware
             $links[$name] = route($name);
         }
         $links['modules'] = route('modules.index');
+        // two-factor: entries of the account menu and of the administration sidebar
+        $links['account.security'] = route('account.security');
+        $links['settings.security'] = route('settings.security');
 
         return [...parent::share($request),
             'currentUrl' => $request->getBaseUrl().$request->getPathInfo(),

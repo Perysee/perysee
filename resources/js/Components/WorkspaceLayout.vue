@@ -201,6 +201,12 @@ const configNav = computed(() =>
                             active: p.value.screen === "settings.mail",
                         },
                         {
+                            label: "Security",
+                            icon: "i-tabler-shield-lock",
+                            to: p.value.links["settings.security"],
+                            active: p.value.screen === "settings.security",
+                        },
+                        {
                             label: "Modules",
                             icon: "i-tabler-puzzle",
                             to: p.value.links.modules,
@@ -243,6 +249,11 @@ const accountMenu = computed(() => [
             label: "Password",
             to: p.value.links["password.edit"],
             icon: "i-tabler-key",
+        },
+        {
+            label: "Security",
+            to: p.value.links["account.security"],
+            icon: "i-tabler-shield-lock",
         },
         ...(p.value.auth?.is_admin
             ? [
