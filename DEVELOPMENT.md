@@ -164,6 +164,9 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 | `perysee:update:check --quiet-unless-new` | 04:17 | Cherche une nouvelle version. |
 | `perysee:modules catalog --refresh-only` | 04:43 | Rafraîchit le catalogue de modules. |
 | `perysee:prune-api-tokens` | toutes les heures, sans chevauchement | Supprime les jetons d'API expirés ou révoqués depuis plus de 30 jours. |
+| `perysee:prune-access-log --limit=1000` | toutes les heures, sans chevauchement | Supprime les entrées du journal d'accès de plus de 90 jours. |
+| `perysee:prune-diagnostics` | toutes les heures, sans chevauchement | Supprime les diagnostics de collecte de plus de 7 jours. |
+| `perysee:prune-event-values --limit=1000` | toutes les heures, sans chevauchement | Supprime les identifiants de commande hors fenêtre et les propriétés d'événements hors rétention. |
 
 ### Équipe et invitations
 
@@ -400,3 +403,11 @@ Validation uses `SegmentReportingTest`, `FunnelReportingTest`, `FunnelEngineTest
 Demo traffic v5 covers 90 days, ends with a few visits in the last fifteen minutes for the reception view, and adds UTM campaigns (newsletter, LinkedIn, X, Product Hunt, Google Ads) and eight named events. It uses a local PHP Randomizer, never the global random state. Resets use a fresh seed by default; `--seed=N` reproduces a dataset at the same frozen time. Cohort context stays consistent within each session. Weekday/hour weights, growth, campaign spikes, varied path lengths and nonuniform conversion probabilities make the sample less regular. Three tracked sample definitions are created once and preserved on future resets; real sites and other report jobs are not processed by the demo reset. Sample funnel and journey reports are precomputed for today, 7 and 30 days; other selections use the normal scheduler. Live visits age out after fifteen minutes: rerun the reset just before a demonstration.
 
 Demo report cache keys remain stable while snapshot data, definition, selection and dates are unchanged, so precomputed examples remain immediately available. The update timestamp identifies this synthetic snapshot. Real sites use five-minute cache windows.
+
+## Valeur des événements et propriétés bornées (ADR 008)
+
+- **Collecte.** `value`, `props` et `id` sont retirés du corps par `EventValues::take()` avant la liste blanche du contrôleur, validés par `EventValues::prepare()` (422 pour une erreur de structure) puis ajoutés à l'`INSERT`. Les bornes souples et la liste de clés refusées sont dans `PropertyPolicy` (figées dans le code). Aucune requête de plus sans `id` ; avec `id`, un `INSERT IGNORE` dans `event_order_ids`, dans la transaction de l'événement.
+- **Agrégation.** `Goals` ajoute `value_sum` et `valued_hits` aux deltas existants ; `EventPropertyStats` remplit `stats_event_property_daily` (100 noms par site, 10 clés par nom, 50 valeurs par jour, le reste dans `(other)`).
+- **Rétention.** `perysee:prune-event-values` (toutes les heures) purge les identifiants de commande (`PERYSEE_ORDER_DEDUP_DAYS`, 30 par défaut) et les compteurs de propriétés (rétention des statistiques). Le passage à vide de `perysee:maintenance` ne change pas.
+- **Rapports.** `GoalReports` ajoute le bloc `amounts` (les `totals` gardent leur forme) ; `EventPropertyReports` et `EventPropertyController` servent `/sites/{site}/events/properties` (page, API, CSV). Tout CSV passe par `CsvSafe`.
+- **Tests ajoutés.** `EventValueIngestionTest`, `EventPropertiesIngestionTest`, `EventOrderDeduplicationTest`, `GoalValueTest`, `EventPropertyAggregationTest`, `EventValuePurgeTest`, `GoalValueReportingTest`, `EventPropertyReportTest`, `CsvInjectionTest`, `WebsiteCurrencyTest`, et `tests/Tracker/lueur-values.test.mjs`. Aucun identifiant de ligne fixe : utiliser les identifiants des modèles.

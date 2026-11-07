@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import { useForm, usePage } from "@inertiajs/vue3";
-const props = defineProps(["website", "timezones", "siteLinks", "canUpdate"]);
+const props = defineProps(["website", "timezones", "currencies", "siteLinks", "canUpdate"]);
 const page = usePage(),
     deleting = ref(false);
 const form = useForm({
@@ -9,12 +9,15 @@ const form = useForm({
     domain: props.website.domain || "",
     allowed_domains: (props.website.allowed_domains || []).join("\n"),
     timezone: props.website.timezone || "UTC",
+    currency: props.website.currency || "",
     excluded_paths: (props.website.excluded_paths || []).join("\n"),
     tracking_mode: props.website.tracking_mode || "pageviews",
     consent_required: props.website.consent_required ?? true,
 });
 const removal = useForm({ confirmation: "" });
 const editing = computed(() => !!props.website.id);
+// An empty currency is sent as an empty string, which the server stores as "not set".
+form.transform((data) => ({ ...data, currency: data.currency || "" }));
 const submit = () =>
     editing.value
         ? form.put(props.siteLinks.update, { preserveScroll: true })
@@ -100,6 +103,18 @@ const submit = () =>
                     :disabled="!!website.first_collected_at"
                     class="w-full"
                     aria-label="Reporting timezone" /></UFormField
+            ><UFormField
+                label="Currency of event values"
+                name="currency"
+                :error="form.errors.currency"
+                description="Label shown next to the value of conversions. Perysee never converts between currencies."
+                ><USelectMenu
+                    v-model="form.currency"
+                    :items="currencies"
+                    placeholder="Not set"
+                    clear
+                    class="w-full"
+                    aria-label="Currency of event values" /></UFormField
             ><USeparator /><UFormField
                 label="Measurement"
                 name="tracking_mode"

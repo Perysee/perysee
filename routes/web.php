@@ -5,6 +5,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DemoController;
+use App\Http\Controllers\EventPropertyController;
 use App\Http\Controllers\FunnelController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\GuideController;
@@ -78,6 +79,10 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::delete('/sites/{website}/goals/{goal}', [GoalController::class, 'archive'])->name('sites.goals.archive');
         Route::get('/sites/{website}/goals/{goal}/export', [GoalController::class, 'export'])->name('sites.goals.export');
         Route::get('/api/sites/{website}/goals/{goal}', [GoalController::class, 'api'])->name('sites.goals.api');
+        // Event values: the event > property report.
+        Route::get('/sites/{website}/events/properties', [EventPropertyController::class, 'index'])->name('sites.events.properties.index');
+        Route::get('/sites/{website}/events/properties/export', [EventPropertyController::class, 'export'])->name('sites.events.properties.export');
+        Route::get('/api/sites/{website}/events/properties', [EventPropertyController::class, 'api'])->name('sites.events.properties.api');
         Route::get('/sites/{website}/export', [AnalyticsController::class, 'export'])->name('sites.export');
         Route::get('/settings', [WorkspaceController::class, 'settings'])->name('settings');
         Route::get('/settings/mail', [MailSettingsController::class, 'show'])->name('settings.mail');

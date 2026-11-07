@@ -87,6 +87,8 @@ class Aggregator
         $touched = [];
         $goals = app(Goals::class);
         $goals->begin($events);
+        $properties = app(EventPropertyStats::class);
+        $properties->begin();
         $segments->begin($events, function (int $site, string $key) use (&$measured): ?string {
             return isset($measured[$site.'|'.$key]) ? $measured[$site.'|'.$key]->first_seen_at : null;
         });
@@ -102,6 +104,7 @@ class Aggregator
                 $goals->ingest($event, $site);
             }
             [$date, $hour] = $this->buckets($event->received_at, $site->timezone);
+            $properties->ingest($event, $site, $date);
             $mode = $event->tracking_mode ?? ($event->session_key ? 'sessions' : 'unknown');
             $metrics = ['pageviews' => $event->event_type === 1 ? 1 : 0, 'custom_events' => $event->event_type === 2 ? 1 : 0,
                 'sessions' => 0, 'session_pageviews' => $event->event_type === 1 && $mode === 'sessions' ? 1 : 0,
@@ -158,6 +161,7 @@ class Aggregator
             }
         }
         $goals->flush($segments);
+        $properties->flush();
         $this->batchConversions = $goals->conversions();
         $segments->flush();
         $this->saveMeasuredSessions($measured, $touched);

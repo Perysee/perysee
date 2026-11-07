@@ -232,6 +232,16 @@ const lastConsolidation = computed(() =>
             :title="isDimension ? 'Export table CSV' : 'Export daily CSV'"
             ><span class="hidden 2xl:inline">Export CSV</span></UButton
         ><UButton
+            v-if="current === 'events'"
+            :to="queryUrl(siteLinks.events + '/properties', { from: period.from, to: period.to })"
+            icon="i-tabler-list-details"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            aria-label="Event properties"
+            title="Event properties"
+            ><span class="hidden 2xl:inline">Properties</span></UButton
+        ><UButton
             v-if="canUpdate"
             :to="siteLinks.edit"
             icon="i-tabler-settings"

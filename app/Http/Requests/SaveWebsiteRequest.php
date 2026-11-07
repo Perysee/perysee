@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\Website;
+use App\Support\Currencies;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SaveWebsiteRequest extends FormRequest
 {
@@ -27,6 +29,9 @@ class SaveWebsiteRequest extends FormRequest
         if (is_string($excluded)) {
             $this->merge(['excluded_paths' => array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $excluded))))]);
         }
+        if (is_string($this->input('currency'))) {
+            $this->merge(['currency' => strtoupper(trim($this->input('currency'))) ?: null]);
+        }
         $this->merge(['domain' => is_string($this->domain) ? strtolower(trim($this->domain)) : $this->domain, 'allowed_domains' => $domains]);
     }
 
@@ -44,6 +49,7 @@ class SaveWebsiteRequest extends FormRequest
             'allowed_domains' => ['present', 'array', 'max:20'],
             'allowed_domains.*' => $domain,
             'timezone' => ['required', 'string', 'timezone:all', 'max:64'],
+            'currency' => ['sometimes', 'nullable', 'string', Rule::in(Currencies::CODES)],
         ];
     }
 

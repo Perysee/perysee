@@ -37,6 +37,8 @@ return [
         'budget_seconds' => (int) env('PERYSEE_AGGREGATE_BUDGET_SECONDS', 15),
     ],
     'raw_retention_days' => (int) env('PERYSEE_RAW_RETENTION_DAYS', 90),
+    // How long the identifier of an order is remembered to ignore a reloaded confirmation page (ADR 008).
+    'order_dedup_days' => (int) env('PERYSEE_ORDER_DEDUP_DAYS', 30),
     // A site that has received events but none for this many days is flagged as silent.
     'silent_site_days' => (int) env('PERYSEE_SILENT_SITE_DAYS', 3),
     'redis_enabled' => (bool) env('PERYSEE_REDIS_ENABLED', false),

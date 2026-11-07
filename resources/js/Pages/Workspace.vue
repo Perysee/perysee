@@ -51,6 +51,7 @@ const FunnelsPage =defineAsyncComponent(() => import("../Components/FunnelsPage.
 const JourneyPage = defineAsyncComponent(() => import("../Components/JourneyPage.vue"));
 const GoalsPage = defineAsyncComponent(() => import("../Components/GoalsPage.vue"));
 const GoalReport = defineAsyncComponent(() => import("../Components/GoalReport.vue"));
+const EventPropertiesPage = defineAsyncComponent(() => import("../Components/EventPropertiesPage.vue"));
 const page = usePage();
 const p = computed(() => page.props);
 const failedModuleFiles = ref([]);
@@ -112,6 +113,7 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
         <JourneyPage v-else-if="['funnel.report','journeys'].includes(p.screen)" :key="p.funnel?.id || 'journeys'" v-bind="p" />
         <GoalsPage v-else-if="p.screen === 'goals'" v-bind="p" />
         <GoalReport v-else-if="p.screen === 'goal.report'" :key="p.goal?.id" v-bind="p" />
+        <EventPropertiesPage v-else-if="p.screen === 'event.properties'" v-bind="p" />
         <HealthPage v-else-if="p.screen === 'health'" v-bind="p" />
         <MailSettingsPage v-else-if="p.screen === 'settings.mail'" v-bind="p" />
         <ModulesPage v-else-if="p.screen === 'modules'" v-bind="p" />

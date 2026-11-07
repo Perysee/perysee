@@ -6,6 +6,7 @@ use App\Analytics\Diagnostics\SiteActivity;
 use App\Analytics\Reporting\Reports;
 use App\Http\Requests\SaveWebsiteRequest;
 use App\Models\Website;
+use App\Support\Currencies;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,7 @@ class WebsiteController extends Controller
 
     public function create(): Response
     {
-        return Ui::render('sites.form', ['website' => new Website(['timezone' => 'UTC', 'allowed_domains' => [], 'tracking_mode' => 'pageviews', 'consent_required' => true])]);
+        return Ui::render('sites.form', ['website' => new Website(['timezone' => 'UTC', 'allowed_domains' => [], 'tracking_mode' => 'pageviews', 'consent_required' => true]), 'currencies' => Currencies::CODES]);
     }
 
     public function store(SaveWebsiteRequest $request): RedirectResponse
@@ -94,7 +95,7 @@ class WebsiteController extends Controller
         Gate::authorize('update', $website);
         abort_if($website->deleting_at, 404);
 
-        return Ui::render('sites.form', compact('website'));
+        return Ui::render('sites.form', compact('website') + ['currencies' => Currencies::CODES]);
     }
 
     public function update(SaveWebsiteRequest $request, Website $website): RedirectResponse
