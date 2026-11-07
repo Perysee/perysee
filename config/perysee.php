@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '0.3.0',
+    'version' => '0.4.0',
     'modules_path' => env('PERYSEE_MODULES_PATH', storage_path('app/modules')),
     // "docker" when the instance runs from the image built by the Docker installer: code is replaced by rebuilding
     // the image, never in place, so the in-place updater refuses to run.
