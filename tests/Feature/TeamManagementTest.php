@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Installation\InstallationState;
+use App\Mail\MailSettings;
 use App\Mail\SiteInvitationMail;
 use App\Models\SiteInvitation;
 use App\Models\User;
@@ -211,6 +212,21 @@ class TeamManagementTest extends TestCase
         $this->assertSame($invitation->id, SiteInvitation::findPending(basename(session('invitation_link')))->id);
         $this->assertNotEmpty(session('error'));
         $this->assertStringNotContainsString('SMTP is down', session('error'));
+    }
+
+    public function test_smtp_settings_saved_by_the_administrator_make_invitations_mail_even_though_env_says_log(): void
+    {
+        config(['mail.default' => 'log']);
+        app(MailSettings::class)->save(['enabled' => true, 'host' => 'smtp.example.com', 'port' => 587, 'encryption' => 'starttls', 'from_address' => 'noreply@example.com']);
+        Mail::fake();
+        [$site, $owner] = $this->siteWith('owner');
+        $this->actingAs($owner);
+
+        $this->post('/sites/'.$site->id.'/invitations', ['email' => 'a@example.com', 'role' => 'viewer'])->assertRedirect('/sites/'.$site->id.'/team');
+
+        Mail::assertSent(SiteInvitationMail::class, fn (SiteInvitationMail $mail): bool => $mail->hasTo('a@example.com'));
+        $this->assertNull(session('invitation_link'));
+        $this->assertNotNull(SiteInvitation::where('email', 'a@example.com')->first()->last_sent_at);
     }
 
     public function test_resend_rotates_the_token_and_invalidates_the_old_link(): void

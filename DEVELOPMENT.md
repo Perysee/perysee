@@ -162,6 +162,17 @@ Le banc HTTP local démarre quatre workers du serveur PHP sur 127.0.0.1:18743 et
 
 Le workflow manuel `Internal performance laboratory` reproduit ces profils et conserve le JSON en artifact privé. Il ne publie aucun engagement commercial. Les résultats de référence sont dans `scripts/benchmarks/results-2026-10-25.json` ; leurs limites et l'interruption du premier client sont détaillées dans le fichier associé. Un test court permet uniquement de vérifier le banc, pas de conclure sur un percentile.
 
+## Messagerie de l’instance (SMTP)
+
+Un administrateur règle le serveur SMTP depuis **Administration > Mail** (`/settings/mail`). Sans réglage enregistré, `MAIL_*` dans `.env` reste utilisé : les installations existantes ne changent pas. Les réglages enregistrés (et activés) l’emportent. Décisions : [ADR 003](docs/adr/003-instance-smtp-settings.md).
+
+- **Stockage.** Une clé `mail_settings` de l’état de l’instance (`analytics_state`, via `InstanceHealth`), sans migration. Le mot de passe est chiffré (`Crypt::encryptString`) et n’est jamais renvoyé au navigateur. Si `APP_KEY` change, il doit être ressaisi.
+- **Un seul point d’entrée.** Tout nouveau message passe par `App\Mail\InstanceMailer` : `configured()` (réglages enregistrés complets ou mailer d’environnement autre que `log`/`array`), `send($to, $mailable)` (synchrone, sans file, 10 s de délai) et `test($to)`. `MailSettings::apply()` configure le mailer au moment de l’envoi, pas à chaque requête. Une fonctionnalité qui a besoin d’un mail teste `configured()` et garde un chemin sans mail (les invitations affichent un lien à copier).
+- **Erreurs.** `MailNotSent` ne porte qu’une catégorie : `connection`, `authentication`, `sender_rejected`, `other` (et `not_configured` pour un test sans serveur). Le texte de l’exception est journalisé par `report()` après suppression des secrets ; l’interface n’affiche jamais la réponse du serveur.
+- **Le mot de passe ne change pas de serveur.** Si l’hôte, le port ou l’utilisateur changent (ou si le chiffrement passe à « None ») sans mot de passe saisi ni case « Remove the password », l’enregistrement et le test sont refusés.
+- **Sécurité.** Réservé aux administrateurs, 5 envois de test par minute et par administrateur, délai de connexion de 10 s. Le serveur se connecte à l’hôte choisi par un administrateur, au même niveau de confiance que l’hôte de base de données de l’installateur.
+- **Tests.** `MailSettingsTest`, `InstanceMailerTest`, `MailSettingsPageTest`, `TeamManagementTest` (invitations) et `tests/Charts/workspace-shell.test.mjs`. Pour une vérification de bout en bout sans vrai serveur, un petit puits SMTP local (Python `asyncio`, 127.0.0.1:2525) suffit : choisir « None » comme chiffrement.
+
 ## Installateur
 
 `curl -fsSL https://get.perysee.com | bash` télécharge `install.sh`, épinglé à sa version lors du build. Sans `--mode`, un terminal permet de choisir `cpanel`, `docker` ou `manual` (le mode que la machine suggère est proposé par défaut ; `--yes` sans `--mode` garde le mode manuel). Une version précise s'installe par son adresse : `https://get.perysee.com/releases/vX.Y.Z/install.sh`.
