@@ -11,6 +11,8 @@ use App\Http\Controllers\InstanceUpdateController;
 use App\Http\Controllers\ModuleAssetController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\SiteFaviconController;
+use App\Http\Controllers\SiteInvitationController;
+use App\Http\Controllers\SiteMemberController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Middleware\EnsureInstalled;
@@ -23,6 +25,7 @@ Route::post('/install/unlock', [InstallationController::class, 'unlock'])->name(
 Route::post('/install/database', [InstallationController::class, 'database'])->name('install.database');
 Route::post('/install/administrator', [InstallationController::class, 'administrator'])->name('install.administrator');
 Route::middleware(EnsureInstalled::class)->group(function (): void {
+    Route::get('/invitations/{token}', fn (string $token) => abort(404))->where('token', '[a-f0-9]{64}')->name('invitations.show');
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [AuthController::class, 'create'])->name('login');
         Route::post('/login', [AuthController::class, 'store'])->name('login.store');
@@ -64,6 +67,8 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::post('/settings/modules/{module}/disable', [ModuleController::class, 'disable'])->name('modules.disable');
         Route::get('/sites/{website}/favicon', SiteFaviconController::class)->middleware('throttle:120,1')->name('sites.favicon');
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
+        Route::get('/sites/{website}/team', [SiteMemberController::class, 'index'])->name('sites.team');
+        Route::post('/sites/{website}/invitations', [SiteInvitationController::class, 'store'])->name('sites.invitations.store');
         Route::get('/sites/{website}/{section}', [WorkspaceController::class, 'sitePage'])->whereIn('section', ['countries', 'pages', 'events', 'sessions', 'realtime', 'sources', 'campaigns', 'devices', 'pixels'])->name('sites.section');
         Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
         Route::get('/account/password', [AuthController::class, 'editPassword'])->name('password.edit');

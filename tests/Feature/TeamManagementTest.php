@@ -7,6 +7,7 @@ use App\Models\SiteInvitation;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class TeamManagementTest extends TestCase
@@ -26,6 +27,30 @@ class TeamManagementTest extends TestCase
         $site->members()->attach($user, ['role' => $role]);
 
         return [$site, $user];
+    }
+
+    public function test_inviting_without_mail_returns_a_copyable_link_and_a_viewer_cannot_invite(): void
+    {
+        Mail::fake();
+        [$site, $owner] = $this->siteWith('owner');
+        $viewer = User::factory()->create();
+        $site->members()->attach($viewer, ['role' => 'viewer']);
+
+        $this->actingAs($viewer)->post('/sites/'.$site->id.'/invitations', ['email' => 'a@example.com', 'role' => 'viewer'])->assertForbidden();
+        $this->assertDatabaseCount('site_invitations', 0);
+
+        $response = $this->actingAs($owner)->post('/sites/'.$site->id.'/invitations', ['email' => 'A@Example.com', 'role' => 'viewer']);
+        $response->assertSessionHasNoErrors()->assertRedirect('/sites/'.$site->id.'/team');
+        $link = session('invitation_link');
+        $this->assertMatchesRegularExpression('#^http://[^/]+/invitations/[a-f0-9]{64}$#', $link);
+        $invitation = SiteInvitation::findPending(basename($link));
+        $this->assertSame('a@example.com', $invitation->email);
+        $this->assertSame('viewer', $invitation->role);
+        $this->assertNull($invitation->last_sent_at);
+        Mail::assertNothingSent();
+
+        $this->post('/sites/'.$site->id.'/invitations', ['email' => 'b@example.com', 'role' => 'admin'])->assertSessionHasErrors('role');
+        $this->post('/sites/'.$site->id.'/invitations', ['email' => $owner->email, 'role' => 'viewer'])->assertSessionHasErrors('email');
     }
 
     public function test_an_owner_can_create_an_invitation_that_stores_only_a_token_hash(): void
