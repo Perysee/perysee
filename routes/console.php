@@ -14,3 +14,6 @@ Schedule::command('perysee:journey-reports --batch=500 --budget=10')->everyMinut
 Schedule::command('perysee:update --requested --yes')->everyMinute()->withoutOverlapping(120);
 Schedule::command('perysee:update:check --quiet-unless-new')->dailyAt('04:17');
 Schedule::command('perysee:modules catalog --refresh-only')->dailyAt('04:43');
+
+// Installation check: collector diagnostics expire after seven days.
+Schedule::command('perysee:prune-diagnostics')->hourly()->withoutOverlapping();
