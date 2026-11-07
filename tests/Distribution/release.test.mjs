@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, chmodSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, chmodSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -345,6 +345,157 @@ test('a hostname that is not a plain hostname is refused before anything is writ
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /hostname/);
     assert.equal(existsSync(join(f.root, 'app')), false);
+});
+test('the release publishes the Docker files under the same checksum list as the ZIP', (t) => {
+    const f = fixture(t);
+    build(f);
+    const sums = readFileSync(join(f.output, 'SHA256SUMS'), 'utf8');
+    for (const name of ['Dockerfile', 'compose.yaml', 'docker-entrypoint.sh']) {
+        assert.ok(existsSync(join(f.output, name)), name);
+        const hash = createHash('sha256').update(readFileSync(join(f.output, name))).digest('hex');
+        assert.ok(sums.includes(`${hash}  ${name}\n`), name);
+    }
+});
+// docker is faked: it records every call, and `compose version` succeeds.
+function addDocker(f) {
+    const docker = join(f.root, 'bin', 'docker');
+    writeFileSync(docker, `#!/usr/bin/env node
+import { appendFileSync } from 'node:fs';
+appendFileSync(process.env.PERYSEE_TEST_DOCKER_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');
+`);
+    chmodSync(docker, 0o755);
+}
+function dockerEnvironment(f, { withDocker = true } = {}) {
+    const env = bootstrapEnvironment(f);
+    env.PERYSEE_TEST_DOCKER_LOG = join(f.root, 'docker.log');
+    env.PERYSEE_PHP = '/nonexistent/php'; // the Docker mode must not need PHP on the host
+    if (withDocker) {
+        addDocker(f);
+    }
+    return env;
+}
+function dockerInstall(f, env, extra = []) {
+    return spawnSync('bash', [join(scripts, 'install.sh'), '--mode', 'docker', '--url', 'https://stats.example.com', '--admin-email', 'owner@example.com', '--yes', ...extra],
+        { encoding: 'utf8', env, input: '' });
+}
+function dockerCalls(f) {
+    const log = join(f.root, 'docker.log');
+    return existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line)) : [];
+}
+test('the Docker mode verifies the release, writes the project and secrets, builds and installs without PHP', (t) => {
+    const f = fixture(t);
+    build(f);
+    const target = join(f.root, 'perysee-docker');
+    const result = dockerInstall(f, dockerEnvironment(f), ['--target', target, '--port', '8090']);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    for (const name of ['Dockerfile', 'compose.yaml', 'docker-entrypoint.sh', 'perysee.zip', '.env']) {
+        assert.ok(existsSync(join(target, name)), name);
+    }
+    assert.equal(statSync(join(target, '.env')).mode & 0o777, 0o600);
+    const env = readFileSync(join(target, '.env'), 'utf8');
+    assert.match(env, /^APP_URL=https:\/\/stats\.example\.com$/m);
+    assert.match(env, /^APP_KEY=base64:[A-Za-z0-9+/]{43}=$/m);
+    assert.match(env, /^DB_PASSWORD=[a-f0-9]{48}$/m);
+    assert.match(env, /^MARIADB_ROOT_PASSWORD=[a-f0-9]{48}$/m);
+    assert.match(env, /^PERYSEE_PORT=8090$/m);
+    assert.doesNotMatch(env, /ADMIN/);
+    const calls = dockerCalls(f).map((call) => call.join(' '));
+    assert.ok(calls.includes('compose version'));
+    assert.ok(calls.includes(`compose --project-directory ${target} up -d --build --wait`), calls.join('\n'));
+    const exec = calls.find((call) => call.includes(' exec '));
+    assert.match(exec, /exec -T --user www-data app php artisan perysee:install --url=https:\/\/stats\.example\.com --db-host=mariadb --db-name=perysee --db-user=perysee --admin-name=Administrator --admin-email=owner@example\.com --no-interaction/);
+    assert.doesNotMatch(result.stdout, /[a-f0-9]{48}/);
+});
+test('the Docker mode refuses a missing docker, an unverified file and a used folder before writing anything', (t) => {
+    const f = fixture(t);
+    build(f);
+    const target = join(f.root, 'perysee-docker');
+    const env = dockerEnvironment(f, { withDocker: false });
+    const missing = dockerInstall(f, env, ['--target', target]);
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /Docker with the compose plugin/);
+    assert.equal(existsSync(target), false);
+
+    addDocker(f);
+    writeFileSync(join(f.output, 'Dockerfile'), 'FROM scratch\n');
+    const tampered = dockerInstall(f, env, ['--target', target]);
+    assert.notEqual(tampered.status, 0);
+    assert.match(tampered.stderr, /checksum verification failed/);
+    assert.equal(existsSync(target), false);
+    assert.deepEqual(dockerCalls(f).filter((call) => call.includes('up')), []);
+});
+test('the Docker mode never overwrites a used folder and requires an HTTPS address', (t) => {
+    const f = fixture(t);
+    build(f);
+    const env = dockerEnvironment(f);
+    const used = join(f.root, 'used');
+    mkdirSync(used);
+    writeFileSync(join(used, 'file'), 'mine');
+    const busy = dockerInstall(f, env, ['--target', used]);
+    assert.notEqual(busy.status, 0);
+    assert.match(busy.stderr, /not empty/);
+    assert.equal(readFileSync(join(used, 'file'), 'utf8'), 'mine');
+    const plain = spawnSync('bash', [join(scripts, 'install.sh'), '--mode', 'docker', '--url', 'http://stats.example.com', '--target', join(f.root, 'x'), '--yes'], { encoding: 'utf8', env, input: '' });
+    assert.notEqual(plain.status, 0);
+    assert.match(plain.stderr, /HTTPS/);
+    assert.deepEqual(dockerCalls(f).filter((call) => call.includes('up')), []);
+});
+test('the Docker mode asks for what is missing, keeps the password prompt interactive and can be cancelled', (t) => {
+    const f = fixture(t);
+    build(f);
+    const env = dockerEnvironment(f);
+    const answers = join(f.root, 'answers');
+    const target = join(f.root, 'perysee-docker');
+    env.PERYSEE_TTY = answers;
+    writeFileSync(answers, 'no\n');
+    const run = () => spawnSync('bash', [join(scripts, 'install.sh'), '--mode', 'docker', '--target', target], { encoding: 'utf8', env, input: '' });
+
+    writeFileSync(answers, 'https://stats.example.com\nowner@example.com\nno\n');
+    const cancelled = run();
+    assert.equal(cancelled.status, 0, cancelled.stderr);
+    assert.match(cancelled.stdout, /Installation cancelled/);
+    assert.equal(existsSync(target), false);
+
+    writeFileSync(answers, 'https://stats.example.com\nowner@example.com\nyes\n');
+    const result = run();
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const exec = dockerCalls(f).map((call) => call.join(' ')).find((call) => call.includes(' exec '));
+    assert.ok(exec, JSON.stringify({ stdout: result.stdout, stderr: result.stderr, calls: dockerCalls(f) }));
+    assert.doesNotMatch(exec, / -T /);
+    assert.doesNotMatch(exec, /--no-interaction/);
+    assert.match(exec, /--admin-email=owner@example\.com/);
+    assert.match(readFileSync(join(target, '.env'), 'utf8'), /^APP_URL=https:\/\/stats\.example\.com$/m);
+});
+test('upgrading a Docker installation replaces the release files, keeps the secrets and rebuilds', (t) => {
+    const f = fixture(t);
+    build(f);
+    const env = dockerEnvironment(f);
+    const target = join(f.root, 'perysee-docker');
+    assert.equal(dockerInstall(f, env, ['--target', target]).status, 0);
+    const secrets = readFileSync(join(target, '.env'), 'utf8');
+    writeFileSync(join(target, 'Dockerfile'), 'old Dockerfile');
+    writeFileSync(env.PERYSEE_TEST_DOCKER_LOG, '');
+
+    const result = spawnSync('bash', [join(scripts, 'install.sh'), '--mode', 'docker', '--upgrade', '--target', target, '--yes'], { encoding: 'utf8', env, input: '' });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(readFileSync(join(target, '.env'), 'utf8'), secrets);
+    assert.notEqual(readFileSync(join(target, 'Dockerfile'), 'utf8'), 'old Dockerfile');
+    const calls = dockerCalls(f).map((call) => call.join(' '));
+    assert.ok(calls.includes(`compose --project-directory ${target} build --pull`), calls.join('\n'));
+    assert.ok(calls.includes(`compose --project-directory ${target} up -d --wait`), calls.join('\n'));
+    assert.equal(calls.some((call) => call.includes('perysee:install')), false);
+});
+test('upgrading needs an existing Docker installation', (t) => {
+    const f = fixture(t);
+    build(f);
+    const env = dockerEnvironment(f);
+    const empty = join(f.root, 'nothing');
+    mkdirSync(empty);
+    const result = spawnSync('bash', [join(scripts, 'install.sh'), '--mode', 'docker', '--upgrade', '--target', empty, '--yes'], { encoding: 'utf8', env, input: '' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /No Docker installation found/);
+    assert.deepEqual(readdirSync(empty), []);
 });
 test('the cPanel mode reports a failed perysee:install and exits with an error', (t) => {
     const f = fixture(t);
