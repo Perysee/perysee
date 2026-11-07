@@ -33,10 +33,13 @@ class JourneyReports
     {
         $from = $period['start']->toDateTimeString();
         $to = $period['end']->toDateTimeString();
-        $rows = DB::table('journey_reports')->where('website_id', $site->id)->where('status', 'ready')->where('payload', 'like', '%"kind":"funnel"%')->orderByDesc('id')->limit(200)->get(['id', 'payload', 'result', 'updated_at']);
+        $rows = DB::table('journey_reports')->where('website_id', $site->id)->where('status', 'ready')->where('payload', 'like', '%"kind":"funnel"%')->orderByDesc('id')->limit(200)->get(['id', 'payload', 'updated_at']);
         foreach ($rows as $row) {
             $payload = json_decode($row->payload, true);
             if (is_array($payload) && ($payload['funnel_id'] ?? null) === $funnel && ($payload['version'] ?? null) === $version && ($payload['from'] ?? null) === $from && ($payload['to'] ?? null) === $to && ($payload['filters'] ?? []) == $period['filters']) {
+                // The (large) result is read once, for the match only, not for the 200 candidates.
+                $row->result = DB::table('journey_reports')->where('id', $row->id)->value('result');
+
                 return $row;
             }
         }
