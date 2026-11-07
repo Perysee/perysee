@@ -80,6 +80,39 @@ class InvitationAcceptanceTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_an_invitation_cannot_be_accepted_by_another_account(): void
+    {
+        [$site, $invitation, $token] = $this->invitation('invited@example.com');
+        $stranger = User::factory()->create(['email' => 'stranger@example.com']);
+
+        $response = $this->actingAs($stranger)->post('/invitations/'.$token);
+
+        $response->assertSessionHasErrors(['invitation' => 'This invitation is not valid for this account.']);
+        $this->assertStringNotContainsString('invited@example.com', json_encode(session('errors')->getBag('default')->all()));
+        $this->assertFalse($site->members()->whereKey($stranger->id)->exists());
+        $this->assertTrue($invitation->fresh()->isPending());
+    }
+
+    public function test_a_signed_in_invitee_joins_without_losing_a_higher_role_and_a_guest_with_an_account_is_sent_to_sign_in(): void
+    {
+        [$site, $invitation, $token] = $this->invitation('member@example.com', 'viewer');
+        $invitee = User::factory()->create(['email' => 'Member@Example.com']);
+
+        $this->post('/invitations/'.$token, $this->details())->assertRedirect('/login');
+        $this->assertSame('/invitations/'.$token, parse_url(session('url.intended'), PHP_URL_PATH));
+        $this->assertFalse($site->members()->whereKey($invitee->id)->exists());
+        $this->assertTrue($invitation->fresh()->isPending());
+
+        $this->actingAs($invitee)->post('/invitations/'.$token)->assertRedirect('/sites/'.$site->id);
+        $this->assertSame('viewer', $site->members()->whereKey($invitee->id)->first()->pivot->role);
+        $this->assertNotNull($invitation->fresh()->accepted_at);
+
+        [$other, , $otherToken] = $this->invitation('member@example.com', 'viewer');
+        $other->members()->attach($invitee, ['role' => 'owner']);
+        $this->post('/invitations/'.$otherToken)->assertRedirect();
+        $this->assertSame('owner', $other->members()->whereKey($invitee->id)->first()->pivot->role);
+    }
+
     public function test_a_weak_password_is_refused_and_keeps_the_invitation_usable(): void
     {
         [, $invitation, $token] = $this->invitation();

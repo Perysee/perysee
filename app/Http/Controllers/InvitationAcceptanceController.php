@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -38,27 +39,49 @@ class InvitationAcceptanceController extends Controller
     public function accept(AcceptInvitationRequest $request, string $token): RedirectResponse
     {
         $this->throttle($request);
-        $website = DB::transaction(function () use ($request, $token): Website {
+        $outcome = DB::transaction(function () use ($request, $token): Website|RedirectResponse {
             $invitation = SiteInvitation::pending()->where('token_hash', SiteInvitation::hashToken($token))->lockForUpdate()->first();
             abort_if(! $invitation, 404);
             $website = Website::whereKey($invitation->website_id)->lockForUpdate()->first();
             abort_if(! $website || $website->deleting_at, 404);
 
-            abort_if($request->user(), 403);
-            $user = User::create(['name' => $request->validated('name'), 'email' => $invitation->email, 'password' => $request->validated('password')]);
-            // The address counts as verified only when a message really reached it.
-            if ($invitation->last_sent_at) {
-                $user->forceFill(['email_verified_at' => now()])->save();
+            $user = $request->user();
+            if ($user) {
+                // Never say which address was invited.
+                if (mb_strtolower($user->email) !== $invitation->email) {
+                    throw ValidationException::withMessages(['invitation' => __('This invitation is not valid for this account.')]);
+                }
+            } elseif (User::whereRaw('lower(email) = ?', [$invitation->email])->exists()) {
+                // The holder of the link asks to sign in first; the page then returns here.
+                $request->session()->put('url.intended', route('invitations.show', $token));
+
+                return redirect()->route('login');
+            } else {
+                $user = User::create(['name' => $request->validated('name'), 'email' => $invitation->email, 'password' => $request->validated('password')]);
+                // The address counts as verified only when a message really reached it.
+                if ($invitation->last_sent_at) {
+                    $user->forceFill(['email_verified_at' => now()])->save();
+                }
             }
-            $website->members()->attach($user, ['role' => $invitation->role]);
+            $current = $website->members()->whereKey($user->id)->first();
+            if (! $current) {
+                $website->members()->attach($user, ['role' => $invitation->role]);
+            } elseif ($invitation->role === 'owner' && $current->pivot->role !== 'owner') {
+                $website->members()->updateExistingPivot($user->id, ['role' => 'owner']);
+            }
             $invitation->forceFill(['accepted_at' => now('UTC')])->save();
-            Auth::login($user);
+            if (! $request->user()) {
+                Auth::login($user);
+            }
 
             return $website;
         });
+        if ($outcome instanceof RedirectResponse) {
+            return $outcome;
+        }
         $request->session()->regenerate();
 
-        return redirect()->route('sites.show', $website);
+        return redirect()->route('sites.show', $outcome);
     }
 
     private function throttle(Request $request): void
