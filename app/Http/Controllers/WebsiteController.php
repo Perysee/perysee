@@ -59,8 +59,7 @@ class WebsiteController extends Controller
 
         $props = ['website' => $website, 'period' => $period, 'report' => $reports->overview($website, $period), 'series' => $reports->series($website, $period), 'dimensions' => $reports->dimensions($website, $period, 'path', $request->input('value')), 'dimension' => 'path', 'breakdowns' => ['source' => $reports->dimensions($website, $period, 'source')]];
         if ($period['compare'] === 'previous') {
-            $previous = $reports->previousPeriod($period, $website);
-            $props['comparison'] = ['period' => ['from' => $previous['from'], 'to' => $previous['to']], 'totals' => $reports->overview($website, $previous)['totals'], 'series' => $reports->series($website, $previous)];
+            $props['comparison'] = $reports->comparison($website, $period, $props['report']);
         }
 
         return Ui::render('sites.show', $props);

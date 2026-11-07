@@ -24,13 +24,24 @@ class AnalyticsController extends Controller
         $this->authorizeSite($website);
         $period = $reports->period($request, $website);
         $data = match ($report) {
-            'overview' => $reports->overview($website, $period),
+            'overview' => $this->overview($reports, $website, $period),
             'timeseries' => ['data' => $reports->series($website, $period)],
             'dimensions' => $reports->dimensionReport($website, $period, $request->input('dimension', 'path'), $request->input('value')),
             'recent' => ['data' => $reports->recent($website), 'totals' => $reports->receptionTotals($website), 'checked_at' => now('UTC')->toIso8601String()],
         };
 
         return response()->json($data)->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * @param  array<string, mixed>  $period
+     * @return array<string, mixed>
+     */
+    private function overview(Reports $reports, Website $website, array $period): array
+    {
+        $overview = $reports->overview($website, $period);
+
+        return $period['compare'] === 'previous' ? $overview + ['comparison' => $reports->comparison($website, $period, $overview)] : $overview;
     }
 
     public function filterOptions(Request $request, Website $website, Reports $reports): JsonResponse
