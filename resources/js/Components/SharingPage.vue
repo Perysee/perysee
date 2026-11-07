@@ -12,6 +12,27 @@ const date = (value) => (value ? new Intl.DateTimeFormat("en", { dateStyle: "med
 function create() {
     form.post(props.siteLinks.sharing, { preserveScroll: true, onSuccess: () => form.reset("label", "password", "expires_on") });
 }
+const editing = ref(null);
+const passwordForm = useForm({ password: "" });
+function editPassword(link) {
+    passwordForm.reset();
+    passwordForm.clearErrors();
+    editing.value = link.id;
+}
+function savePassword(link) {
+    passwordForm.put(link.update_url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            editing.value = null;
+            passwordForm.reset();
+        },
+    });
+}
+function removePassword(link) {
+    if (window.confirm("Remove the password? Anyone holding the link will be able to open it without one.")) {
+        router.put(link.update_url, { remove_password: true }, { preserveScroll: true });
+    }
+}
 function revoke(link) {
     if (window.confirm("Revoke this link? Anyone holding it loses access immediately.")) {
         router.delete(link.revoke_url, { preserveScroll: true });
@@ -91,7 +112,20 @@ async function copy() {
                         Created {{ date(link.created_at) }} · Expires {{ date(link.expires_at) }} · Last used {{ date(link.last_used_at) }}
                     </p>
                 </div>
-                <UButton v-if="link.status !== 'revoked'" label="Revoke" icon="i-tabler-trash" color="error" variant="ghost" size="sm" @click="revoke(link)" />
+                <div v-if="link.status !== 'revoked'" class="flex flex-wrap items-center gap-2">
+                    <UButton :label="link.protected ? 'Change password' : 'Set password'" icon="i-tabler-lock" color="neutral" variant="ghost" size="sm" @click="editPassword(link)" />
+                    <UButton v-if="link.protected" label="Remove password" icon="i-tabler-lock-open" color="neutral" variant="ghost" size="sm" @click="removePassword(link)" />
+                    <UButton label="Revoke" icon="i-tabler-trash" color="error" variant="ghost" size="sm" @click="revoke(link)" />
+                </div>
+                <form v-if="editing === link.id" class="basis-full space-y-3" @submit.prevent="savePassword(link)" @keydown.esc="editing = null">
+                    <UFormField label="New password" hint="8 to 128 characters. Anyone already signed in with this link is signed out." :error="passwordForm.errors.password">
+                        <UInput v-model="passwordForm.password" type="password" autocomplete="new-password" maxlength="128" class="w-full max-w-sm" />
+                    </UFormField>
+                    <div class="flex flex-wrap gap-2">
+                        <UButton type="submit" label="Save password" :loading="passwordForm.processing" size="sm" />
+                        <UButton label="Cancel" color="neutral" variant="ghost" size="sm" @click="editing = null" />
+                    </div>
+                </form>
             </li>
         </ul>
     </UCard>

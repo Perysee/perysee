@@ -37,6 +37,7 @@ class ShareLinkController extends Controller
             'use_count' => $link->use_count,
             'created_at' => $link->created_at?->toIso8601String(),
             'revoke_url' => route('sites.sharing.destroy', [$website, $link], false),
+            'update_url' => route('sites.sharing.update', [$website, $link], false),
         ])->all();
 
         return Ui::render('sites.sharing', [

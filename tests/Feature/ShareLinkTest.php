@@ -186,7 +186,8 @@ class ShareLinkTest extends TestCase
             ->component('Workspace')->where('screen', 'sites.sharing')->has('shareLinks', 3)
             ->where('shareLinks.0.status', 'revoked')->where('shareLinks.1.status', 'expired')
             ->where('shareLinks.2.status', 'active')->where('shareLinks.2.protected', true)->where('shareLinks.2.sections', ['overview', 'pages'])
-            ->where('shareLinks.2.revoke_url', '/sites/'.$site->id.'/sharing/'.$active->id)->where('sectionOptions', array_keys(ShareLink::SECTIONS)));
+            ->where('shareLinks.2.revoke_url', '/sites/'.$site->id.'/sharing/'.$active->id)->where('shareLinks.2.update_url', '/sites/'.$site->id.'/sharing/'.$active->id)
+            ->where('sectionOptions', array_keys(ShareLink::SECTIONS)));
         $this->actingAs($viewer)->get('/sites/'.$site->id)->assertInertia(fn (Assert $page) => $page->where('canShare', false));
         $this->delete('/sites/'.$site->id.'/sharing/'.$expired->id)->assertForbidden();
     }
