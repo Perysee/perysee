@@ -45,13 +45,40 @@ watch(
         if (String(form.port) === String(ports[previous]) || form.port === "") form.port = ports[next];
     },
 );
+// After "Use the environment instead" the fields show the values of the environment again. Validation errors keep what was typed.
+watch(
+    () => props.mail.saved,
+    () => {
+        form.defaults({
+            enabled: props.mail.enabled,
+            host: props.mail.host ?? "",
+            port: props.mail.port ?? "",
+            encryption: props.mail.encryption,
+            username: props.mail.username ?? "",
+            password: "",
+            remove_password: false,
+            from_address: props.mail.from_address ?? "",
+            from_name: props.mail.from_name ?? "",
+        });
+        form.reset();
+    },
+);
 const url = computed(() => page.props.links["settings.mail"]);
 const keepsPassword = computed(() => props.mail.password_set && !form.remove_password);
 function save() {
-    form.put(url.value, { preserveScroll: true, onSuccess: () => form.reset("password", "remove_password") });
+    form.transform((data) => data).put(url.value, { preserveScroll: true, onSuccess: () => {
+            // A successful submit makes the typed values the form defaults, so reset() would keep the password: clear it by hand.
+            form.password = "";
+            form.remove_password = false;
+        },
+    });
 }
 function sendTest() {
-    form.transform((data) => ({ ...data, recipient: recipient.value })).post(page.props.links["settings.mail.test"], { preserveScroll: true });
+    // The transformation is sticky on an Inertia form: it is removed again so that "Save" never sends the recipient.
+    form.transform((data) => ({ ...data, recipient: recipient.value })).post(page.props.links["settings.mail.test"], {
+        preserveScroll: true,
+        onFinish: () => form.transform((data) => data),
+    });
 }
 function reset() {
     if (confirm("Remove the mail settings saved here and use the environment configuration again?")) router.delete(url.value, { preserveScroll: true });
