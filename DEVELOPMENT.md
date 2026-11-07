@@ -164,6 +164,9 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 | `perysee:update:check --quiet-unless-new` | 04:17 | Cherche une nouvelle version. |
 | `perysee:modules catalog --refresh-only` | 04:43 | Rafraîchit le catalogue de modules. |
 | `perysee:prune-api-tokens` | toutes les heures, sans chevauchement | Supprime les jetons d'API expirés ou révoqués depuis plus de 30 jours. |
+| `perysee:prune-access-log --limit=1000` | toutes les heures, sans chevauchement | Supprime les entrées du journal d'accès de plus de 90 jours. |
+| `perysee:prune-diagnostics` | toutes les heures, sans chevauchement | Supprime les diagnostics de collecte de plus de 7 jours. |
+| `perysee:prune-event-values --limit=1000` | toutes les heures, sans chevauchement | Supprime les identifiants de commande hors fenêtre et les propriétés d'événements hors rétention. |
 
 ### Équipe et invitations
 
