@@ -17,6 +17,8 @@ return [
         'window' => 600,
         'threshold' => ['stable' => 20, 'beta' => 10, 'experimental' => 5],
     ],
+    // Domain events (module events): after this many milliseconds spent delivering one event, the listeners left are skipped.
+    'module_events' => ['budget_ms' => 2000],
     'modules_backup_path' => env('PERYSEE_MODULES_BACKUP_PATH', storage_path('app/modules-backup')),
     // The public catalog of free official modules. PERYSEE_MODULE_CATALOG=false turns every call to it off.
     'module_catalog' => [

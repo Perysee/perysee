@@ -4,12 +4,15 @@ namespace App\Providers;
 
 use App\Modules\Catalog\CatalogSignature;
 use App\Modules\Catalog\ModuleCatalog;
+use App\Modules\Events\DomainEvents;
 use App\Modules\ModuleExtensions;
 use App\Modules\ModuleFailures;
 use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
 use App\Modules\ModuleScope;
 use App\Modules\ModuleSettings;
+use App\Modules\Notifications\NotificationChannels;
+use App\Modules\Reports\ReportSources;
 use App\Support\CacheCoordination;
 use App\Support\Coordination;
 use Illuminate\Support\ServiceProvider;
@@ -29,6 +32,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ModuleExtensions::class);
         $this->app->singleton(ModuleSettings::class);
         $this->app->singleton(ModuleScope::class);
+        // Module events and extension registries (ADR 005).
+        $this->app->singleton(DomainEvents::class);
+        $this->app->singleton(NotificationChannels::class);
+        $this->app->singleton(ReportSources::class);
         // A module may rebind this before its first use; the default keeps the state in the application cache.
         $this->app->singleton(Coordination::class, CacheCoordination::class);
     }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules;
 
 use App\Analytics\InstanceHealth;
+use App\Modules\Events\DomainEvents;
+use App\Modules\Events\ModuleQuarantined;
 use App\Support\Coordination;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -147,7 +149,9 @@ final class ModuleFailures
     {
         $state = $this->quarantined();
         $at = now('UTC')->toIso8601String();
-        foreach ($this->dependentsFirst($id) as $dependent) {
+        $dependents = $this->dependentsFirst($id);
+        $stability = $this->registry->all()[$id]->manifest->stability ?? Manifest::DEFAULT_STABILITY;
+        foreach ($dependents as $dependent) {
             $this->registry->disable($dependent);
             $state[$dependent] = ['reason' => "Needs {$id}, which was put in quarantine.", 'at' => $at];
         }
@@ -155,6 +159,11 @@ final class ModuleFailures
         $state[$id] = ['reason' => $reason, 'at' => $at];
         $this->health->put(self::STATE, $state);
         Log::error("Module {$id} was put in quarantine: {$reason}");
+        // The modules still enabled learn of it; the quarantined ones are disabled by now and receive nothing.
+        $events = app(DomainEvents::class);
+        if ($events->listening(ModuleQuarantined::class)) {
+            $events->publish(new ModuleQuarantined($id, $stability, $dependents, $at));
+        }
     }
 
     /**
