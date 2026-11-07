@@ -1,6 +1,7 @@
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import { useForm, usePage } from "@inertiajs/vue3";
+import { takeInstallationSecret } from "../installation-secret.mjs";
 const props = defineProps([
     "checks",
     "authorized",
@@ -24,6 +25,19 @@ const admin = useForm({
     password_confirmation: "",
 });
 const ready = computed(() => props.checks.every((check) => check.ok));
+onMounted(() => {
+    if (props.authorized) {
+        return;
+    }
+    const linked = takeInstallationSecret(window.location, window.history);
+    if (linked === null) {
+        return;
+    }
+    secret.installation_secret = linked;
+    secret.post(page.props.links["install.unlock"], {
+        onFinish: () => secret.reset(),
+    });
+});
 </script>
 <template>
     <div class="text-center mb-8">
@@ -87,7 +101,9 @@ const ready = computed(() => props.checks.every((check) => check.ok));
             </h2></template
         >
         <p class="text-sm text-muted mb-4">
-            Copy the secret from your hosting file manager:
+            Open the link printed by the installer in your terminal and this
+            step completes by itself. Without it, copy the secret from your
+            hosting file manager:
         </p>
         <pre class="code-block mb-5">
 storage/app/private/installation/secret</pre
@@ -104,7 +120,7 @@ storage/app/private/installation/secret</pre
                 label="Installation secret"
                 name="installation_secret"
                 :error="secret.errors.installation_secret"
-                description="This file is outside public/. Never share the secret or put it in a URL."
+                description="This file is outside public/. Never share the secret or the installer link."
                 required
                 ><UInput
                     v-model="secret.installation_secret"
