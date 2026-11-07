@@ -101,4 +101,31 @@ class ComparisonReportTest extends TestCase
 
         $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=year')->assertSessionHasErrors('compare');
     }
+
+    public function test_percent_is_withheld_when_range_includes_today(): void
+    {
+        $site = $this->memberSite();
+        $this->day($site, '2026-10-20', 10);
+        $this->day($site, '2026-10-13', 4);
+
+        $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('comparison.reliability.pageviews.percent_allowed', true)
+            ->where('comparison.reliability.pageviews.reason', null));
+
+        $today = now('UTC')->toDateString();
+        $this->get('/sites/'.$site->id.'?from='.now('UTC')->subDays(6)->toDateString().'&to='.$today.'&compare=previous')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('comparison.reliability.pageviews.percent_allowed', false)
+            ->where('comparison.reliability.pageviews.reason', 'current_period')
+            ->where('comparison.reliability.custom_events.reason', 'current_period'));
+    }
+
+    public function test_a_zero_previous_value_withholds_the_percent(): void
+    {
+        $site = $this->memberSite();
+        $this->day($site, '2026-10-20', 10);
+
+        $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous')->assertInertia(fn (Assert $page) => $page
+            ->where('comparison.reliability.pageviews.reason', 'previous_zero')
+            ->where('comparison.totals.pageviews', 0));
+    }
 }

@@ -63,6 +63,50 @@ class Reports
         ] + $period;
     }
 
+    /**
+     * The previous period with its totals, series and the server-side verdict on whether a percentage may be shown.
+     *
+     * @param  array<string, mixed>  $period
+     * @param  array<string, mixed>|null  $current  the overview of $period when the caller already has it
+     * @return array<string, mixed>
+     */
+    public function comparison(Website $site, array $period, ?array $current = null): array
+    {
+        $current ??= $this->overview($site, $period);
+        $previous = $this->previousPeriod($period, $site);
+        $overview = $this->overview($site, $previous);
+
+        return [
+            'period' => ['from' => $previous['from'], 'to' => $previous['to']],
+            'totals' => $overview['totals'],
+            'series' => $this->series($site, $previous),
+            'availability' => $overview['availability'],
+            'coverage' => $overview['coverage'],
+            'freshness' => $overview['freshness'],
+            'reliability' => $this->reliability($site, $period, $current, $overview),
+        ];
+    }
+
+    /**
+     * @return array<string, array{percent_allowed: bool, reason: string|null}>
+     */
+    private function reliability(Website $site, array $period, array $current, array $previous): array
+    {
+        $includesToday = $period['to'] >= now($site->timezone)->toDateString();
+        $verdict = [];
+        foreach (['pageviews', 'sessions', 'custom_events'] as $metric) {
+            $reason = null;
+            if ($includesToday) {
+                $reason = 'current_period';
+            } elseif (($previous['totals'][$metric] ?? 0) === 0) {
+                $reason = 'previous_zero';
+            }
+            $verdict[$metric] = ['percent_allowed' => $reason === null, 'reason' => $reason];
+        }
+
+        return $verdict;
+    }
+
     public function overview(Website $site, array $period): array
     {
         $rows = DB::table('stats_daily')->where('website_id', $site->id)->whereBetween('stat_date', [$period['from'], $period['to']])->get();
