@@ -61,10 +61,12 @@ class TwoFactorChallengeController extends Controller
 
             return redirect()->route('login')->withErrors(['email' => __('Too many incorrect codes. Try again later.')]);
         }
+        // The attempt is counted before the check, so parallel requests cannot all pass the limiter with the same
+        // count; a success gives it back.
+        RateLimiter::hit($address, 60);
+        RateLimiter::hit(self::userKey($user), 3600);
         $method = $this->twoFactor->verifyChallenge($user, $data['code']);
         if ($method === null) {
-            RateLimiter::hit($address, 60);
-            RateLimiter::hit(self::userKey($user), 3600);
             AccessLog::record(AccessLog::LOGIN_FAILED, $user, $request, ['stage' => 'two_factor']);
             throw ValidationException::withMessages(['code' => __('The code is not valid.')]);
         }
