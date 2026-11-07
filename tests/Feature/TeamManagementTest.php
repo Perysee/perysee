@@ -82,6 +82,37 @@ class TeamManagementTest extends TestCase
         $this->get('/sites/'.$site->id.'/team')->assertInertia(fn (Assert $page) => $page->where('invitationLink', null));
     }
 
+    public function test_expired_invitations_are_purged_by_maintenance(): void
+    {
+        [$site, $owner] = $this->siteWith('owner');
+        $make = function (string $email, array $state) use ($site, $owner): int {
+            [$invitation] = SiteInvitation::issue($site, $email, 'viewer', $owner);
+            $invitation->forceFill($state)->save();
+
+            return $invitation->id;
+        };
+        $old = now()->subDays(31);
+        $recent = now()->subDays(5);
+        $gone = [
+            $make('expired-long-ago@example.com', ['expires_at' => $old]),
+            $make('accepted-long-ago@example.com', ['accepted_at' => $old]),
+            $make('revoked-long-ago@example.com', ['revoked_at' => $old]),
+        ];
+        $kept = [
+            $make('pending@example.com', []),
+            $make('expired-recently@example.com', ['expires_at' => $recent]),
+            $make('accepted-recently@example.com', ['accepted_at' => $recent]),
+        ];
+
+        $this->artisan('perysee:maintenance', ['--limit' => 2])->assertSuccessful();
+        $this->assertSame(1, SiteInvitation::whereIn('id', $gone)->count(), 'The purge is bounded by the limit.');
+        $this->artisan('perysee:maintenance', ['--limit' => 2])->assertSuccessful();
+
+        $this->assertSame(0, SiteInvitation::whereIn('id', $gone)->count());
+        $this->assertSame(3, SiteInvitation::whereIn('id', $kept)->count());
+        $this->assertTrue($site->members()->whereKey($owner->id)->exists());
+    }
+
     public function test_an_owner_can_change_roles_and_remove_members_of_their_own_site_only(): void
     {
         [$site, $owner] = $this->siteWith('owner');
