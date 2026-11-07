@@ -29,6 +29,7 @@ Reports in scope include, besides the usual web vulnerabilities:
 
 - a way to read a site's data through a public share link (`/s/{token}`) beyond the sections its owner chose, or after the link was revoked, expired or its password changed;
 - a way to guess, recover or leak a share or invitation token (both are stored as SHA-256 hashes and travel in the URL);
+- a way to sign in to an account that has two-factor authentication without a valid code or recovery code, to reuse a code, or to learn or keep alive a session of someone else through the list of connected devices;
 - a way to accept an invitation for another address, to gain a role above the invited one, or to leave a site without an owner.
 
 ## Supported versions
