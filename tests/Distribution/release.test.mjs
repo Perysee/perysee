@@ -310,3 +310,47 @@ test('an unknown finish value is refused', (t) => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /--finish must be/);
 });
+function installCpanel(f, target, extra = []) {
+    return run(join(f.output, 'install.php'), ['--archive', join(f.output, 'perysee.zip'),
+        '--checksums', join(f.output, 'SHA256SUMS'), '--mode', 'cpanel', '--target', target, '--yes', ...extra]);
+}
+test('the cPanel mode hands over to perysee:install --cpanel with the hostname and derives the address from it', (t) => {
+    const f = fixture(t);
+    reportingArtisan(f);
+    build(f);
+    const target = join(f.root, 'app');
+    const result = installCpanel(f, target, ['--domain', 'stats.example.com']);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /ARTISAN perysee:install --cpanel --domain=stats\.example\.com/);
+    assert.doesNotMatch(result.stdout, /--browser/);
+    assert.ok(existsSync(join(target, 'artisan')));
+});
+test('the cPanel mode needs a hostname and cannot finish in the browser', (t) => {
+    const f = fixture(t);
+    reportingArtisan(f);
+    build(f);
+    const missing = installCpanel(f, join(f.root, 'one'));
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /--domain/);
+    const browser = installCpanel(f, join(f.root, 'two'), ['--domain', 'stats.example.com', '--finish', 'browser']);
+    assert.notEqual(browser.status, 0);
+    assert.match(browser.stderr, /cPanel mode finishes in the terminal/);
+    assert.equal(existsSync(join(f.root, 'one')), false);
+    assert.equal(existsSync(join(f.root, 'two')), false);
+});
+test('a hostname that is not a plain hostname is refused before anything is written', (t) => {
+    const f = fixture(t);
+    build(f);
+    const result = installCpanel(f, join(f.root, 'app'), ['--domain', 'https://stats.example.com/x']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /hostname/);
+    assert.equal(existsSync(join(f.root, 'app')), false);
+});
+test('the cPanel mode reports a failed perysee:install and exits with an error', (t) => {
+    const f = fixture(t);
+    reportingArtisan(f, { status: 1 });
+    build(f);
+    const result = installCpanel(f, join(f.root, 'app'), ['--domain', 'stats.example.com']);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /perysee:install did not finish/);
+});

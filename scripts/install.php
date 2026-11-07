@@ -56,7 +56,7 @@ function installationDownload(string $url, string $destination, int $limit, stri
 /** The installation modes this installer can run. */
 function installationModes(): array
 {
-    return ['manual'];
+    return ['manual', 'cpanel'];
 }
 
 /** What to do once the files are in place: prepare the browser installer, run it in the terminal, or stop. */
@@ -113,14 +113,23 @@ function installationArtisan(string $target, array $arguments, bool $interactive
 }
 
 /** The final instructions, either from the prepared browser link or the manual steps. */
-function installationFinish(string $target, string $url, string $finish): void
+function installationFinish(string $target, string $url, string $finish, string $domain = ''): void
 {
+    $cpanel = $domain !== '';
+    $arguments = $cpanel ? ['perysee:install', '--cpanel', '--domain='.$domain] : ['perysee:install', '--url='.$url];
     if ($finish === 'terminal') {
-        echo "\nFinishing the installation in the terminal. The database must already exist; its password goes in PERYSEE_DB_PASSWORD.\n";
-        [$status] = installationArtisan($target, ['perysee:install', '--url='.$url], true);
+        echo $cpanel
+            ? "\nPreparing your cPanel account and finishing the installation in the terminal.\n"
+            : "\nFinishing the installation in the terminal. The database must already exist; its password goes in PERYSEE_DB_PASSWORD.\n";
+        [$status] = installationArtisan($target, $arguments, true);
         if ($status !== 0) {
-            throw new RuntimeException("perysee:install did not finish. Fix the reported problem and run: php {$target}/artisan perysee:install --url={$url}");
+            throw new RuntimeException('perysee:install did not finish. Fix the reported problem and run: php '.$target.'/artisan '.implode(' ', $arguments));
         }
+
+        return;
+    }
+    if ($cpanel) {
+        echo "\nPerysee files installed successfully. Prepare cPanel and finish with: php {$target}/artisan ".implode(' ', $arguments)."\n";
 
         return;
     }
@@ -228,7 +237,7 @@ function installationExtract(string $archive, string $directory): void
 function installPerysee(array $options): void
 {
     if (isset($options['help'])) {
-        echo "Perysee installer (PHP 8.3+, curl and zip).\nphp install.php [--mode manual] [--target /path/perysee --url https://stats.example.com --yes]\nFinish: --finish browser (default; prints a private link that unlocks the browser installer), terminal (runs php artisan perysee:install) or none.\nOffline: add --archive /path/perysee.zip --checksums /path/SHA256SUMS\nPrivate GitHub: set GH_TOKEN in the environment; never pass it as an argument.\nAnother version: use its own address, https://get.perysee.com/releases/vX.Y.Z/install.sh\n";
+        echo "Perysee installer (PHP 8.3+, curl and zip).\nphp install.php [--mode manual] [--target /path/perysee --url https://stats.example.com --yes]\nphp install.php --mode cpanel [--target ~/perysee --domain stats.example.com --yes]  (creates the subdomain, database, user, PHP version and cron through UAPI)\nFinish: --finish browser (default; prints a private link that unlocks the browser installer), terminal (runs php artisan perysee:install) or none.\nOffline: add --archive /path/perysee.zip --checksums /path/SHA256SUMS\nPrivate GitHub: set GH_TOKEN in the environment; never pass it as an argument.\nAnother version: use its own address, https://get.perysee.com/releases/vX.Y.Z/install.sh\n";
 
         return;
     }
@@ -245,15 +254,34 @@ function installPerysee(array $options): void
     if (! in_array($finish, installationFinishModes(), true)) {
         throw new RuntimeException('--finish must be one of: '.implode(', ', installationFinishModes()).'.');
     }
-    if (isset($options['yes']) && (! isset($options['target']) || ! isset($options['url']))) {
+    $cpanel = $mode === 'cpanel';
+    if ($cpanel) {
+        // Everything but the files is done by `php artisan perysee:install --cpanel`, which asks for the administrator.
+        $finish = $options['finish'] ?? 'terminal';
+        if ($finish === 'browser') {
+            throw new RuntimeException('The cPanel mode finishes in the terminal (or with --finish none): there is no browser step to prepare.');
+        }
+        if (isset($options['yes']) && (! isset($options['target']) || ! isset($options['domain']))) {
+            throw new RuntimeException('--yes requires both --target and --domain in cPanel mode.');
+        }
+    } elseif (isset($options['yes']) && (! isset($options['target']) || ! isset($options['url']))) {
         throw new RuntimeException('--yes requires both --target and --url.');
     }
     echo 'Perysee '.PERYSEE_RELEASE." — first installation\n";
     $target = installationDestination($options['target'] ?? installationPrompt('Application directory', (getenv('HOME') ?: getcwd()).'/perysee'));
-    $url = rtrim($options['url'] ?? installationPrompt('Public HTTPS URL (domain or subdomain)'), '/');
-    $parsed = parse_url($url);
-    if (! filter_var($url, FILTER_VALIDATE_URL) || ($parsed['scheme'] ?? '') !== 'https' || empty($parsed['host']) || isset($parsed['user'], $parsed['pass']) || isset($parsed['user']) || isset($parsed['query']) || isset($parsed['fragment']) || ! empty($parsed['path'])) {
-        throw new RuntimeException('Provide an HTTPS origin without a path, credentials, query or fragment.');
+    $domain = '';
+    if ($cpanel) {
+        $domain = strtolower(trim($options['domain'] ?? installationPrompt('Hostname to create (a subdomain of one of your domains)')));
+        if (! preg_match('/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $domain)) {
+            throw new RuntimeException('Provide a plain hostname such as stats.example.com, without scheme or path.');
+        }
+        $url = 'https://'.$domain;
+    } else {
+        $url = rtrim($options['url'] ?? installationPrompt('Public HTTPS URL (domain or subdomain)'), '/');
+        $parsed = parse_url($url);
+        if (! filter_var($url, FILTER_VALIDATE_URL) || ($parsed['scheme'] ?? '') !== 'https' || empty($parsed['host']) || isset($parsed['user'], $parsed['pass']) || isset($parsed['user']) || isset($parsed['query']) || isset($parsed['fragment']) || ! empty($parsed['path'])) {
+            throw new RuntimeException('Provide an HTTPS origin without a path, credentials, query or fragment.');
+        }
     }
     echo "Destination: {$target}\nRequired document root: {$target}/public\n";
     if (! isset($options['yes']) && strtolower(installationPrompt('Download and install here? Type yes', 'no')) !== 'yes') {
@@ -313,7 +341,7 @@ function installPerysee(array $options): void
     } finally {
         installationRemoveDirectory($staging);
     }
-    installationFinish($target, $url, $finish);
+    installationFinish($target, $url, $finish, $domain);
 }
 
 if (PHP_SAPI !== 'cli') {
@@ -321,7 +349,7 @@ if (PHP_SAPI !== 'cli') {
     exit;
 }
 try {
-    installPerysee(getopt('', ['help', 'mode:', 'finish:', 'target:', 'url:', 'yes', 'archive:', 'checksums:']));
+    installPerysee(getopt('', ['help', 'mode:', 'finish:', 'domain:', 'target:', 'url:', 'yes', 'archive:', 'checksums:']));
 } catch (Throwable $exception) {
     fwrite(STDERR, 'Installation failed: '.$exception->getMessage()."\n");
     exit(1);
