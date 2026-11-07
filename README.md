@@ -1,6 +1,6 @@
 # Application Perysee
 
-Application autonome **PHP 8.3+ / Laravel 13 / Vue 3 + Nuxt UI / MariaDB 11.4.x**. Ce dossier contient l’application du produit ; `../perysee-web/` contient sa landing et son site documentaire et n’est pas une dépendance de l’application.
+Application autonome **PHP 8.3+ / Laravel 13 / Vue 3 + Nuxt UI / MariaDB 10.11, 11.4 ou 11.8**. Ce dossier contient l’application du produit ; `../perysee-web/` contient sa landing et son site documentaire et n’est pas une dépendance de l’application.
 
 Ce dossier est la racine du dépôt public [Perysee/perysee](https://github.com/Perysee/perysee) : `app/`, `artisan` et `.github/` sont directement à sa racine sur GitHub. Les sites de présentation ne font pas partie de ce dépôt.
 
@@ -62,7 +62,7 @@ Le script local conserve les secrets déjà configurés. Ne pas lancer `key:gene
 
 La release `perysee.zip` contient `vendor/` de production, les assets compilés dans `public/build/`, `public/fonts/`, `public/tracker/`. La qualification sur de vrais hébergements cPanel reste à réaliser.
 
-1. Déployer les fichiers sur un hébergement PHP compatible et créer une base MariaDB **11.4.x** dédiée avec les droits nécessaires aux migrations.
+1. Déployer les fichiers sur un hébergement PHP compatible et créer une base MariaDB (**10.11, 11.4 ou 11.8**) dédiée avec les droits nécessaires aux migrations.
 2. Activer HTTPS et diriger la racine du domaine **vers `public/`**. Ne jamais exposer la racine de l’application. Vérifier également les alias et accès alternatifs du serveur.
 3. Autoriser l’écriture dans le dossier de l’application pour créer/remplacer `.env`, ainsi que dans `storage/` et `bootstrap/cache/`. Ne pas utiliser de permissions universelles `0777`.
 4. Déployer sans `.env` préexistant, ou utiliser une configuration de production avec `APP_DEBUG=false`, `APP_ENV=production`, sessions et cache fichiers. Ne pas copier les réglages locaux tels quels. Aucun cache `bootstrap/cache/config.php` ne doit être livré avant installation.

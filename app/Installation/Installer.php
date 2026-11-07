@@ -34,8 +34,8 @@ class Installer
         DB::purge('mariadb');
         $connection = DB::connection('mariadb');
         $version = $connection->selectOne('SELECT VERSION() AS version')->version;
-        if (! str_contains($version, 'MariaDB') || ! str_starts_with($version, '11.4.')) {
-            throw ValidationException::withMessages(['database' => 'This release requires MariaDB 11.4.x.']);
+        if (! DatabaseVersion::supports($version)) {
+            throw ValidationException::withMessages(['database' => DatabaseVersion::requirement()]);
         }
 
         return $connection;

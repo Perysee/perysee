@@ -127,13 +127,13 @@ function installationFinish(string $target, string $url, string $finish): void
     if ($finish === 'browser') {
         [$status, $output] = installationArtisan($target, ['perysee:install', '--browser', '--url='.$url], false);
         if ($status === 0 && str_contains($output, '#secret=')) {
-            echo "\nPerysee files installed successfully.\n1. Set your domain document root to: {$target}/public\n2. Enable HTTPS and select compatible web PHP (CLI checks do not configure web PHP).\n3. Create an empty MariaDB 11.4.x database and user.\n4. Finish in your browser with this private link; it unlocks the installer by itself:\n".trim($output)."\n5. Configure the retention cron after completing the browser installer.\n";
+            echo "\nPerysee files installed successfully.\n1. Set your domain document root to: {$target}/public\n2. Enable HTTPS and select compatible web PHP (CLI checks do not configure web PHP).\n3. Create an empty MariaDB database (10.11, 11.4 or 11.8) and user.\n4. Finish in your browser with this private link; it unlocks the installer by itself:\n".trim($output)."\n5. Configure the retention cron after completing the browser installer.\n";
 
             return;
         }
         echo "\nThe browser link could not be prepared; follow the manual steps instead.\n";
     }
-    echo "\nPerysee files installed successfully.\n1. Set your domain document root to: {$target}/public\n2. Enable HTTPS and select compatible web PHP (CLI checks do not configure web PHP).\n3. Create an empty MariaDB 11.4.x database and user.\n4. Open: {$url}/install\n5. Retrieve storage/app/private/installation/secret after the first visit.\n6. Configure the retention cron after completing the browser installer.\n";
+    echo "\nPerysee files installed successfully.\n1. Set your domain document root to: {$target}/public\n2. Enable HTTPS and select compatible web PHP (CLI checks do not configure web PHP).\n3. Create an empty MariaDB database (10.11, 11.4 or 11.8) and user.\n4. Open: {$url}/install\n5. Retrieve storage/app/private/installation/secret after the first visit.\n6. Configure the retention cron after completing the browser installer.\n";
 }
 
 function installationRemoveDirectory(string $directory): void
