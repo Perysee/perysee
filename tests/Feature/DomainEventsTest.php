@@ -14,6 +14,9 @@ use App\Modules\ModuleFailures;
 use App\Modules\ModuleLoader;
 use App\Modules\ModuleRegistry;
 use App\Modules\ModuleScope;
+use App\Modules\Notifications\Notification;
+use App\Modules\Notifications\NotificationChannels;
+use App\Modules\Reports\ReportSources;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -183,6 +186,22 @@ class DomainEventsTest extends TestCase
         DB::disableQueryLog();
 
         $this->assertSame([], $queries);
+    }
+
+    public function test_publish_after_response_waits_for_the_application_to_terminate_and_fires_once(): void
+    {
+        $this->install('alerts');
+        $calls = 0;
+        $this->events()->listen('alerts', AggregationCompleted::class, function () use (&$calls): void {
+            $calls++;
+        });
+
+        $this->events()->publishAfterResponse($this->completed());
+        $this->assertSame(0, $calls);
+
+        app()->terminate();
+        app()->terminate();
+        $this->assertSame(1, $calls);
     }
 
     public function test_a_failing_listener_blocks_neither_the_publisher_nor_the_other_modules(): void
@@ -376,6 +395,23 @@ class DomainEventsTest extends TestCase
         $this->events()->publish($this->completed());
 
         $this->assertSame(3, app('provider-ok.got'));
+    }
+
+    public function test_a_module_provider_declares_a_channel_and_a_report_source(): void
+    {
+        $this->makeProviderModule('provider-reg', '0.4.0', "\$this->notificationChannel('provider-reg.log', \\Perysee\\Modules\\ProviderReg\\LogChannel::class); \$this->reportSource('provider-reg.figures', \\Perysee\\Modules\\ProviderReg\\Figures::class);");
+        file_put_contents($this->modulesPath.'/provider-reg/src/LogChannel.php', "<?php\nnamespace Perysee\\Modules\\ProviderReg;\nuse App\\Modules\\Contracts\\NotificationChannel;\nuse App\\Modules\\Notifications\\Notification;\nfinal class LogChannel implements NotificationChannel {\n public function label(): string { return 'Log'; }\n public function configured(): bool { return true; }\n public function send(Notification \$n, string \$target): void { app()->instance('provider-reg.sent', \$n->subject.'>'.\$target); }\n}\n");
+        file_put_contents($this->modulesPath.'/provider-reg/src/Figures.php', "<?php\nnamespace Perysee\\Modules\\ProviderReg;\nuse App\\Modules\\Contracts\\ReportSource;\nuse App\\Modules\\Reports\\ReportSection;\nuse Illuminate\\Support\\Carbon;\nfinal class Figures implements ReportSource {\n public function label(): string { return 'Figures'; }\n public function sections(int \$siteId, Carbon \$from, Carbon \$to): array { return [new ReportSection('Figures', [['label' => 'Site', 'value' => \$siteId]])]; }\n}\n");
+
+        app(ModuleRegistry::class)->enable('provider-reg');
+        app(ModuleLoader::class)->load();
+        $this->assertSame([], app(ModuleLoader::class)->failures());
+        $site = Website::factory()->create();
+
+        $this->assertTrue(app(NotificationChannels::class)->send('provider-reg.log', 'ops', new Notification('Hi', 'Body')));
+        $this->assertSame('Hi>ops', app('provider-reg.sent'));
+        $report = collect(app(ReportSources::class)->collect($site->id, now('UTC')->subDay(), now('UTC')))->firstWhere('key', 'provider-reg.figures');
+        $this->assertSame([['label' => 'Site', 'value' => (string) $site->id]], $report['sections'][0]->rows);
     }
 
     public function test_a_module_that_uses_events_without_requiring_a_core_that_has_them_fails_with_a_clear_reason(): void

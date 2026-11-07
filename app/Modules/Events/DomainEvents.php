@@ -116,7 +116,14 @@ final class DomainEvents
     public function publishAfterResponse(DomainEvent $event): void
     {
         if ($this->listening($event::class)) {
-            app()->terminating(fn () => $this->publish($event));
+            // The callback stays registered on a long-lived application (tests, Octane): it must fire once.
+            $sent = false;
+            app()->terminating(function () use ($event, &$sent): void {
+                if (! $sent) {
+                    $sent = true;
+                    $this->publish($event);
+                }
+            });
         }
     }
 

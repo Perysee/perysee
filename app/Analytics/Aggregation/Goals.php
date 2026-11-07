@@ -25,12 +25,20 @@ class Goals
     private ?array $batch = null;
 
     /**
+     * New conversions counted live by the current batch, by goal version (for the events modules can listen to).
+     *
+     * @var array<string, array{site: int, goal: int, version: int, count: int}>
+     */
+    private array $converted = [];
+
+    /**
      * Opens a batch: the active goals of the sites involved are read once. Sites without a goal cost nothing more.
      *
      * @param  Collection<int, object>  $events
      */
     public function begin(Collection $events): void
     {
+        $this->converted = [];
         $this->batch = ['items' => [], 'goals' => $events->isEmpty() ? [] : $this->active($events->pluck('website_id')->unique()->values()->all())];
     }
 
@@ -56,6 +64,17 @@ class Goals
             return;
         }
         $this->process($batch['items'], $batch['goals'], fn (int $site, string $key): ?object => $segments->firstEvent($site, $key), true);
+    }
+
+    /**
+     * The conversions the last flush() counted that were not there before. A conversion that only moved to another day nets
+     * out at zero and is left out; a backfill or a rebuild never contributes.
+     *
+     * @return list<array{site: int, goal: int, version: int, count: int}>
+     */
+    public function conversions(): array
+    {
+        return array_values(array_filter($this->converted, fn (array $row): bool => $row['count'] > 0));
     }
 
     /**
@@ -270,6 +289,13 @@ class Goals
         }
         foreach (array_chunk($writes, 200) as $chunk) {
             DB::table('goal_sessions')->upsert($chunk, self::SESSION_KEY, ['hits', 'converted_at', 'last_hit_at', 'event_data']);
+        }
+        if ($live) {
+            foreach ($deltas as $row) {
+                $key = $row['website_id'].'|'.$row['goal_id'].'|'.$row['version'];
+                $this->converted[$key] ??= ['site' => (int) $row['website_id'], 'goal' => (int) $row['goal_id'], 'version' => (int) $row['version'], 'count' => 0];
+                $this->converted[$key]['count'] += $row['conversions'];
+            }
         }
         $this->flushDeltas($deltas);
     }

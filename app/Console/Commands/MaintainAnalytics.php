@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Analytics\InstanceHealth;
+use App\Modules\Events\SchedulerWatch;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -20,7 +21,8 @@ class MaintainAnalytics extends Command
 
             return self::FAILURE;
         }
-        $health->put('heartbeat', now('UTC')->toIso8601String());
+        // Records the heartbeat; a module listening to scheduler.heartbeat_missed also learns of a recovery (no extra query otherwise).
+        app(SchedulerWatch::class)->beat($health);
         $maria = in_array(DB::getDriverName(), ['mariadb', 'mysql'], true);
         $name = 'perysee:aggregate:'.substr(hash('sha256', DB::connection()->getDatabaseName()), 0, 32);
         if ($maria && (int) DB::selectOne('SELECT GET_LOCK(?, 0) AS acquired', [$name])->acquired !== 1) {
