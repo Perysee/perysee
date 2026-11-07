@@ -71,3 +71,5 @@ jobs:
       - run: npm run test:tracker
       - run: npm run test:distribution
       - run: bash -n scripts/install.sh
+      - name: Lint the shell installer
+        run: shellcheck --severity=warning scripts/install.sh

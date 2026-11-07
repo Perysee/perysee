@@ -1,12 +1,48 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Global on purpose: the EXIT trap runs after main() has returned, when a local would be gone.
+workspace=''
+
+# The PHP CLI to install with. PERYSEE_PHP wins; otherwise the default php when it is recent enough, then the
+# newest versioned binary (php8.5...) or cPanel EasyApache one (/opt/cpanel/ea-php85/...) that qualifies.
+find_php() {
+    if [[ -n "${PERYSEE_PHP:-}" ]]; then
+        echo "$PERYSEE_PHP"
+        return 0
+    fi
+    local candidates=(php php8.5 php8.4 php8.3)
+    local cpanel=()
+    local entry candidate resolved
+    shopt -s nullglob
+    for entry in "${PERYSEE_CPANEL_ROOT:-/opt/cpanel}"/ea-php*/root/usr/bin/php; do
+        cpanel+=("$entry")
+    done
+    shopt -u nullglob
+    # Globs sort ascending: walk the cPanel installations from the newest.
+    local index
+    for ((index = ${#cpanel[@]} - 1; index >= 0; index--)); do
+        candidates+=("${cpanel[$index]}")
+    done
+    for candidate in "${candidates[@]}"; do
+        resolved="$(command -v "$candidate" 2>/dev/null || true)"
+        if [[ -n "$resolved" ]] && "$resolved" -r 'exit(PHP_VERSION_ID >= 80300 ? 0 : 1);' >/dev/null 2>&1; then
+            echo "$resolved"
+            return 0
+        fi
+    done
+    echo 'Perysee needs PHP CLI 8.3 or later. Ask your hosting provider to enable it, or set PERYSEE_PHP to its path.' >&2
+
+    return 1
+}
+
 main() {
     local release_base='https://github.com/Perysee/perysee/releases/latest/download'
     local download_base="${PERYSEE_DOWNLOAD_URL:-$release_base}"
-    local php_binary="${PERYSEE_PHP:-php}"
+    local php_binary
 
     command -v curl >/dev/null || { echo 'Perysee needs curl. Ask your hosting provider to enable it.' >&2; exit 1; }
+    php_binary="$(find_php)"
     command -v "$php_binary" >/dev/null || { echo 'Perysee needs PHP CLI 8.3 or later.' >&2; exit 1; }
     "$php_binary" -r 'if (PHP_VERSION_ID < 80300) {fwrite(STDERR, "Perysee needs PHP CLI 8.3 or later.\n"); exit(1);}'
     case "$download_base" in
@@ -41,5 +77,8 @@ main() {
     fi
 }
 
-# A function keeps the piped shell source separate from the installer's input.
-main "$@"
+# A function keeps the piped shell source separate from the installer's input. Tests source this file to reach
+# find_php without installing anything.
+if [[ -z "${PERYSEE_INSTALL_SOURCED:-}" ]]; then
+    main "$@"
+fi

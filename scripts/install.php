@@ -53,6 +53,89 @@ function installationDownload(string $url, string $destination, int $limit, stri
     }
 }
 
+/** The installation modes this installer can run. */
+function installationModes(): array
+{
+    return ['manual'];
+}
+
+/** What to do once the files are in place: prepare the browser installer, run it in the terminal, or stop. */
+function installationFinishModes(): array
+{
+    return ['browser', 'terminal', 'none'];
+}
+
+/**
+ * Remove the staging directory even when the process is interrupted (Ctrl+C, hang-up), where `finally` does not run.
+ */
+function installationTrackStaging(?string $directory = null): void
+{
+    static $tracked = null;
+    static $registered = false;
+    if ($directory !== null) {
+        $tracked = $directory;
+    }
+    if ($registered) {
+        return;
+    }
+    $registered = true;
+    register_shutdown_function(static function () use (&$tracked): void {
+        if ($tracked !== null) {
+            installationRemoveDirectory($tracked);
+        }
+    });
+    if (function_exists('pcntl_async_signals') && function_exists('pcntl_signal')) {
+        pcntl_async_signals(true);
+        foreach ([SIGINT, SIGTERM, SIGHUP] as $signal) {
+            pcntl_signal($signal, static fn () => exit(130));
+        }
+    }
+}
+
+/** Run the installed application's artisan with this PHP; the output is captured unless $interactive is true. */
+function installationArtisan(string $target, array $arguments, bool $interactive): array
+{
+    $command = array_merge([PHP_BINARY, $target.'/artisan'], $arguments);
+    $descriptors = $interactive ? [0 => STDIN, 1 => STDOUT, 2 => STDERR] : [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+    $process = proc_open($command, $descriptors, $pipes, $target);
+    if (! is_resource($process)) {
+        return [1, ''];
+    }
+    $output = '';
+    if (! $interactive) {
+        $output = (string) stream_get_contents($pipes[1]);
+        stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+    }
+
+    return [proc_close($process), $output];
+}
+
+/** The final instructions, either from the prepared browser link or the manual steps. */
+function installationFinish(string $target, string $url, string $finish): void
+{
+    if ($finish === 'terminal') {
+        echo "\nFinishing the installation in the terminal. The database must already exist; its password goes in PERYSEE_DB_PASSWORD.\n";
+        [$status] = installationArtisan($target, ['perysee:install', '--url='.$url], true);
+        if ($status !== 0) {
+            throw new RuntimeException("perysee:install did not finish. Fix the reported problem and run: php {$target}/artisan perysee:install --url={$url}");
+        }
+
+        return;
+    }
+    if ($finish === 'browser') {
+        [$status, $output] = installationArtisan($target, ['perysee:install', '--browser', '--url='.$url], false);
+        if ($status === 0 && str_contains($output, '#secret=')) {
+            echo "\nPerysee files installed successfully.\n1. Set your domain document root to: {$target}/public\n2. Enable HTTPS and select compatible web PHP (CLI checks do not configure web PHP).\n3. Create an empty MariaDB 11.4.x database and user.\n4. Finish in your browser with this private link; it unlocks the installer by itself:\n".trim($output)."\n5. Configure the retention cron after completing the browser installer.\n";
+
+            return;
+        }
+        echo "\nThe browser link could not be prepared; follow the manual steps instead.\n";
+    }
+    echo "\nPerysee files installed successfully.\n1. Set your domain document root to: {$target}/public\n2. Enable HTTPS and select compatible web PHP (CLI checks do not configure web PHP).\n3. Create an empty MariaDB 11.4.x database and user.\n4. Open: {$url}/install\n5. Retrieve storage/app/private/installation/secret after the first visit.\n6. Configure the retention cron after completing the browser installer.\n";
+}
+
 function installationRemoveDirectory(string $directory): void
 {
     if (! is_dir($directory) || is_link($directory)) {
@@ -145,7 +228,7 @@ function installationExtract(string $archive, string $directory): void
 function installPerysee(array $options): void
 {
     if (isset($options['help'])) {
-        echo "Perysee installer (PHP 8.3+, curl and zip).\nphp install.php [--target /path/perysee --url https://stats.example.com --yes]\nOffline: add --archive /path/perysee.zip --checksums /path/SHA256SUMS\nPrivate GitHub: set GH_TOKEN in the environment; never pass it as an argument.\n";
+        echo "Perysee installer (PHP 8.3+, curl and zip).\nphp install.php [--mode manual] [--target /path/perysee --url https://stats.example.com --yes]\nFinish: --finish browser (default; prints a private link that unlocks the browser installer), terminal (runs php artisan perysee:install) or none.\nOffline: add --archive /path/perysee.zip --checksums /path/SHA256SUMS\nPrivate GitHub: set GH_TOKEN in the environment; never pass it as an argument.\nAnother version: use its own address, https://get.perysee.com/releases/vX.Y.Z/install.sh\n";
 
         return;
     }
@@ -153,6 +236,14 @@ function installPerysee(array $options): void
     $missing = array_filter($extensions, fn (string $extension): bool => ! extension_loaded($extension));
     if (PHP_VERSION_ID < 80300 || $missing) {
         throw new RuntimeException('PHP 8.3+ is required. Missing extensions: '.implode(', ', $missing));
+    }
+    $mode = $options['mode'] ?? 'manual';
+    if (! in_array($mode, installationModes(), true)) {
+        throw new RuntimeException('Unknown installation mode "'.$mode.'". Available: '.implode(', ', installationModes()).'.');
+    }
+    $finish = $options['finish'] ?? 'browser';
+    if (! in_array($finish, installationFinishModes(), true)) {
+        throw new RuntimeException('--finish must be one of: '.implode(', ', installationFinishModes()).'.');
     }
     if (isset($options['yes']) && (! isset($options['target']) || ! isset($options['url']))) {
         throw new RuntimeException('--yes requires both --target and --url.');
@@ -174,6 +265,7 @@ function installPerysee(array $options): void
     if (! mkdir($staging, 0700)) {
         throw new RuntimeException('Cannot create private staging directory.');
     }
+    installationTrackStaging($staging);
     try {
         if (isset($options['archive']) !== isset($options['checksums'])) {
             throw new RuntimeException('Provide both --archive and --checksums for offline installation.');
@@ -218,10 +310,10 @@ function installPerysee(array $options): void
         if (! rename($root, $target)) {
             throw new RuntimeException('Cannot move staged application to destination.');
         }
-        echo "\nPerysee files installed successfully.\n1. Set your domain document root to: {$target}/public\n2. Enable HTTPS and select compatible web PHP (CLI checks do not configure web PHP).\n3. Create an empty MariaDB 11.4.x database and user.\n4. Open: {$url}/install\n5. Retrieve storage/app/private/installation/secret after the first visit.\n6. Configure the retention cron after completing the browser installer.\n";
     } finally {
         installationRemoveDirectory($staging);
     }
+    installationFinish($target, $url, $finish);
 }
 
 if (PHP_SAPI !== 'cli') {
@@ -229,7 +321,7 @@ if (PHP_SAPI !== 'cli') {
     exit;
 }
 try {
-    installPerysee(getopt('', ['help', 'target:', 'url:', 'yes', 'archive:', 'checksums:']));
+    installPerysee(getopt('', ['help', 'mode:', 'finish:', 'target:', 'url:', 'yes', 'archive:', 'checksums:']));
 } catch (Throwable $exception) {
     fwrite(STDERR, 'Installation failed: '.$exception->getMessage()."\n");
     exit(1);

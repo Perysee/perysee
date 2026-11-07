@@ -98,7 +98,7 @@ jobs:
         run: cd dist && sha256sum --check SHA256SUMS
       - name: Smoke-test the actual production ZIP
         run: |
-          php dist/install.php --archive dist/perysee.zip --checksums dist/SHA256SUMS --target "$RUNNER_TEMP/perysee-smoke" --url https://stats.example.com --yes
+          php dist/install.php --archive dist/perysee.zip --checksums dist/SHA256SUMS --target "$RUNNER_TEMP/perysee-smoke" --url https://stats.example.com --yes --finish none
           cd "$RUNNER_TEMP/perysee-smoke"
           php artisan --version
           test ! -f .env
