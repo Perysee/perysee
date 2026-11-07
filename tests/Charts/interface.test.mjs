@@ -57,3 +57,32 @@ test("an absolute address keeps its origin and a path loses any previous query",
     assert.equal(queryUrl("https://stats.test/sites/3", { period: "7d" }), "https://stats.test/sites/3?period=7d");
     assert.equal(queryUrl("/sites/3?old=1", { period: "7d" }), "/sites/3?period=7d");
 });
+
+test("the accessible chart table lines the previous values up by rank and shows a dash for a missing slot", async () => {
+    const { comparisonRows } = await import("../../resources/js/comparison.mjs");
+    const series = [
+        { label: "10-18", pageviews: 4, sessions: null },
+        { label: "10-19", pageviews: 6, sessions: 2 },
+    ];
+    const previous = [{ label: "10-11", day: "10-11", rank: 0, pageviews: 3, sessions: null }];
+    const rows = comparisonRows(series, previous, ["pageviews", "sessions"]);
+    assert.equal(rows[0].previous_label, "10-11");
+    assert.equal(rows[0].previous_pageviews, 3);
+    assert.equal(rows[0].previous_sessions, null);
+    assert.equal(rows[1].previous_label, null);
+    assert.equal(rows[1].previous_pageviews, null);
+    assert.equal(comparisonRows(series, null, ["pageviews"]), series);
+});
+
+test("a goal link stays a path and keeps the period, the cross filters and the version", () => {
+    const filters = reportFilters("/sites/3/goals/2?filters[country][]=FR&version=2&page=4");
+    const url = new URL(
+        queryUrl("/sites/3/goals/2", { ...filters, from: "2026-10-01", to: "2026-10-25", version: 2 }),
+        "https://stats.test",
+    );
+    assert.equal(url.pathname, "/sites/3/goals/2");
+    assert.deepEqual(url.searchParams.getAll("filters[country][]"), ["FR"]);
+    assert.equal(url.searchParams.get("from"), "2026-10-01");
+    assert.equal(url.searchParams.get("version"), "2");
+    assert.equal(url.searchParams.has("page"), false);
+});

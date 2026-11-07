@@ -91,24 +91,31 @@ const share = (row) =>
                 description="Adjust the period or filters, or check that the tracking snippet is installed."
         /></template>
         <template #value-cell="{ row }"
-            ><a
+            ><component
+                :is="reportUrl ? 'a' : 'span'"
                 :href="
-                    queryUrl(reportUrl, { ...query, ...selectFilter(page.url, type, row.original.value) })
+                    reportUrl
+                        ? queryUrl(reportUrl, { ...query, ...selectFilter(page.url, type, row.original.value) })
+                        : undefined
                 "
                 class="breakdown-label"
                 :style="{
                     '--bar-width':
                         (row.original.count / leadingCount) * 100 + '%',
                 }"
-                :title="'Filter: ' + name(row.original)"
-                @click.prevent="
-                    router.visit(
-                        queryUrl(reportUrl, {
-                            ...query,
-                            ...selectFilter(page.url, type, row.original.value),
-                        }),
-                        { preserveState: true, preserveScroll: true },
-                    )
+                :title="reportUrl ? 'Filter: ' + name(row.original) : undefined"
+                @click="
+                    (event) => {
+                        if (!reportUrl) return;
+                        event.preventDefault();
+                        router.visit(
+                            queryUrl(reportUrl, {
+                                ...query,
+                                ...selectFilter(page.url, type, row.original.value),
+                            }),
+                            { preserveState: true, preserveScroll: true },
+                        );
+                    }
                 "
                 ><img
                     v-if="type === 'source' && row.original.icon"
@@ -129,7 +136,7 @@ const share = (row) =>
                     v-else-if="['browser', 'device_brand'].includes(type)"
                     :name="row.original.icon"
                     class="size-5 text-muted shrink-0"
-                /><span>{{ name(row.original) }}</span></a
+                /><span>{{ name(row.original) }}</span></component
             ></template
         >
         <template #count-cell="{ row }">{{
@@ -148,7 +155,7 @@ const share = (row) =>
                 : `${visible.length} values shown · share of matching ${type === "event" ? "events" : "pageviews"}`
         }}</span
         ><UButton
-            v-if="compact"
+            v-if="compact && reportUrl"
             :to="queryUrl(reportUrl, query)"
             label="View report"
             trailing-icon="i-tabler-arrow-up-right"

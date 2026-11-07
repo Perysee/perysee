@@ -4,16 +4,23 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DemoController;
 use App\Http\Controllers\FunnelController;
+use App\Http\Controllers\GoalController;
 use App\Http\Controllers\GuideController;
 use App\Http\Controllers\InstallationController;
 use App\Http\Controllers\InstanceHealthController;
 use App\Http\Controllers\InstanceUpdateController;
+use App\Http\Controllers\InvitationAcceptanceController;
+use App\Http\Controllers\MailSettingsController;
 use App\Http\Controllers\ModuleAssetController;
 use App\Http\Controllers\ModuleController;
+use App\Http\Controllers\ShareLinkController;
 use App\Http\Controllers\SiteFaviconController;
+use App\Http\Controllers\SiteInvitationController;
+use App\Http\Controllers\SiteMemberController;
 use App\Http\Controllers\WebsiteController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Middleware\EnsureInstalled;
+use App\Http\Middleware\ThrottleInvitationLinks;
 use App\Installation\InstallationState;
 use Illuminate\Support\Facades\Route;
 
@@ -23,6 +30,10 @@ Route::post('/install/unlock', [InstallationController::class, 'unlock'])->name(
 Route::post('/install/database', [InstallationController::class, 'database'])->name('install.database');
 Route::post('/install/administrator', [InstallationController::class, 'administrator'])->name('install.administrator');
 Route::middleware(EnsureInstalled::class)->group(function (): void {
+    Route::middleware(ThrottleInvitationLinks::class)->group(function (): void {
+        Route::get('/invitations/{token}', [InvitationAcceptanceController::class, 'show'])->name('invitations.show');
+        Route::post('/invitations/{token}', [InvitationAcceptanceController::class, 'accept'])->name('invitations.accept');
+    });
     Route::middleware('guest')->group(function (): void {
         Route::get('/login', [AuthController::class, 'create'])->name('login');
         Route::post('/login', [AuthController::class, 'store'])->name('login.store');
@@ -51,8 +62,19 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/sites/{website}/journeys', [FunnelController::class, 'journeys'])->middleware('throttle:30,1')->name('sites.journeys');
         Route::get('/api/sites/{website}/journey-reports/{report}', [FunnelController::class, 'status'])->name('sites.journeys.status');
         Route::get('/sites/{website}/journey-reports/{report}/export', [FunnelController::class, 'export'])->name('sites.journeys.export');
+        Route::get('/sites/{website}/goals', [GoalController::class, 'index'])->name('sites.goals.index');
+        Route::post('/sites/{website}/goals', [GoalController::class, 'store'])->name('sites.goals.store');
+        Route::get('/sites/{website}/goals/{goal}', [GoalController::class, 'show'])->name('sites.goals.show');
+        Route::put('/sites/{website}/goals/{goal}', [GoalController::class, 'update'])->name('sites.goals.update');
+        Route::delete('/sites/{website}/goals/{goal}', [GoalController::class, 'archive'])->name('sites.goals.archive');
+        Route::get('/sites/{website}/goals/{goal}/export', [GoalController::class, 'export'])->name('sites.goals.export');
+        Route::get('/api/sites/{website}/goals/{goal}', [GoalController::class, 'api'])->name('sites.goals.api');
         Route::get('/sites/{website}/export', [AnalyticsController::class, 'export'])->name('sites.export');
         Route::get('/settings', [WorkspaceController::class, 'settings'])->name('settings');
+        Route::get('/settings/mail', [MailSettingsController::class, 'show'])->name('settings.mail');
+        Route::put('/settings/mail', [MailSettingsController::class, 'update'])->name('settings.mail.update');
+        Route::delete('/settings/mail', [MailSettingsController::class, 'reset'])->name('settings.mail.reset');
+        Route::post('/settings/mail/test', [MailSettingsController::class, 'test'])->middleware('throttle:5,1')->name('settings.mail.test');
         Route::get('/settings/modules', [ModuleController::class, 'index'])->name('modules.index');
         Route::post('/settings/modules/install', [ModuleController::class, 'install'])->name('modules.install');
         Route::post('/settings/modules/catalog/refresh', [ModuleController::class, 'refreshCatalog'])->name('modules.catalog.refresh');
@@ -63,7 +85,18 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::post('/settings/modules/{module}/enable', [ModuleController::class, 'enable'])->name('modules.enable');
         Route::post('/settings/modules/{module}/disable', [ModuleController::class, 'disable'])->name('modules.disable');
         Route::get('/sites/{website}/favicon', SiteFaviconController::class)->middleware('throttle:120,1')->name('sites.favicon');
+        Route::get('/sites/{website}/sharing', [ShareLinkController::class, 'index'])->name('sites.sharing');
+        Route::post('/sites/{website}/sharing', [ShareLinkController::class, 'store'])->name('sites.sharing.store');
+        Route::put('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'update'])->name('sites.sharing.update');
+        Route::delete('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'destroy'])->name('sites.sharing.destroy');
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
+        Route::get('/sites/{website}/team', [SiteMemberController::class, 'index'])->name('sites.team');
+        Route::delete('/sites/{website}/team/me', [SiteMemberController::class, 'leave'])->name('sites.team.leave');
+        Route::put('/sites/{website}/team/{member}', [SiteMemberController::class, 'update'])->whereNumber('member')->name('sites.team.update');
+        Route::delete('/sites/{website}/team/{member}', [SiteMemberController::class, 'destroy'])->whereNumber('member')->name('sites.team.destroy');
+        Route::post('/sites/{website}/invitations', [SiteInvitationController::class, 'store'])->name('sites.invitations.store');
+        Route::post('/sites/{website}/invitations/{invitation}/resend', [SiteInvitationController::class, 'resend'])->whereNumber('invitation')->name('sites.invitations.resend');
+        Route::delete('/sites/{website}/invitations/{invitation}', [SiteInvitationController::class, 'revoke'])->whereNumber('invitation')->name('sites.invitations.revoke');
         Route::get('/sites/{website}/{section}', [WorkspaceController::class, 'sitePage'])->whereIn('section', ['countries', 'pages', 'events', 'sessions', 'realtime', 'sources', 'campaigns', 'devices', 'pixels'])->name('sites.section');
         Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
         Route::get('/account/password', [AuthController::class, 'editPassword'])->name('password.edit');

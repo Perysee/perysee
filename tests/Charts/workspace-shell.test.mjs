@@ -94,6 +94,15 @@ test("the top bar shows the white label name and members do not get the administ
     assert.doesNotMatch(html, /Instance health|href="\/settings\/modules"/);
 });
 
+test("administrators get a Mail entry in the administration menu, members do not", async () => {
+    const links = { ...signedIn().links, "settings.mail": "/settings/mail" };
+    const admin = await render(signedIn({ links, screen: "settings.mail", currentUrl: "/settings/mail" }));
+    assert.match(admin, /aria-current="page"[^>]*href="\/settings\/mail"|href="\/settings\/mail"[^>]*aria-current="page"/);
+
+    const member = await render(signedIn({ links, auth: { id: 2, name: "Bo", email: "bo@example.test", is_admin: false } }));
+    assert.doesNotMatch(member, /href="\/settings\/mail"/);
+});
+
 test("a visitor who is not signed in gets the plain sign-in shell, not the dashboard", async () => {
     const html = await render({ ...signedIn({ screen: "auth.login" }), auth: null, modules: { navigation: { workspace: [], admin: [], site: [] }, data: {}, active: [], scripts: [], styles: [] } });
 
@@ -107,7 +116,7 @@ const inSite = () =>
         currentUrl: "/sites/1",
         website: { id: 1, name: "Acme", domain: "acme.test" },
         canUpdate: true,
-        siteLinks: Object.fromEntries(["show", "pages", "sources", "campaigns", "devices", "countries", "sessions", "events", "funnels", "journeys", "realtime", "tracking", "edit", "favicon"].map((key) => [key, `/sites/1${key === "show" ? "" : `/${key}`}`])),
+        siteLinks: Object.fromEntries(["show", "pages", "sources", "campaigns", "devices", "countries", "sessions", "events", "funnels", "goals", "journeys", "realtime", "tracking", "edit", "favicon"].map((key) => [key, `/sites/1${key === "show" ? "" : `/${key}`}`])),
     });
 
 test("Home is the first entry of the menu, inside a site as well, so there is always a way back", async () => {

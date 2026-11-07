@@ -30,7 +30,10 @@ class BootstrapInstallation
         if (! $request->is('modules/*/assets/*')) {
             $response->headers->set('Cache-Control', 'no-store, private');
         }
-        $response->headers->set('Referrer-Policy', 'same-origin');
+        if (! $response->headers->has('Referrer-Policy')) {
+            // An invitation address carries a secret: it must not leak through the Referer of any link or resource.
+            $response->headers->set('Referrer-Policy', $request->is('invitations/*') ? 'no-referrer' : 'same-origin');
+        }
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'DENY');
 

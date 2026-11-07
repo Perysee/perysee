@@ -21,6 +21,11 @@ class InstanceHealth
         return $value === null ? $default : json_decode($value, true, flags: JSON_THROW_ON_ERROR);
     }
 
+    public function forget(string $name): void
+    {
+        DB::table('analytics_state')->where('name', $name)->delete();
+    }
+
     public function failure(string $name): void
     {
         try {

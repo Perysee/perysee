@@ -21,6 +21,7 @@ export const sectionGroups = [
         sections: [
             { key: "events", label: "Events", icon: "i-tabler-bolt", keywords: ["conversions", "evenements", "custom", "goals"] },
             { key: "funnels", label: "Funnels", icon: "i-tabler-filter", keywords: ["conversion", "entonnoirs", "steps", "etapes"] },
+            { key: "goals", label: "Goals", icon: "i-tabler-target", keywords: ["conversions", "objectifs", "targets", "signup", "taux"] },
             { key: "journeys", label: "Journeys", icon: "i-tabler-route", keywords: ["parcours", "paths", "flow", "sankey"] },
         ],
     },
