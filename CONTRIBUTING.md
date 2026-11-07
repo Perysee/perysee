@@ -15,7 +15,9 @@ Thanks for helping. Here is how it works.
 
 ## Pull requests
 
-1. Fork the repository and create a branch from `main`.
+1. Fork the repository and create a branch from `develop` (`feat/…`, `fix/…`,
+   `chore/…` or `docs/…`) and open the pull request against `develop`. `main`
+   only holds published releases.
 2. Keep one topic per pull request.
 3. Add or update tests when you change behavior.
 4. Run the test suite and the linter before pushing.
