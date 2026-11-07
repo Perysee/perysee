@@ -90,12 +90,18 @@ function buildRelease(array $options): void
     $bootstrap = str_replace('https://github.com/Perysee/perysee/releases/latest/download',
         'https://get.perysee.com/releases/'.$version, file_get_contents(__DIR__.'/install.sh'));
     file_put_contents($output.'/install.sh', $bootstrap);
+    // The Docker installer builds its image from these files and the ZIP; they are verified like the ZIP itself.
+    foreach (['Dockerfile', 'compose.yaml', 'docker-entrypoint.sh'] as $file) {
+        if (! is_file(dirname(__DIR__).'/docker/'.$file) || ! copy(dirname(__DIR__).'/docker/'.$file, $output.'/'.$file)) {
+            throw new RuntimeException('Missing Docker file: docker/'.$file);
+        }
+    }
     $checksums = '';
-    foreach (['perysee.zip', 'install.php', 'install.sh'] as $file) {
+    foreach (['perysee.zip', 'install.php', 'install.sh', 'Dockerfile', 'compose.yaml', 'docker-entrypoint.sh'] as $file) {
         $checksums .= hash_file('sha256', $output.'/'.$file).'  '.$file."\n";
     }
     file_put_contents($output.'/SHA256SUMS', $checksums);
-    echo "Release {$version}: {$output}/perysee.zip, install.php, install.sh, SHA256SUMS\n";
+    echo "Release {$version}: {$output}/perysee.zip, install.php, install.sh, Dockerfile, compose.yaml, docker-entrypoint.sh, SHA256SUMS\n";
 }
 
 try {

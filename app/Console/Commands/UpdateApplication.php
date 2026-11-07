@@ -23,6 +23,14 @@ class UpdateApplication extends Command
 
     public function handle(UpdateRunner $runner, UpdateStatus $status): int
     {
+        if (config('perysee.install_mode') === 'docker') {
+            if ($this->option('requested')) {
+                return self::SUCCESS;
+            }
+            $this->error('This instance runs in Docker, where the code lives in the image. Update it by running the installer again: install.sh --mode docker --upgrade --target <installation folder>');
+
+            return self::FAILURE;
+        }
         $dump = (string) $this->option('dump');
         if ($this->option('requested')) {
             $request = $status->requested();

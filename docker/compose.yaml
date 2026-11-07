@@ -1,0 +1,82 @@
+# Perysee with Docker: the application, its scheduler and MariaDB. Written next to a .env file by the installer
+# (install.sh --mode docker); the values below come from that file. Put a reverse proxy with HTTPS in front of
+# PERYSEE_BIND:PERYSEE_PORT and list its address in PERYSEE_TRUSTED_PROXIES.
+name: perysee
+
+x-environment: &environment
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_URL: ${APP_URL}
+  APP_KEY: ${APP_KEY}
+  LOG_CHANNEL: stderr
+  DB_CONNECTION: mariadb
+  DB_HOST: mariadb
+  DB_PORT: "3306"
+  DB_DATABASE: ${DB_DATABASE}
+  DB_USERNAME: ${DB_USERNAME}
+  DB_PASSWORD: ${DB_PASSWORD}
+  PERYSEE_DB_PASSWORD: ${DB_PASSWORD}
+  PERYSEE_INSTALL_MODE: docker
+  PERYSEE_UPDATE_CHECK: "false"
+  PERYSEE_TRUSTED_PROXIES: ${PERYSEE_TRUSTED_PROXIES:-}
+
+x-application: &application
+  image: perysee-local:${PERYSEE_TAG:-latest}
+  restart: unless-stopped
+  volumes:
+    - perysee-storage:/var/www/perysee/storage
+
+services:
+  app:
+    <<: *application
+    build:
+      context: .
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.4}
+    environment:
+      <<: *environment
+      PERYSEE_RUN_MIGRATIONS: "true"
+    ports:
+      - "${PERYSEE_BIND:-127.0.0.1}:${PERYSEE_PORT:-8080}:80"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  scheduler:
+    <<: *application
+    user: www-data
+    command: ["php", "artisan", "schedule:work"]
+    environment: *environment
+    depends_on:
+      app:
+        condition: service_healthy
+
+  mariadb:
+    image: mariadb:${MARIADB_VERSION:-11.4}
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    environment:
+      MARIADB_DATABASE: ${DB_DATABASE}
+      MARIADB_USER: ${DB_USERNAME}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+    volumes:
+      - perysee-database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  perysee-storage:
+  perysee-database:
