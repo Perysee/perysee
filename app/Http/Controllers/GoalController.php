@@ -3,15 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Analytics\Privacy\NormalizePath;
+use App\Analytics\Reporting\GoalReports;
 use App\Analytics\Reporting\Reports;
 use App\Models\Website;
 use App\Support\Ui;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class GoalController extends Controller
 {
@@ -103,13 +106,53 @@ class GoalController extends Controller
         return redirect()->route('sites.goals.index', $website)->with('status', 'Goal archived.');
     }
 
-    public function show(Request $request, Website $website, int $goal, Reports $reports): Response
+    /**
+     * @return array{0: object, 1: object, 2: array<string, mixed>, 3: array<string, mixed>}
+     */
+    private function load(Request $request, Website $website, int $goal, Reports $reports, GoalReports $goals): array
     {
         $this->authorizeSite($website);
         $definition = $this->definition($website, $goal);
         $request->validate(['version' => ['sometimes', 'integer', 'min:1']]);
         $version = DB::table('goal_versions')->where('goal_id', $goal)->where('version', $request->integer('version', $definition->current_version))->firstOrFail();
+        $period = $reports->period($request, $website);
 
-        return Ui::render('goal.report', ['website' => $website, 'period' => $reports->period($request, $website), 'goal' => (array) $definition, 'definition' => (array) $version, 'versions' => DB::table('goal_versions')->where('goal_id', $goal)->orderByDesc('version')->pluck('version'), 'version' => $version->version, 'updateUrl' => route('sites.goals.update', [$website, $goal]), 'archiveUrl' => route('sites.goals.archive', [$website, $goal])]);
+        return [$definition, $version, $period, $goals->report($website, $goal, $version->version, $period)];
+    }
+
+    public function show(Request $request, Website $website, int $goal, Reports $reports, GoalReports $goals): Response
+    {
+        [$definition, $version, $period, $report] = $this->load($request, $website, $goal, $reports, $goals);
+        $query = $request->only(['period', 'from', 'to', 'filters', 'version']);
+
+        return Ui::render('goal.report', ['website' => $website, 'period' => $period, 'goal' => (array) $definition, 'definition' => (array) $version, 'report' => $report, 'versions' => DB::table('goal_versions')->where('goal_id', $goal)->orderByDesc('version')->pluck('version'), 'version' => $version->version, 'updateUrl' => route('sites.goals.update', [$website, $goal]), 'archiveUrl' => route('sites.goals.archive', [$website, $goal]), 'exportUrl' => route('sites.goals.export', ['website' => $website, 'goal' => $goal] + $query), 'apiUrl' => route('sites.goals.api', ['website' => $website, 'goal' => $goal] + $query)]);
+    }
+
+    public function api(Request $request, Website $website, int $goal, Reports $reports, GoalReports $goals): JsonResponse
+    {
+        [$definition, $version, $period, $report] = $this->load($request, $website, $goal, $reports, $goals);
+
+        return response()->json(['goal' => ['id' => $definition->id, 'name' => $definition->name, 'archived' => $definition->archived_at !== null, 'version' => $version->version, 'type' => $version->type, 'value' => $version->value, 'threshold' => (int) $version->threshold], 'period' => ['from' => $period['from'], 'to' => $period['to']]] + $report)->header('Cache-Control', 'no-store, private');
+    }
+
+    public function export(Request $request, Website $website, int $goal, Reports $reports, GoalReports $goals): StreamedResponse
+    {
+        [, $version, , $report] = $this->load($request, $website, $goal, $reports, $goals);
+
+        return response()->streamDownload(function () use ($report, $website): void {
+            $stream = fopen('php://output', 'w');
+            if ($website->is_demo) {
+                fputcsv($stream, ['# demonstration data: synthetic events'], escape: '');
+            }
+            $safe = fn ($value) => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'".$value : $value;
+            fputcsv($stream, ['dimension', 'value', 'conversions', 'sessions', 'rate_percent'], escape: '');
+            fputcsv($stream, ['total', 'all', $report['totals']['conversions'], $report['totals']['sessions'], $report['totals']['rate']], escape: '');
+            foreach ($report['breakdown'] as $dimension => $rows) {
+                foreach ($rows as $row) {
+                    fputcsv($stream, array_map($safe, [$dimension, $row['label'], $row['conversions'], $row['sessions'], $row['rate']]), escape: '');
+                }
+            }
+            fclose($stream);
+        }, 'perysee-goal-'.$goal.'-v'.$version->version.'.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'no-store, private']);
     }
 }
