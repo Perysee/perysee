@@ -31,16 +31,16 @@ jobs:
           --health-timeout=5s
           --health-retries=20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.3'
           extensions: mbstring, pdo_mysql, pdo_sqlite, xml, dom, curl
           tools: composer:v2
           coverage: none
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: .nvmrc
       - run: composer install --prefer-dist --no-interaction
@@ -66,7 +66,7 @@ jobs:
         env:
           PROFILE_SECONDS: ${{ inputs.seconds }}
         run: node scripts/benchmarks/run.mjs "$PROFILE_SECONDS" benchmark.json
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: internal-benchmark-results
