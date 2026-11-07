@@ -271,9 +271,9 @@ class Goals
                     $lastHit = $event->received_at;
                 }
             }
-            $data = $row->event_data ?? null;
+            $data = Segments::normalise($row->event_data ?? null);
             if ($convertedAt !== null) {
-                $data = json_encode($firstEvent, JSON_THROW_ON_ERROR);
+                $data = Segments::snapshot($firstEvent);
                 if ($before === null) {
                     $this->delta($deltas, $site, $goal, $convertedAt, $firstEvent, 1, 0);
                 } elseif ($this->place($site, $before[0], $before[1]) !== $this->place($site, $convertedAt, $firstEvent)) {
@@ -283,7 +283,7 @@ class Goals
             }
             $prior = $row?->converted_at;
             $moved = ($convertedAt === null) !== ($prior === null) || ($convertedAt !== null && $this->ms($convertedAt) !== $this->ms($prior));
-            if (! $row || $count !== (int) $row->hits || $moved || $data !== $row->event_data) {
+            if (! $row || $count !== (int) $row->hits || $moved || $data !== Segments::normalise($row->event_data)) {
                 $writes[] = ['website_id' => $site->id, 'goal_id' => $goal->goal_id, 'version' => $goal->version, 'session_key' => $key, 'hits' => $count, 'converted_at' => $convertedAt, 'last_hit_at' => $lastHit, 'event_data' => $data];
             }
         }

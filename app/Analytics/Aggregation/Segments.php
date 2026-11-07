@@ -80,6 +80,33 @@ class Segments
         }
     }
 
+    /** The only fields of an event that the dimensions and the date of a session start are computed from. */
+    private const SNAPSHOT_FIELDS = ['received_at', 'event_type', 'event_name', 'path', 'referrer_host', 'source_value', 'dimensions_available', 'utm_source', 'utm_medium', 'utm_campaign', 'country_code', 'geo_available', 'device_type', 'device_brand', 'browser_name'];
+
+    /**
+     * What is kept of the first event of a session (segment_sessions and goal_sessions.event_data): the fields the
+     * dimensions are computed from and nothing else. Never the properties, the value, the session key or the order
+     * identifier of the event.
+     */
+    public static function snapshot(object $event): string
+    {
+        $kept = [];
+        foreach (self::SNAPSHOT_FIELDS as $field) {
+            $kept[$field] = $event->{$field} ?? null;
+        }
+
+        return json_encode($kept, JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * The snapshot of a stored one, so that a row written before the fields were reduced compares equal to what would
+     * be written now and is not rewritten for that reason alone.
+     */
+    public static function normalise(?string $stored): ?string
+    {
+        return $stored === null ? null : self::snapshot((object) json_decode($stored, true, flags: JSON_THROW_ON_ERROR));
+    }
+
     /**
      * The first event of a measured session as the open batch currently knows it, or null.
      */
@@ -122,7 +149,7 @@ class Segments
             return true;
         }
         $this->increment($event, $site, 'sessions', 1);
-        $values = ['first_event_id' => $event->id, 'first_seen_at' => $event->received_at, 'event_data' => json_encode($event, JSON_THROW_ON_ERROR)];
+        $values = ['first_event_id' => $event->id, 'first_seen_at' => $event->received_at, 'event_data' => self::snapshot($event)];
         if ($this->batch !== null) {
             $this->batch['sessions'][$slot] = (object) ($identity + $values);
             $this->batch['dirty'][$slot] = true;
