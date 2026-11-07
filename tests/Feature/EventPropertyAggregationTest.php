@@ -162,6 +162,38 @@ class EventPropertyAggregationTest extends TestCase
         $this->assertSame(2, (int) DB::table('stats_event_property_daily')->where('event_name', '(other)')->sum('metric_count'));
     }
 
+    public function test_the_bound_on_names_holds_across_passes(): void
+    {
+        $site = Website::factory()->create();
+        foreach (range(1, 100) as $i) {
+            $this->named($site, 'event'.$i, ['a' => 'b']);
+        }
+        app(Aggregator::class)->run();
+        $this->named($site, 'event101', ['a' => 'b'], null, '2026-10-24 11:00:00');
+        $this->named($site, 'event102', ['a' => 'b'], null, '2026-10-24 11:01:00');
+        $this->named($site, 'event7', ['a' => 'b'], null, '2026-10-24 11:02:00');
+
+        app(Aggregator::class)->run();
+
+        $this->assertSame(100, DB::table('stats_event_property_daily')->where('event_name', '!=', '(other)')->distinct()->count('event_name'));
+        $this->assertSame(2, (int) DB::table('stats_event_property_daily')->where('event_name', '(other)')->sum('metric_count'));
+        $this->assertSame(2, (int) DB::table('stats_event_property_daily')->where('event_name', 'event7')->sum('metric_count'));
+    }
+
+    public function test_names_and_keys_differing_only_by_case_are_one(): void
+    {
+        $site = Website::factory()->create();
+        $this->named($site, 'Buy', ['Plan' => 'Pro']);
+        $this->named($site, 'buy', ['plan' => 'Pro']);
+        $this->named($site, 'BUY', ['PLAN' => 'Pro']);
+
+        app(Aggregator::class)->run();
+
+        $this->assertSame(['buy'], DB::table('stats_event_property_daily')->distinct()->pluck('event_name')->all());
+        $this->assertSame(['plan'], DB::table('stats_event_property_daily')->distinct()->pluck('prop_key')->all());
+        $this->assertSame(3, (int) DB::table('stats_event_property_daily')->sum('metric_count'));
+    }
+
     public function test_bounds_are_kept_per_site(): void
     {
         $a = Website::factory()->create();

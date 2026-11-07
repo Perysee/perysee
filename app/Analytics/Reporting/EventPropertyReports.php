@@ -41,6 +41,7 @@ class EventPropertyReports
     public function report(Website $site, array $period, ?string $event): array
     {
         $events = $this->events($site, $period);
+        $event = $event === null ? null : mb_strtolower($event);
         $event ??= $events[0]['name'] ?? null;
         $keys = [];
         if ($event !== null) {

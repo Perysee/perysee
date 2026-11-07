@@ -10,7 +10,7 @@ use RuntimeException;
  * that a badly configured site cannot grow the table without limit. What exceeds a bound is counted under
  * "(other)": the totals stay exact, only the detail is lost.
  *
- * Bounds: 100 event names per site, 10 keys per event name, 50 values per day, event name and key. Events are
+ * Event names and property keys are stored in lower case. Bounds: 100 event names per site, 10 keys per event name, 50 values per day, event name and key. Events are
  * admitted in the order of their id, so one batch is deterministic; a rebuild in another order can admit other
  * values (ADR 008).
  */
@@ -55,23 +55,24 @@ class EventPropertyStats
             return;
         }
         $sites = array_values(array_unique(array_map(fn (array $item): int => $item[1], $held)));
-        $names = array_values(array_unique(array_map(fn (array $item): string => $item[0]->event_name, $held)));
-        // Known names and keys, over the whole retained period.
+        // Names and keys already stored for these sites, over the whole retained period: the bound counts them, not
+        // only the names of this batch. Bounded by construction (at most MAX_NAMES + 1 names of MAX_KEYS + 1 keys
+        // per site), and read together with the keys in a single query.
         $knownNames = $knownKeys = [];
-        foreach (array_chunk($names, 500) as $chunk) {
-            foreach (DB::table('stats_event_property_daily')->whereIn('website_id', $sites)->whereIn('event_name', [...$chunk, self::OTHER])->select('website_id', 'event_name', 'prop_key')->distinct()->get() as $row) {
+        foreach (array_chunk($sites, 200) as $chunk) {
+            foreach (DB::table('stats_event_property_daily')->whereIn('website_id', $chunk)->select('website_id', 'event_name', 'prop_key')->distinct()->get() as $row) {
                 $knownNames[$row->website_id][$row->event_name] = true;
                 $knownKeys[$row->website_id.'|'.$row->event_name][$row->prop_key] = true;
             }
         }
-        // Names of the sites that are not in this batch also count toward the bound.
         foreach ($sites as $site) {
             $knownNames[$site] ??= [];
         }
         $lines = [];
         foreach ($held as [$event, $site, $date]) {
             $props = json_decode($event->event_props, true, flags: JSON_THROW_ON_ERROR);
-            $name = $event->event_name;
+            // Case is folded: MariaDB's collation treats "Buy" and "buy" as one primary key, SQLite does not.
+            $name = mb_strtolower($event->event_name);
             if (! isset($knownNames[$site][$name])) {
                 if ($this->count($knownNames[$site]) >= self::MAX_NAMES) {
                     $name = self::OTHER;
@@ -79,6 +80,7 @@ class EventPropertyStats
                 $knownNames[$site][$name] = true;
             }
             foreach ($props as $key => $value) {
+                $key = mb_strtolower((string) $key);
                 $slot = $site.'|'.$name;
                 if (! isset($knownKeys[$slot][$key])) {
                     if ($this->count($knownKeys[$slot] ?? []) >= self::MAX_KEYS) {
