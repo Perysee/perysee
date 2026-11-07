@@ -31,6 +31,10 @@ L'administrateur est créé avec un mot de passe saisi (invite masquée) ou gén
 ## Fonctionnalités
 
 - Sites avec domaines autorisés, exclusions et fuseau ; membres `owner` (écriture) ou `viewer` (lecture).
+- Équipe : invitation par e-mail avec un rôle, valable 7 jours. Sans courrier configuré, le lien s'affiche une fois pour le propriétaire ; changement de rôle, retrait et départ, avec toujours un propriétaire.
+- Liens de partage publics en lecture seule (`/s/{token}`) : sections au choix, mot de passe et expiration facultatifs, révocation. Le jeton n'est stocké que sous forme d'empreinte.
+- Objectifs : jusqu'à cinq par site (événement nommé ou page, seuil par session), conversions attribuées au premier contact, versions successives. Un objectif défini après coup n'est compté que sur les événements bruts conservés (90 jours par défaut).
+- Comparaison avec la période précédente : le pourcentage n'apparaît que lorsqu'il est fiable, sinon la raison est affichée.
 - Lueur, le collecteur : pages vues sans identifiant ou sessions, consentement configurable, événements nommés.
 - Rapports : pages, sessions, sources (dont IA), campagnes, appareils, pays, filtres croisés, funnels et parcours Sankey, exports CSV.
 - Page de santé, rétention réglable et mise à jour assistée avec sauvegarde et retour arrière.
