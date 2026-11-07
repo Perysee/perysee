@@ -1,0 +1,1375 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Perysee read API",
+    "version": "1",
+    "description": "Read-only access to the figures of one site, with a bearer token created by a site owner. The token carries the site: no URL contains a site identifier. Fields are only ever added within version 1."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "paths": {
+    "/site": {
+      "get": {
+        "summary": "The site and the scopes of the token",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Site"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/overview": {
+      "get": {
+        "summary": "Totals, coverage and freshness of a period",
+        "security": [
+          {
+            "bearerAuth": [
+              "overview"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/compare"
+          },
+          {
+            "$ref": "#/components/parameters/source_group"
+          },
+          {
+            "$ref": "#/components/parameters/provider"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/timeseries": {
+      "get": {
+        "summary": "Pageviews, events and sessions over time",
+        "security": [
+          {
+            "bearerAuth": [
+              "overview"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/granularity"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Timeseries"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/dimensions/{dimension}": {
+      "get": {
+        "summary": "Top values of one dimension (at most 100)",
+        "security": [
+          {
+            "bearerAuth": [
+              "one of pages, sources, campaigns, devices, countries, events, depending on the dimension"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dimension",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "path",
+                "source",
+                "campaign",
+                "device",
+                "device_brand",
+                "browser",
+                "country",
+                "event"
+              ]
+            },
+            "description": "path needs pages; source needs sources; campaign needs campaigns; device, device_brand and browser need devices; country needs countries; event needs events."
+          },
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/value"
+          },
+          {
+            "$ref": "#/components/parameters/source_group"
+          },
+          {
+            "$ref": "#/components/parameters/provider"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DimensionReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/goals": {
+      "get": {
+        "summary": "Goals of the site, archived ones included",
+        "security": [
+          {
+            "bearerAuth": [
+              "goals"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/goals/{id}": {
+      "get": {
+        "summary": "Conversions of one goal",
+        "security": [
+          {
+            "bearerAuth": [
+              "goals"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/version"
+          },
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/funnels": {
+      "get": {
+        "summary": "Funnel definitions of the site",
+        "security": [
+          {
+            "bearerAuth": [
+              "funnels"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/funnels/{id}": {
+      "get": {
+        "summary": "The last calculated result of one funnel for a period",
+        "security": [
+          {
+            "bearerAuth": [
+              "funnels"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/version"
+          },
+          {
+            "$ref": "#/components/parameters/period"
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "404": {
+            "description": "Unknown funnel or version (not_found), or no result calculated for this period and these filters (report_not_computed). Reading never starts a calculation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns a result that was already calculated, for exactly this version, period and filters. Open the funnel once in the interface to calculate it."
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "This description",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token created by a site owner (psy_...). Send it in the Authorization header only; a token in the query string is ignored.",
+        "x-scopes": [
+          "overview",
+          "pages",
+          "sources",
+          "campaigns",
+          "devices",
+          "countries",
+          "events",
+          "goals",
+          "funnels"
+        ]
+      }
+    },
+    "parameters": {
+      "period": {
+        "name": "period",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "today",
+            "7d",
+            "30d"
+          ],
+          "default": "7d"
+        },
+        "description": "Ignored when from and to are given."
+      },
+      "from": {
+        "name": "from",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "description": "First day (site time zone). Needs to. At most three years before the last day."
+      },
+      "to": {
+        "name": "to",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "description": "Last day, today or earlier."
+      },
+      "granularity": {
+        "name": "granularity",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "day",
+            "hour"
+          ]
+        },
+        "description": "hour only for a single day."
+      },
+      "compare": {
+        "name": "compare",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "previous"
+          ]
+        },
+        "description": "Adds the previous period of the same length, with the server verdict on percentages."
+      },
+      "source_group": {
+        "name": "source_group",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "all",
+            "ai"
+          ]
+        },
+        "description": "Needs the sources scope."
+      },
+      "provider": {
+        "name": "provider",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "chatgpt",
+            "claude",
+            "perplexity",
+            "gemini",
+            "copilot",
+            "grok"
+          ]
+        },
+        "description": "Needs the sources scope."
+      },
+      "value": {
+        "name": "value",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "description": "Restricts the report to one value of the dimension."
+      },
+      "version": {
+        "name": "version",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "description": "Definition version; the current one by default."
+      },
+      "filters": {
+        "name": "filters",
+        "in": "query",
+        "style": "deepObject",
+        "explode": true,
+        "schema": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          "propertyNames": {
+            "enum": [
+              "path",
+              "country",
+              "source",
+              "provider",
+              "campaign",
+              "device",
+              "device_brand",
+              "browser",
+              "event"
+            ]
+          }
+        },
+        "description": "filters[dimension][]=value. Values of one dimension are alternatives (OR); dimensions are combined (AND). A filter needs the scope of its dimension (provider needs sources)."
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "The token is missing, malformed, unknown, expired or revoked, or its site is gone. The answer is the same in every case.",
+        "headers": {
+          "WWW-Authenticate": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "The token lacks a scope this request needs (code insufficient_scope, details.required).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Unknown resource, or one that belongs to another site.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Invalid": {
+        "description": "A parameter is not valid (code validation_failed, details.errors).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "The token (or the address, for repeated invalid tokens) went over its limit. Wait Retry-After seconds.",
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "details"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "invalid_token",
+                  "insufficient_scope",
+                  "not_found",
+                  "report_not_computed",
+                  "method_not_allowed",
+                  "validation_failed",
+                  "rate_limited",
+                  "unavailable",
+                  "server_error"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "api_version": {
+            "type": "integer",
+            "const": 1
+          }
+        }
+      },
+      "Period": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        }
+      },
+      "Site": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "site": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "domain": {
+                    "type": "string"
+                  },
+                  "timezone": {
+                    "type": "string"
+                  }
+                }
+              },
+              "token": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "overview",
+                        "pages",
+                        "sources",
+                        "campaigns",
+                        "devices",
+                        "countries",
+                        "events",
+                        "goals",
+                        "funnels"
+                      ]
+                    }
+                  },
+                  "rate_per_minute": {
+                    "type": "integer"
+                  },
+                  "expires_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "Overview": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "period": {
+                "$ref": "#/components/schemas/Period"
+              },
+              "totals": {
+                "type": "object",
+                "properties": {
+                  "pageviews": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "custom_events": {
+                    "type": "integer"
+                  },
+                  "sessions": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "description": "null means unavailable, never zero."
+                  }
+                }
+              },
+              "coverage": {
+                "type": "object",
+                "properties": {
+                  "measured_pageviews": {
+                    "type": "integer"
+                  },
+                  "pageviews": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "country_pageviews": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "availability": {
+                "type": "object",
+                "properties": {
+                  "sessions": {
+                    "type": "string",
+                    "enum": [
+                      "available",
+                      "partial",
+                      "unavailable"
+                    ]
+                  },
+                  "dimensions": {
+                    "type": "string",
+                    "enum": [
+                      "available",
+                      "partial",
+                      "unavailable"
+                    ]
+                  },
+                  "countries": {
+                    "type": "string",
+                    "enum": [
+                      "available",
+                      "partial",
+                      "unavailable"
+                    ]
+                  }
+                }
+              },
+              "freshness": {
+                "type": "object",
+                "properties": {
+                  "aggregated_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "pending": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "measurement_periods": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "started_at": {
+                      "type": "string"
+                    },
+                    "ended_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "mode": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "segment_coverage": {
+                "type": "object",
+                "description": "Present when filters apply.",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "available",
+                      "partial",
+                      "rebuilding"
+                    ]
+                  },
+                  "missing_sessions": {
+                    "type": "integer"
+                  },
+                  "unmeasured_dimensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "comparison": {
+                "type": "object",
+                "description": "Present with compare=previous. Never compute a percentage yourself: use reliability.",
+                "properties": {
+                  "period": {
+                    "$ref": "#/components/schemas/Period"
+                  },
+                  "totals": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "coverage": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "availability": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "reliability": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "percent_allowed": {
+                          "type": "boolean"
+                        },
+                        "reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "current_period",
+                            "previous_zero",
+                            "unavailable",
+                            "partial_coverage",
+                            "rebuilding",
+                            "not_applicable",
+                            null
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "Timeseries": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "period": {
+                "$ref": "#/components/schemas/Period"
+              },
+              "granularity": {
+                "type": "string",
+                "enum": [
+                  "day",
+                  "hour"
+                ]
+              },
+              "points": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "pageviews": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "custom_events": {
+                      "type": "integer"
+                    },
+                    "sessions": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "session_availability": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "DimensionReport": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "dimension": {
+                "type": "string",
+                "enum": [
+                  "path",
+                  "source",
+                  "campaign",
+                  "device",
+                  "device_brand",
+                  "browser",
+                  "country",
+                  "event"
+                ]
+              },
+              "period": {
+                "$ref": "#/components/schemas/Period"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "distinct_values": {
+                "type": "integer"
+              },
+              "series": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string"
+                    },
+                    "pageviews": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "custom_events": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "rows": {
+                "type": "array",
+                "description": "At most 100 rows, by count then value. Values are raw: escape them before putting them in a spreadsheet.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "api_version": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer",
+                "const": 100
+              },
+              "truncated": {
+                "type": "boolean",
+                "description": "True when distinct_values exceeds the rows returned."
+              }
+            }
+          }
+        }
+      },
+      "GoalDefinition": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "event",
+              "path"
+            ]
+          },
+          "value": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "integer"
+          }
+        }
+      },
+      "GoalList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoalDefinition"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "GoalReport": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "goal": {
+                "$ref": "#/components/schemas/GoalDefinition"
+              },
+              "period": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
+                }
+              },
+              "report": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "sessions",
+                      "pageviews"
+                    ]
+                  },
+                  "totals": {
+                    "type": "object"
+                  },
+                  "series": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "breakdown": {
+                    "type": "object",
+                    "description": "Conversions by source, campaign, country and device. Only the breakdowns whose scope the token holds are present (sources, campaigns, countries, devices); a token with the goals scope alone gets an empty object."
+                  },
+                  "coverage": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "FunnelDefinition": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "path",
+                    "event"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "FunnelList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunnelDefinition"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "FunnelReport": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "funnel": {
+                "$ref": "#/components/schemas/FunnelDefinition"
+              },
+              "period": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
+                }
+              },
+              "result": {
+                "type": "object",
+                "properties": {
+                  "entries": {
+                    "type": "integer"
+                  },
+                  "conversions": {
+                    "type": "integer"
+                  },
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "conversion_rate": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "integer"
+                        },
+                        "rate": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "abandoned": {
+                          "type": "integer"
+                        },
+                        "pending": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  "coverage": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "computed_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      }
+    }
+  }
+}

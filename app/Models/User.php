@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -26,6 +28,16 @@ class User extends Authenticatable
     public function websites(): BelongsToMany
     {
         return $this->belongsToMany(Website::class, 'site_members')->withPivot('role')->withTimestamps();
+    }
+
+    public function twoFactor(): HasOne
+    {
+        return $this->hasOne(UserTwoFactor::class);
+    }
+
+    public function userSessions(): HasMany
+    {
+        return $this->hasMany(UserSession::class);
     }
 
     protected function casts(): array

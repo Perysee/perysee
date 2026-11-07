@@ -6,6 +6,7 @@ use App\Analytics\Reporting\Filters;
 use App\Analytics\Reporting\Reports;
 use App\Analytics\Reporting\SegmentReports;
 use App\Models\Website;
+use App\Support\CsvSafe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -66,8 +67,7 @@ class AnalyticsController extends Controller
             if ($dimension) {
                 fputcsv($stream, ['value', 'count'], escape: '');
                 foreach ($reports->dimensions($website, $period, $dimension, $request->input('value')) as $row) {
-                    $value = preg_match('/^[\s]*[=+@-]/u', $row['value']) ? "'".$row['value'] : $row['value'];
-                    fputcsv($stream, [$value, $row['count']], escape: '');
+                    fputcsv($stream, CsvSafe::row([$row['value'], $row['count']]), escape: '');
                 }
             } else {
                 fputcsv($stream, ['date', 'pageviews', 'custom_events', 'sessions_started', 'session_availability'], escape: '');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Updates;
 
+use App\Installation\Diagnostics;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class Preflight
 {
-    public function __construct(private readonly CodeSwapper $swapper) {}
+    public function __construct(private readonly CodeSwapper $swapper, private readonly Diagnostics $diagnostics) {}
 
     /**
      * @return list<string> human-readable problems, empty when the update can start
@@ -28,6 +29,9 @@ final class Preflight
         $required = $this->requiredPhp($staged);
         if ($required !== null && $required > PHP_VERSION_ID) {
             $problems[] = 'This release needs PHP '.intdiv($required, 10000).'.'.intdiv($required % 10000, 100).' or newer; this server runs '.PHP_VERSION.'.';
+        }
+        foreach ($this->diagnostics->missingExtensions() as $extension) {
+            $problems[] = "The PHP extension {$extension} is not enabled on this server; the application needs it, so the update cannot start.";
         }
         $free = @disk_free_space($live);
         $needed = (int) (filesize($archive) ?: 0) * 4 + 256 * 1024 * 1024;

@@ -3,6 +3,7 @@
 namespace App\Analytics\Aggregation;
 
 use App\Analytics\InstanceHealth;
+use App\Modules\Events\PassEvents;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,9 @@ class Aggregator
     private ?string $lock = null;
 
     private ?array $siteIds = null;
+
+    /** @var list<array{site: int, goal: int, version: int, count: int}> Conversions of the batch being written; only a committed batch is announced to modules. */
+    private array $batchConversions = [];
 
     public function run(int $batch = 500, int $budgetSeconds = 15, ?array $siteIds = null): int
     {
@@ -29,13 +33,17 @@ class Aggregator
         $this->siteIds = $siteIds;
         $deadline = hrtime(true) + $budgetSeconds * 1000000000;
         $count = 0;
+        $pass = new PassEvents;
+        $completed = false;
         try {
             do {
                 $processed = DB::transaction(fn (): int => $this->batch($batch), 3);
                 $count += $processed;
+                $pass->committed($this->batchConversions);
             } while ($processed > 0 && hrtime(true) < $deadline);
             app(InstanceHealth::class)->put('aggregate_success', now('UTC')->toIso8601String());
             app(InstanceHealth::class)->put('aggregate_error', null);
+            $completed = true;
 
             return $count;
         } catch (Throwable $exception) {
@@ -49,12 +57,22 @@ class Aggregator
                 DB::selectOne('SELECT RELEASE_LOCK(?) AS released', [$this->lock]);
             }
             $this->lock = null;
+            $sites = $this->siteIds;
             $this->siteIds = null;
+            // Module events (ADR 005): after the commit and the unlock, never inside a transaction; they never throw.
+            if ($completed) {
+                $pass->finish($count, $processed > 0, $sites === null);
+            } else {
+                // The pass failed, but its earlier batches are committed: their conversions are still announced
+                // (not the completion or the backlog, which describe a pass that ended).
+                $pass->publishConversions();
+            }
         }
     }
 
     private function batch(int $limit): int
     {
+        $this->batchConversions = [];
         if ($this->lock && (int) DB::selectOne('SELECT IS_USED_LOCK(?) = CONNECTION_ID() AS owned', [$this->lock])->owned !== 1) {
             throw new RuntimeException('Aggregation database lock was lost.');
         }
@@ -69,6 +87,8 @@ class Aggregator
         $touched = [];
         $goals = app(Goals::class);
         $goals->begin($events);
+        $properties = app(EventPropertyStats::class);
+        $properties->begin();
         $segments->begin($events, function (int $site, string $key) use (&$measured): ?string {
             return isset($measured[$site.'|'.$key]) ? $measured[$site.'|'.$key]->first_seen_at : null;
         });
@@ -84,6 +104,7 @@ class Aggregator
                 $goals->ingest($event, $site);
             }
             [$date, $hour] = $this->buckets($event->received_at, $site->timezone);
+            $properties->ingest($event, $site, $date);
             $mode = $event->tracking_mode ?? ($event->session_key ? 'sessions' : 'unknown');
             $metrics = ['pageviews' => $event->event_type === 1 ? 1 : 0, 'custom_events' => $event->event_type === 2 ? 1 : 0,
                 'sessions' => 0, 'session_pageviews' => $event->event_type === 1 && $mode === 'sessions' ? 1 : 0,
@@ -140,6 +161,8 @@ class Aggregator
             }
         }
         $goals->flush($segments);
+        $properties->flush();
+        $this->batchConversions = $goals->conversions();
         $segments->flush();
         $this->saveMeasuredSessions($measured, $touched);
         $this->upsertCounters('stats_daily', $daily, ['website_id', 'stat_date']);

@@ -25,12 +25,20 @@ class Goals
     private ?array $batch = null;
 
     /**
+     * New conversions counted live by the current batch, by goal version (for the events modules can listen to).
+     *
+     * @var array<string, array{site: int, goal: int, version: int, count: int}>
+     */
+    private array $converted = [];
+
+    /**
      * Opens a batch: the active goals of the sites involved are read once. Sites without a goal cost nothing more.
      *
      * @param  Collection<int, object>  $events
      */
     public function begin(Collection $events): void
     {
+        $this->converted = [];
         $this->batch = ['items' => [], 'goals' => $events->isEmpty() ? [] : $this->active($events->pluck('website_id')->unique()->values()->all())];
     }
 
@@ -56,6 +64,17 @@ class Goals
             return;
         }
         $this->process($batch['items'], $batch['goals'], fn (int $site, string $key): ?object => $segments->firstEvent($site, $key), true);
+    }
+
+    /**
+     * The conversions the last flush() counted that were not there before. A conversion that only moved to another day nets
+     * out at zero and is left out; a backfill or a rebuild never contributes.
+     *
+     * @return list<array{site: int, goal: int, version: int, count: int}>
+     */
+    public function conversions(): array
+    {
+        return array_values(array_filter($this->converted, fn (array $row): bool => $row['count'] > 0));
     }
 
     /**
@@ -201,7 +220,7 @@ class Goals
                 if (! $event->session_key) {
                     // Without a measured session there is no conversion, only a hit.
                     if ($counts) {
-                        $this->delta($deltas, $site, $goal, $event->received_at, $event, 0, 1);
+                        $this->delta($deltas, $site, $goal, $event->received_at, $event, 0, 1, $event);
                     }
 
                     continue;
@@ -239,7 +258,7 @@ class Goals
             $before = $convertedAt !== null ? [$convertedAt, (object) json_decode($row->event_data, true, flags: JSON_THROW_ON_ERROR)] : null;
             foreach ($mine as $event) {
                 $count++;
-                $this->delta($deltas, $site, $goal, $event->received_at, $firstEvent, 0, 1);
+                $this->delta($deltas, $site, $goal, $event->received_at, $firstEvent, 0, 1, $event);
                 if ($convertedAt === null) {
                     $convertedAt = $count >= (int) $goal->threshold ? $event->received_at : null;
                 } elseif ((int) $goal->threshold === 1 && $this->ms($event->received_at) < $this->ms($convertedAt)) {
@@ -252,9 +271,9 @@ class Goals
                     $lastHit = $event->received_at;
                 }
             }
-            $data = $row->event_data ?? null;
+            $data = Segments::normalise($row->event_data ?? null);
             if ($convertedAt !== null) {
-                $data = json_encode($firstEvent, JSON_THROW_ON_ERROR);
+                $data = Segments::snapshot($firstEvent);
                 if ($before === null) {
                     $this->delta($deltas, $site, $goal, $convertedAt, $firstEvent, 1, 0);
                 } elseif ($this->place($site, $before[0], $before[1]) !== $this->place($site, $convertedAt, $firstEvent)) {
@@ -264,12 +283,19 @@ class Goals
             }
             $prior = $row?->converted_at;
             $moved = ($convertedAt === null) !== ($prior === null) || ($convertedAt !== null && $this->ms($convertedAt) !== $this->ms($prior));
-            if (! $row || $count !== (int) $row->hits || $moved || $data !== $row->event_data) {
+            if (! $row || $count !== (int) $row->hits || $moved || $data !== Segments::normalise($row->event_data)) {
                 $writes[] = ['website_id' => $site->id, 'goal_id' => $goal->goal_id, 'version' => $goal->version, 'session_key' => $key, 'hits' => $count, 'converted_at' => $convertedAt, 'last_hit_at' => $lastHit, 'event_data' => $data];
             }
         }
         foreach (array_chunk($writes, 200) as $chunk) {
             DB::table('goal_sessions')->upsert($chunk, self::SESSION_KEY, ['hits', 'converted_at', 'last_hit_at', 'event_data']);
+        }
+        if ($live) {
+            foreach ($deltas as $row) {
+                $key = $row['website_id'].'|'.$row['goal_id'].'|'.$row['version'];
+                $this->converted[$key] ??= ['site' => (int) $row['website_id'], 'goal' => (int) $row['goal_id'], 'version' => (int) $row['version'], 'count' => 0];
+                $this->converted[$key]['count'] += $row['conversions'];
+            }
         }
         $this->flushDeltas($deltas);
     }
@@ -285,16 +311,21 @@ class Goals
     /**
      * @param  array<string, array<string, mixed>>  $deltas
      */
-    private function delta(array &$deltas, object $site, object $goal, string $at, object $first, int $conversions, int $hits): void
+    private function delta(array &$deltas, object $site, object $goal, string $at, object $first, int $conversions, int $hits, ?object $hit = null): void
     {
         $dimensions = app(Filters::class)->values($first);
         $json = json_encode($dimensions, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $local = Carbon::parse($at, 'UTC')->setTimezone($site->timezone);
         $identity = ['website_id' => $site->id, 'goal_id' => $goal->goal_id, 'version' => $goal->version, 'bucket_start' => $local->copy()->startOfDay()->utc()->toDateTimeString(), 'segment_hash' => hash('sha256', $json)];
         $key = implode('|', $identity);
-        $deltas[$key] ??= $identity + $dimensions + ['stat_date' => $local->toDateString(), 'dimensions' => $json, 'conversions' => 0, 'hits' => 0];
+        $deltas[$key] ??= $identity + $dimensions + ['stat_date' => $local->toDateString(), 'dimensions' => $json, 'conversions' => 0, 'hits' => 0, 'value_sum' => 0, 'valued_hits' => 0];
         $deltas[$key]['conversions'] += $conversions;
         $deltas[$key]['hits'] += $hits;
+        // The value of a hit follows the hit itself, so it lands where the hit lands (the first touch of its session).
+        if ($hit !== null && ($hit->event_value ?? null) !== null) {
+            $deltas[$key]['value_sum'] += (int) $hit->event_value;
+            $deltas[$key]['valued_hits']++;
+        }
     }
 
     /**
@@ -302,9 +333,9 @@ class Goals
      */
     private function flushDeltas(array $deltas): void
     {
-        $rows = array_values(array_filter($deltas, fn (array $row): bool => $row['conversions'] !== 0 || $row['hits'] !== 0));
+        $rows = array_values(array_filter($deltas, fn (array $row): bool => $row['conversions'] !== 0 || $row['hits'] !== 0 || $row['value_sum'] !== 0 || $row['valued_hits'] !== 0));
         $expressions = [];
-        foreach (['conversions', 'hits'] as $metric) {
+        foreach (['conversions', 'hits', 'value_sum', 'valued_hits'] as $metric) {
             $expressions[$metric] = DB::raw($metric.' + '.(DB::getDriverName() === 'sqlite' ? 'excluded.'.$metric : 'VALUES('.$metric.')'));
         }
         foreach (array_chunk($rows, 200) as $chunk) {

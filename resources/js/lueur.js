@@ -42,7 +42,7 @@
         } catch (_) { return null; }
     }
     const campaignValue = value => !value || /[\x00-\x1f\x7f@\\/?#=&]/.test(value) || /[a-f0-9]{32,}/i.test(value) ? null : value.trim().slice(0, 100);
-    function send(type, path, name) {
+    function send(type, path, name, extra) {
         if (!allowed || blocked()) return;
         const cleaned = normalize(path || script.dataset.path || location.pathname);
         if (type === 'pageview' && cleaned === lastPath) return;
@@ -50,7 +50,7 @@
         if (rules.some(rule => rule.endsWith('*') ? cleaned.startsWith(rule.slice(0, -1)) : cleaned === rule)) return;
         const payload = { v: 1, site, type, mode, host: location.hostname, path: cleaned, consent: given, ref: null };
         if (/Macintosh/i.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1) payload.device_hint = 'tablet';
-        if (type === 'event') payload.event_name = name;
+        if (type === 'event') { payload.event_name = name; Object.assign(payload, extra); }
         try {
             const ref = new URL(document.referrer);
             if (['http:', 'https:'].includes(ref.protocol) && ref.hostname !== location.hostname) payload.ref = ref.protocol + '//' + ref.hostname;
@@ -65,12 +65,43 @@
         }
         if (type === 'pageview') lastPath = cleaned;
         try {
-            window.fetch(endpoint, { method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', keepalive: true, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(payload) }).catch(() => {});
+            window.fetch(endpoint, { method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', keepalive: true, headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(payload) }).then(response => { const cut = debug && response && response.headers && response.headers.get('X-Perysee-Truncated'); if (cut) warn('the server shortened the properties (' + cut + ')'); }).catch(() => {});
         } catch (_) { /* Analytics must never break the host page. */ }
     }
     function pageview(path) { send('pageview', path); }
-    function track(name) {
-        if (typeof name === 'string' && /^[a-zA-Z][a-zA-Z0-9_.:-]{0,63}$/.test(name)) send('event', null, name);
+    const debug = script.dataset.debug === 'true';
+    const warn = message => { if (debug && window.console) window.console.warn('lueur: ' + message); };
+    function track(name, options) {
+        if (typeof name !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_.:-]{0,63}$/.test(name)) return warn('event name ignored');
+        const extra = {};
+        if (options && typeof options === 'object') {
+            const { value, props, id } = options;
+            if (value !== undefined) {
+                if (typeof value === 'number' && value >= 0 && value <= 1e9) extra.value = value;
+                else warn('value must be a number between 0 and 1000000000');
+            }
+            if (id !== undefined) {
+                if (/^[\x21-\x7e]{1,64}$/.test(typeof id === 'number' ? String(id) : id)) extra.id = String(id);
+                else warn('id must be 1 to 64 printable characters without spaces');
+            }
+            if (props !== undefined) {
+                const kept = Object.create(null);
+                let count = 0;
+                if (props && typeof props === 'object' && !Array.isArray(props)) {
+                    Object.keys(props).forEach(raw => {
+                        const key = raw.trim().toLowerCase();
+                        const item = props[raw];
+                        const text = ['string', 'number', 'boolean'].includes(typeof item) ? String(item).trim() : '';
+                        if (!/^[a-z][a-z0-9_]{0,31}$/.test(key) || kept[key] !== undefined || !text || Array.from(text).length > 64) return warn('property "' + raw + '" ignored');
+                        if (count >= 5) return warn('property "' + raw + '" ignored: at most 5 properties');
+                        kept[key] = text;
+                        count++;
+                    });
+                } else warn('props must be an object');
+                if (count) extra.props = kept;
+            }
+        }
+        send('event', null, name, extra);
     }
     const api = {
         version: 1,

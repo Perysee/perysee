@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
-#[Fillable(['name', 'domain', 'allowed_domains', 'timezone', 'tracking_mode', 'consent_required', 'excluded_paths'])]
+#[Fillable(['name', 'domain', 'allowed_domains', 'timezone', 'tracking_mode', 'consent_required', 'excluded_paths', 'currency'])]
 class Website extends Model
 {
     /** @use HasFactory<WebsiteFactory> */
@@ -31,6 +31,11 @@ class Website extends Model
     public function shareLinks(): HasMany
     {
         return $this->hasMany(ShareLink::class);
+    }
+
+    public function apiTokens(): HasMany
+    {
+        return $this->hasMany(ApiToken::class);
     }
 
     public function invitations(): HasMany

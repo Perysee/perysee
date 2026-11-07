@@ -49,10 +49,28 @@ class Diagnostics
 
     private function extensions(): array
     {
-        $extensions = ['ctype', 'curl', 'dom', 'fileinfo', 'filter', 'hash', 'mbstring', 'openssl', 'pcre', 'pdo', 'pdo_mysql', 'session', 'tokenizer', 'xml'];
-        $missing = array_values(array_filter($extensions, fn (string $extension) => ! extension_loaded($extension)));
+        $missing = $this->missingExtensions();
 
         return ['label' => $missing ? 'Missing extensions: '.implode(', ', $missing) : 'Required PHP extensions', 'ok' => $missing === []];
+    }
+
+    /** PHP extensions the application needs (iconv and xmlwriter: the two-factor QR code). @return list<string> */
+    public function requiredExtensions(): array
+    {
+        $extensions = ['ctype', 'curl', 'dom', 'fileinfo', 'filter', 'hash', 'iconv', 'mbstring', 'openssl', 'pcre', 'pdo', 'pdo_mysql', 'session', 'tokenizer', 'xml', 'xmlwriter'];
+
+        return $extensions;
+    }
+
+    /** @return list<string> */
+    public function missingExtensions(): array
+    {
+        return array_values(array_filter($this->requiredExtensions(), fn (string $extension) => ! $this->extensionLoaded($extension)));
+    }
+
+    protected function extensionLoaded(string $extension): bool
+    {
+        return extension_loaded($extension);
     }
 
     private function storage(): array

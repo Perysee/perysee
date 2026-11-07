@@ -24,6 +24,9 @@ const HealthPage = defineAsyncComponent(
     () => import("../Components/HealthPage.vue"),
 );
 const MailSettingsPage = defineAsyncComponent(() => import("../Components/MailSettingsPage.vue"));
+const SecurityPage = defineAsyncComponent(() => import("../Components/SecurityPage.vue"));
+const SecuritySettingsPage = defineAsyncComponent(() => import("../Components/SecuritySettingsPage.vue"));
+const TwoFactorChallengePage = defineAsyncComponent(() => import("../Components/TwoFactorChallengePage.vue"));
 const AccountPage = defineAsyncComponent(
     () => import("../Components/AccountPage.vue"),
 );
@@ -33,6 +36,7 @@ const InstallerPage = defineAsyncComponent(
 const TrackingPage = defineAsyncComponent(
     () => import("../Components/TrackingPage.vue"),
 );
+const TrackingVerifyPage = defineAsyncComponent(() => import("../Components/TrackingVerifyPage.vue"));
 const TeamPage = defineAsyncComponent(() => import("../Components/TeamPage.vue"));
 const InvitationPage = defineAsyncComponent(() => import("../Components/InvitationPage.vue"));
 const ModulesPage = defineAsyncComponent(
@@ -42,10 +46,12 @@ const ModuleSettingsPage = defineAsyncComponent(
     () => import("../Components/ModuleSettingsPage.vue"),
 );
 const SharingPage = defineAsyncComponent(() => import("../Components/SharingPage.vue"));
+const ApiTokensPage = defineAsyncComponent(() => import("../Components/ApiTokensPage.vue"));
 const FunnelsPage =defineAsyncComponent(() => import("../Components/FunnelsPage.vue"));
 const JourneyPage = defineAsyncComponent(() => import("../Components/JourneyPage.vue"));
 const GoalsPage = defineAsyncComponent(() => import("../Components/GoalsPage.vue"));
 const GoalReport = defineAsyncComponent(() => import("../Components/GoalReport.vue"));
+const EventPropertiesPage = defineAsyncComponent(() => import("../Components/EventPropertiesPage.vue"));
 const page = usePage();
 const p = computed(() => page.props);
 const failedModuleFiles = ref([]);
@@ -78,6 +84,7 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
     <template v-if="!p.auth || p.screen === 'install'">
         <InstallerPage v-if="p.screen === 'install'" v-bind="p" />
         <InvitationPage v-else-if="p.screen === 'invitation'" v-bind="p" />
+        <TwoFactorChallengePage v-else-if="p.screen === 'auth.two-factor'" v-bind="p" />
         <AccountPage v-else v-bind="p" />
     </template>
     <template v-else>
@@ -97,18 +104,23 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
             v-bind="p"
         />
         <TrackingPage v-else-if="p.screen === 'sites.tracking'" v-bind="p" />
+        <TrackingVerifyPage v-else-if="p.screen === 'sites.verify'" v-bind="p" />
         <SharingPage v-else-if="p.screen === 'sites.sharing'" v-bind="p" />
+        <ApiTokensPage v-else-if="p.screen === 'sites.api-tokens'" v-bind="p" />
         <TeamPage v-else-if="p.screen === 'sites.team'" v-bind="p" />
         <InvitationPage v-else-if="p.screen === 'invitation'" v-bind="p" />
         <FunnelsPage v-else-if="p.screen === 'funnels'" v-bind="p" />
         <JourneyPage v-else-if="['funnel.report','journeys'].includes(p.screen)" :key="p.funnel?.id || 'journeys'" v-bind="p" />
         <GoalsPage v-else-if="p.screen === 'goals'" v-bind="p" />
         <GoalReport v-else-if="p.screen === 'goal.report'" :key="p.goal?.id" v-bind="p" />
+        <EventPropertiesPage v-else-if="p.screen === 'event.properties'" v-bind="p" />
         <HealthPage v-else-if="p.screen === 'health'" v-bind="p" />
         <MailSettingsPage v-else-if="p.screen === 'settings.mail'" v-bind="p" />
         <ModulesPage v-else-if="p.screen === 'modules'" v-bind="p" />
         <ModuleSettingsPage v-else-if="p.screen === 'modules.settings'" v-bind="p" />
         <AccountPage v-else-if="p.screen === 'auth.password'" v-bind="p" />
+        <SecurityPage v-else-if="p.screen === 'account.security'" v-bind="p" />
+        <SecuritySettingsPage v-else-if="p.screen === 'settings.security'" v-bind="p" />
         <template v-else-if="p.screen === 'settings'"
             ><div class="page-heading">
                 <div>

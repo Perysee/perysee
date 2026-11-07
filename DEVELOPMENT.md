@@ -29,11 +29,12 @@ Les assets d'une release publiée ne se remplacent jamais : l'empreinte est dans
 
 Les fonctionnalités optionnelles sont des modules (guide : documentation, `Modules > Build a module`).
 
-- **Sources** : les modules maison sont dans `modules/<id>/` (White label, Annotations, Example). Ils sont versionnés avec le Core mais **absents du ZIP** : `scripts/build-release.php` n'embarque que sa liste explicite de chemins, et `storage/` n'en fait pas partie. `resources/module-template/` (gabarit de `perysee:make-module`) est en revanche distribué.
-- **En local** : relier un module au dossier chargé par l'application, par exemple `ln -s ../../../modules/annotations storage/app/modules/annotations`, puis `php artisan perysee:modules enable annotations`. L'activation écrit en base ; la première installe aussi les migrations du module.
-- **Nouveau module** : `php artisan perysee:make-module <id>` crée le squelette dans le dossier des modules ; le déplacer dans `modules/` pour le versionner. Préfixer les tables et les noms de migration par l'identifiant (les noms de migration sont communs à tous les modules).
+- **Sources** : les modules officiels ne sont pas dans ce dépôt : ils vivent dans `modules/<id>/` du dépôt `perysee-modules`. Le Core ne les versionne donc pas et son ZIP ne les contient pas : `scripts/build-release.php` n'embarque que sa liste explicite de chemins, et `storage/` n'en fait pas partie. `resources/module-template/` (gabarit de `perysee:make-module`) est en revanche distribué.
+- **En local** : relier un module au dossier chargé par l'application, par exemple `ln -s <chemin de perysee-modules>/modules/annotations storage/app/modules/annotations`, puis `php artisan perysee:modules enable annotations`. L'activation écrit en base ; la première installe aussi les migrations du module.
+- **Nouveau module** : `php artisan perysee:make-module <id>` crée le squelette dans le dossier des modules ; le déplacer dans `modules/` du dépôt `perysee-modules` pour le versionner. Préfixer les tables et les noms de migration par l'identifiant (les noms de migration sont communs à tous les modules).
 - **Tests** : `php artisan test --compact --filter=Module` (registre, chargeur, installation, périmètre, extensions, pages d'administration, robustesse), `AnnotationsModuleTest`, `WhiteLabelModuleTest`, `ExampleModuleTest`, `MakeModuleTest`, et `npm run test:charts` (hôte JavaScript, rendu des modules). Un module qui s'appuie sur un autre sujet de test charge `base_path('modules')` via `perysee.modules_path`.
 - **Avant de livrer un module** : activation sans erreur de chargement, refus des rôles insuffisants, absence hors du périmètre choisi, activation répétée sans seconde migration, désinstallation limitée à ses tables. Le guide public donne la même liste.
+- **Événements de domaine et registres (ADR 005)** : `App\Modules\Events\DomainEvents` (bus, `listening()` avant tout calcul), le catalogue `App\Modules\Events\*`, les registres `NotificationChannels` (canal Core `core.mail`) et `ReportSources` (source Core `core.traffic`). Les modules s'abonnent avec `ModuleProvider::listen`, déclarent avec `notificationChannel` / `reportSource` et indiquent `core` ≥ `ModuleApi::DOMAIN_EVENTS_SINCE` dans `module.json` ; `ModuleApi::VERSION` reste 1. Publication : après le commit et le déverrouillage pour l'agrégateur, en `terminating` pour les actions d'administration, jamais dans la collecte (`DomainEventCriticalPathTest`). Un événement ne perd ni ne change un champ dans une version de schéma : `DomainEventCatalogTest` le garde, la suppression exige un nouveau schéma. Tests : `php artisan test --filter=DomainEvent` (+ `NotificationChannelsTest`, `ReportSourcesTest`) ; le coût au repos avec écouteur est borné par `DomainEventsCostTest` (le budget d'`IdleSchedulerCostTest` vaut sans écouteur).
 
 ## Développement local — environnement et démonstrations
 
@@ -162,6 +163,10 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 | `perysee:update --requested --yes` | 1 min, sans chevauchement | Prend la demande de mise à jour déposée depuis la page Santé. |
 | `perysee:update:check --quiet-unless-new` | 04:17 | Cherche une nouvelle version. |
 | `perysee:modules catalog --refresh-only` | 04:43 | Rafraîchit le catalogue de modules. |
+| `perysee:prune-api-tokens` | toutes les heures, sans chevauchement | Supprime les jetons d'API expirés ou révoqués depuis plus de 30 jours. |
+| `perysee:prune-access-log --limit=1000` | toutes les heures, sans chevauchement | Supprime les entrées du journal d'accès de plus de 90 jours. |
+| `perysee:prune-diagnostics` | toutes les heures, sans chevauchement | Supprime les diagnostics de collecte de plus de 7 jours. |
+| `perysee:prune-event-values --limit=1000` | toutes les heures, sans chevauchement | Supprime les identifiants de commande hors fenêtre et les propriétés d'événements hors rétention. |
 
 ### Équipe et invitations
 
@@ -183,6 +188,18 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 - Coque séparée (`Pages/Share/Show.vue`, `Unlock.vue`) : pour les routes `share.*`, `HandleInertiaRequests` ne partage que `currentUrl`, `assets`, `flash` et `errors` ; aucun compte, aucune navigation, aucun module. Réponses en `Cache-Control: no-store, private`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow`. Aucun filtre, export ou identifiant de site n'est lu depuis la requête.
 - L'usage est enregistré au plus une fois par heure et par lien (`last_used_at`, `use_count`). Les liens expirés ou révoqués ne sont pas purgés ; les lignes disparaissent avec le site (clé étrangère en cascade).
 
+### API de lecture (`/api/v1`)
+
+- Écran `/sites/{website}/api-tokens` (propriétaire seulement, jamais sur un site de démonstration, aucun accès implicite de l'administrateur d'instance). Un jeton appartient à un site, porte des portées (`overview`, `pages`, `sources`, `campaigns`, `devices`, `countries`, `events`, `goals`, `funnels`), une limite de 10 à 300 requêtes par minute (60 par défaut, plafond `PERYSEE_API_MAX_RATE`) et une expiration facultative (plafond facultatif `PERYSEE_API_MAX_EXPIRY_DAYS`). Un jeton survit au départ de son créateur.
+- Le secret (`psy_` + 32 octets en base64url) n'est jamais stocké : `api_tokens.token_hash` (SHA-256) et les six derniers caractères comme repère. Il n'est affiché qu'une fois, à la création. Il ne circule que dans l'en-tête `Authorization: Bearer` ; dans l'URL ou le corps, il est ignoré.
+- Routes dans `routes/api_v1.php`, hors groupe `web` (ni session, ni cookie, ni CSRF) : `GET /site`, `/overview`, `/timeseries`, `/dimensions/{dimension}`, `/goals`, `/goals/{id}`, `/funnels`, `/funnels/{id}`, et `/openapi.json` (public, `resources/openapi/v1.json`, un test vérifie qu'il décrit exactement les routes). Le site vient du jeton (`ResolveApiToken`), jamais d'une liaison de modèle. Un jeton inconnu, absent, expiré, révoqué ou d'un site supprimé ou de démonstration reçoit un même 401. Erreurs : `{"error": {"code", "message", "details"}}`.
+- Les chiffres viennent de `Reports`, `GoalReports` et `JourneyReports` ; la mise en forme passe par `ReportPresenter` (liste blanche partagée avec les liens de partage, dont le JSON est figé par `ShareJsonCharacterizationTest`) et `ReportSections` (portées vers dimensions). Un filtre exige la portée de sa dimension. Tableaux limités à 100 lignes (`meta.truncated`, `distinct_values`). `compare=previous` renvoie le verdict du serveur sur les pourcentages.
+- Funnels en lecture seule : le dernier résultat déjà calculé pour la version, la période et les filtres demandés, sinon 404 `report_not_computed`. Aucun calcul n'est déclenché.
+- Aucun CORS : `ApiV1Boundary` (premier middleware global) refuse un `OPTIONS` et retire les en-têtes `Access-Control-*` sur `/api/v1/*`. `/api/collect` garde le comportement de toujours. Chaque réponse porte `Cache-Control: no-store, private`, `Referrer-Policy: no-referrer`, `X-Robots-Tag`, `X-Perysee-Api-Version: 1`.
+- Limite par jeton avec `RateLimiter` (en-têtes `X-RateLimit-*`, `Retry-After` sur 429) ; les échecs d'authentification sont limités à 60 par minute et par adresse IP hachée.
+- Usage : `last_used_at` et `use_count` au plus toutes les 10 minutes par jeton (une requête `UPDATE`). Rétention : `perysee:prune-api-tokens` (toutes les heures, sans chevauchement) supprime les jetons expirés ou révoqués depuis plus de 30 jours. Commande dédiée, pas dans `perysee:maintenance`, pour ne pas toucher au budget de requêtes du passage à vide.
+- Décision : [ADR 006](docs/adr/006-read-only-api-tokens.md). Tests : `ApiTokenManagementTest`, `ApiV1AuthTest`, `ApiV1ReportsTest`, `ApiV1RateLimitTest`, `ApiV1GoalsFunnelsTest`, `ApiV1OpenApiTest`, `ApiTokenPurgeTest`, `ShareJsonCharacterizationTest`, plus `tests/Charts/api-tokens-nav.test.mjs`.
+
 ### Objectifs et conversions
 
 - Écrans `/sites/{website}/goals` et `/goals/{goal}` (lecture pour tout membre, création, modification et archivage pour un `owner`), API JSON et export CSV. Cinq objectifs actifs au plus par site ; type `event` (événement nommé) ou `path` (chemin normalisé) ; seuil de 1 à 1000 occurrences par session.
@@ -198,6 +215,16 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 ### Tests ajoutés
 
 `ComparisonReportTest` (18), `TeamManagementTest` (11), `TeamMariaDbTest` (1, MariaDB seulement), `InvitationAcceptanceTest` (6), `ShareLinkTest` (12), `GoalDefinitionTest` (4), `GoalConversionTest` (7), `GoalBackfillTest` (6), `GoalReportingTest` (6), `GoalCostTest` (3), `GoalPurgeTest` (2), plus `tests/Charts/comparison.test.mjs`. Sur SQLite, ces 76 tests PHP passent (un ignoré). La suite MariaDB (voir « Vérifications ») rejoue les mêmes classes avec le conteneur Apple `perysee-mariadb` (`bash scripts/mariadb.sh test-db`, `php scripts/configure-testing.php`, `composer test:mariadb`) ; elle est la seule à exécuter `TeamMariaDbTest`. Les tests d'objectifs ne supposent aucun identifiant fixe : MariaDB ne remet pas l'auto-incrément à zéro entre deux tests.
+
+## Double authentification, appareils connectés et journal d'accès
+
+Décision : [ADR 007](docs/adr/007-two-factor-authentication-open-sessions-and-the-access-log.md). Quatre migrations additives (`2026_11_08_1200*`) : `user_two_factor`, `user_recovery_codes`, `user_sessions`, `access_log`. Aucune ne touche `users`.
+
+- **Dépendances** : `pragmarx/google2fa` (TOTP) et `bacon/bacon-qr-code` (QR en SVG côté serveur). Elles exigent les extensions `iconv` et `xmlwriter`, vérifiées par l'installateur. Le ZIP de release embarque tout `vendor/`.
+- **Connexion** : `AuthController::store` n'authentifie jamais un compte doté d'un second facteur ; l'état en attente vit dans la session (`login.2fa`, 5 minutes) et `TwoFactorChallengeController` appelle `Auth::login()` après un code valide. Un compte sans second facteur suit le chemin d'origine (`LoginFlowCharacterizationTest` le fige).
+- **Tests** : `TwoFactorEnrollmentTest`, `TwoFactorLoginTest`, `RequiredTwoFactorTest`, `UserSessionsTest`, `AccessLogTest`, `AccessLogPurgeTest`, `TwoFactorRecoveryCommandTest`, `TwoFactorMariaDbTest` (MariaDB seulement : deux tentatives simultanées avec le même code), `npm run test:security`. Le client de test de Laravel ne renvoie pas le cookie de session : `KeepsSessionCookie::browser()` le fait quand un test dépend de l'identifiant de session.
+- **Purge** : `php artisan perysee:prune-access-log` (90 jours, lots de 1000, 20 lots au plus par passage), planifiée toutes les heures sans chevauchement. Le passage à vide de `perysee:maintenance` n'est pas modifié.
+- **Perte du téléphone** : codes de secours, puis `php artisan perysee:recover-admin <email> --reset-2fa` pour un administrateur. Perdre `APP_KEY` rend les secrets illisibles.
 
 ## Fiabilité et laboratoire de performances
 
@@ -227,6 +254,17 @@ Un administrateur règle le serveur SMTP depuis **Administration > Mail** (`/set
 - **Le mot de passe ne change pas de serveur.** Si l’hôte, le port ou l’utilisateur changent (ou si le chiffrement passe à « None ») sans mot de passe saisi ni case « Remove the password », l’enregistrement et le test sont refusés.
 - **Sécurité.** Réservé aux administrateurs, 5 envois de test par minute et par administrateur, délai de connexion de 10 s. Le serveur se connecte à l’hôte choisi par un administrateur, au même niveau de confiance que l’hôte de base de données de l’installateur.
 - **Tests.** `MailSettingsTest`, `InstanceMailerTest`, `MailSettingsPageTest`, `TeamManagementTest` (invitations) et `tests/Charts/workspace-shell.test.mjs`. Pour une vérification de bout en bout sans vrai serveur, un petit puits SMTP local (Python `asyncio`, 127.0.0.1:2525) suffit : choisir « None » comme chiffrement.
+
+## Vérificateur d’installation du tracker
+
+Une page **Verify the installation** par site (`/sites/{site}/tracking/verify`, liée depuis « Tracking setup ») répond à « pourquoi rien n’apparaît ? ». Décisions : [ADR 004](docs/adr/004-tracker-installation-check.md).
+
+- **Collecteur.** Chaque refus est une `App\Analytics\Ingestion\CollectionRejected` (statut et corps identiques à l’ancien `abort_*`) portant une `RejectionCause`. Elle est enregistrée dans le `catch` de `TrackingController::collect`, après le rollback, par `RejectionLog`. Le chemin accepté ne change pas : un SELECT du site, un INSERT, plus un UPDATE à la première collecte ; `CollectionQueryBudgetTest` fige cette liste. Les refus de forme (413, 415, 422) sont désormais comptés dans « Collection rejections ».
+- **Stockage.** Table `collection_diagnostics` : une ligne par site, heure UTC et cause, `hits` incrémenté par upsert, rétention de 7 jours (`perysee:prune-diagnostics`, toutes les heures). Ni IP, ni User-Agent, ni chemin, ni payload ; `sample_host` seulement pour `domain_not_allowed` et `unknown_site`. Écritures limitées à 20 par minute, site et cause : les comptes affichés sont « au moins N ».
+- **Test « Test now ».** Réservé aux propriétaires : `POST /sites/{site}/tracking/probe` (6 par minute) délivre un jeton HMAC de 10 minutes lié au site ; le navigateur le présente dans l’en-tête `X-Perysee-Probe` au vrai `/api/collect`, qui répond 204 sans rien écrire dans `events` ni dans `first_collected_at`. `OPTIONS /api/collect` répond au preflight. Le test ne prouve pas la liste de domaines ni le consentement du site suivi.
+- **Sites silencieux.** `SiteActivity` ajoute `last_event_at` et `silent` aux listes (une requête groupée par page). Seuil : `perysee.silent_site_days` (`PERYSEE_SILENT_SITE_DAYS`, 3 jours).
+- **Budget au repos.** `IdleSchedulerCostTest` est à 30 requêtes sur SQLite (limite 30) : la purge n’est donc pas dans `perysee:maintenance` mais dans sa propre commande.
+- **Tests.** `CollectionQueryBudgetTest`, `CollectionRejectionCharacterizationTest`, `CollectionRejectionTest`, `CollectionDiagnosticsPurgeTest`, `TrackerCheckTest`, `TrackerProbeTest`, `SilentSiteIndicatorTest`, `tests/Charts/tracker-check.test.mjs`.
 
 ## Installateur
 
@@ -365,3 +403,11 @@ Validation uses `SegmentReportingTest`, `FunnelReportingTest`, `FunnelEngineTest
 Demo traffic v5 covers 90 days, ends with a few visits in the last fifteen minutes for the reception view, and adds UTM campaigns (newsletter, LinkedIn, X, Product Hunt, Google Ads) and eight named events. It uses a local PHP Randomizer, never the global random state. Resets use a fresh seed by default; `--seed=N` reproduces a dataset at the same frozen time. Cohort context stays consistent within each session. Weekday/hour weights, growth, campaign spikes, varied path lengths and nonuniform conversion probabilities make the sample less regular. Three tracked sample definitions are created once and preserved on future resets; real sites and other report jobs are not processed by the demo reset. Sample funnel and journey reports are precomputed for today, 7 and 30 days; other selections use the normal scheduler. Live visits age out after fifteen minutes: rerun the reset just before a demonstration.
 
 Demo report cache keys remain stable while snapshot data, definition, selection and dates are unchanged, so precomputed examples remain immediately available. The update timestamp identifies this synthetic snapshot. Real sites use five-minute cache windows.
+
+## Valeur des événements et propriétés bornées (ADR 008)
+
+- **Collecte.** `value`, `props` et `id` sont retirés du corps par `EventValues::take()` avant la liste blanche du contrôleur, validés par `EventValues::prepare()` (422 pour une erreur de structure) puis ajoutés à l'`INSERT`. Les bornes souples et la liste de clés refusées sont dans `PropertyPolicy` (figées dans le code). Aucune requête de plus sans `id` ; avec `id`, un `INSERT IGNORE` dans `event_order_ids`, dans la transaction de l'événement.
+- **Agrégation.** `Goals` ajoute `value_sum` et `valued_hits` aux deltas existants ; `EventPropertyStats` remplit `stats_event_property_daily` (100 noms par site, 10 clés par nom, 50 valeurs par jour, le reste dans `(other)`).
+- **Rétention.** `perysee:prune-event-values` (toutes les heures) purge les identifiants de commande (`PERYSEE_ORDER_DEDUP_DAYS`, 30 par défaut) et les compteurs de propriétés (rétention des statistiques). Le passage à vide de `perysee:maintenance` ne change pas.
+- **Rapports.** `GoalReports` ajoute le bloc `amounts` (les `totals` gardent leur forme) ; `EventPropertyReports` et `EventPropertyController` servent `/sites/{site}/events/properties` (page, API, CSV). Tout CSV passe par `CsvSafe`.
+- **Tests ajoutés.** `EventValueIngestionTest`, `EventPropertiesIngestionTest`, `EventOrderDeduplicationTest`, `GoalValueTest`, `EventPropertyAggregationTest`, `EventValuePurgeTest`, `GoalValueReportingTest`, `EventPropertyReportTest`, `CsvInjectionTest`, `WebsiteCurrencyTest`, et `tests/Tracker/lueur-values.test.mjs`. Aucun identifiant de ligne fixe : utiliser les identifiants des modèles.

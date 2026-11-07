@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\ShareLink;
 use App\Models\Website;
+use App\Modules\Events\DomainEvents;
+use App\Modules\Events\ShareLinkCreated;
+use App\Modules\Events\ShareLinkRevoked;
+use App\Support\AccessLog;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,7 +63,13 @@ class ShareLinkController extends Controller
             'expires_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
         ]);
         $expires = isset($data['expires_on']) ? Carbon::parse($data['expires_on'], $website->timezone)->endOfDay()->utc() : null;
-        [, $token] = ShareLink::issue($website, $request->user(), $data['label'] ?? '', $data['sections'], $data['password'] ?? null, $expires);
+        [$link, $token] = ShareLink::issue($website, $request->user(), $data['label'] ?? '', $data['sections'], $data['password'] ?? null, $expires);
+        // Module events (ADR 005): the token, its hint and the label never leave the Core.
+        $events = app(DomainEvents::class);
+        if ($events->listening(ShareLinkCreated::class)) {
+            $events->publishAfterResponse(new ShareLinkCreated($website->id, $link->id, array_values($data['sections']), $link->password_hash !== null, $expires?->toIso8601String()));
+        }
+        AccessLog::record(AccessLog::SHARE_CREATED, $request->user(), $request, ['site_id' => $website->id, 'link_id' => $link->id]);
 
         return redirect()->route('sites.sharing', $website)->with('share_created', ['url' => route('share.show', $token, false)]);
     }
@@ -87,8 +97,13 @@ class ShareLinkController extends Controller
     {
         $this->authorizeSharing($website);
         $model = $website->shareLinks()->findOrFail($link);
+        $wasActive = $model->revoked_at === null;
         $model->revoked_at ??= now();
         $model->save();
+        $events = app(DomainEvents::class);
+        if ($wasActive && $events->listening(ShareLinkRevoked::class)) {
+            $events->publishAfterResponse(new ShareLinkRevoked($website->id, $model->id));
+        }
 
         return redirect()->route('sites.sharing', $website)->with('status', __('Link revoked.'));
     }

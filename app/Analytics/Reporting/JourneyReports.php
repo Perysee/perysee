@@ -23,6 +23,30 @@ class JourneyReports
         return DB::table('journey_reports')->where('cache_key', $key)->first();
     }
 
+    /**
+     * The newest finished funnel report of a site for this funnel version, period and filters, or null. Read only:
+     * it never asks for a calculation, so a caller cannot make the application write or scan events.
+     *
+     * @param  array<string, mixed>  $period  a result of Reports::period()
+     */
+    public function latestReady(Website $site, int $funnel, int $version, array $period): ?object
+    {
+        $from = $period['start']->toDateTimeString();
+        $to = $period['end']->toDateTimeString();
+        $rows = DB::table('journey_reports')->where('website_id', $site->id)->where('status', 'ready')->where('payload', 'like', '%"kind":"funnel"%')->orderByDesc('id')->limit(200)->get(['id', 'payload', 'updated_at']);
+        foreach ($rows as $row) {
+            $payload = json_decode($row->payload, true);
+            if (is_array($payload) && ($payload['funnel_id'] ?? null) === $funnel && ($payload['version'] ?? null) === $version && ($payload['from'] ?? null) === $from && ($payload['to'] ?? null) === $to && ($payload['filters'] ?? []) == $period['filters']) {
+                // The (large) result is read once, for the match only, not for the 200 candidates.
+                $row->result = DB::table('journey_reports')->where('id', $row->id)->value('result');
+
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
     public function publicStatus(object $report): array
     {
         return ['id' => $report->id, 'status' => $report->status, 'scanned_events' => $report->scanned, 'excluded_sessions' => $report->excluded, 'updated_at' => $report->updated_at, 'error' => $report->error, 'data' => $report->result ? json_decode($report->result, true, flags: JSON_THROW_ON_ERROR) : null];

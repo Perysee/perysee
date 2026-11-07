@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Diagnostics\SiteActivity;
 use App\Analytics\Reporting\Reports;
 use App\Http\Requests\SaveWebsiteRequest;
 use App\Models\Website;
+use App\Support\Currencies;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,12 +29,15 @@ class WebsiteController extends Controller
             });
         }
 
-        return Ui::render('sites.index', ['websites' => $query->orderBy('name')->paginate(20)->withQueryString(), 'search' => $search]);
+        $websites = $query->orderBy('name')->paginate(20)->withQueryString();
+        SiteActivity::annotate($websites); // installation check: last event and silent flag
+
+        return Ui::render('sites.index', ['websites' => $websites, 'search' => $search]);
     }
 
     public function create(): Response
     {
-        return Ui::render('sites.form', ['website' => new Website(['timezone' => 'UTC', 'allowed_domains' => [], 'tracking_mode' => 'pageviews', 'consent_required' => true])]);
+        return Ui::render('sites.form', ['website' => new Website(['timezone' => 'UTC', 'allowed_domains' => [], 'tracking_mode' => 'pageviews', 'consent_required' => true]), 'currencies' => Currencies::CODES]);
     }
 
     public function store(SaveWebsiteRequest $request): RedirectResponse
@@ -90,7 +95,7 @@ class WebsiteController extends Controller
         Gate::authorize('update', $website);
         abort_if($website->deleting_at, 404);
 
-        return Ui::render('sites.form', compact('website'));
+        return Ui::render('sites.form', compact('website') + ['currencies' => Currencies::CODES]);
     }
 
     public function update(SaveWebsiteRequest $request, Website $website): RedirectResponse
