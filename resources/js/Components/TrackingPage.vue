@@ -70,6 +70,12 @@ async function copy() {
 window.lueur.push(['consent', true]);</code></pre>
         <div class="flex flex-wrap gap-2 mt-5">
             <UButton
+                :to="siteLinks.verify"
+                icon="i-tabler-checkup-list"
+                label="Verify the installation"
+                color="neutral"
+                variant="outline"
+            /><UButton
                 v-if="siteLinks.demo"
                 :href="siteLinks.demo"
                 external

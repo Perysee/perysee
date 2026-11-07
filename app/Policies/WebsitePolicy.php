@@ -23,6 +23,12 @@ class WebsitePolicy
         return $website->members()->whereKey($user->id)->wherePivot('role', 'owner')->exists();
     }
 
+    /** Read API tokens are managed by a site owner only; an instance administrator has no implicit access. */
+    public function manageApiTokens(User $user, Website $website): bool
+    {
+        return $website->members()->whereKey($user->id)->wherePivot('role', 'owner')->exists();
+    }
+
     /** Inviting, changing roles and removing members: owners only, an instance administrator has no implicit access. */
     public function manageMembers(User $user, Website $website): bool
     {

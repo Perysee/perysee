@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Website;
 use App\Modules\Events\DomainEvents;
 use App\Modules\Events\InvitationAccepted;
+use App\Support\AccessLog;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,6 +94,7 @@ class InvitationAcceptanceController extends Controller
         if ($joined !== null && $events->listening(InvitationAccepted::class)) {
             $events->publishAfterResponse(new InvitationAccepted(...$joined));
         }
+        AccessLog::record(AccessLog::INVITATION_ACCEPTED, $request->user(), $request, ['site_id' => $outcome->id]);
 
         return redirect()->route('sites.show', $outcome);
     }

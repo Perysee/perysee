@@ -7,6 +7,7 @@ use App\Models\Website;
 use App\Modules\Events\DomainEvents;
 use App\Modules\Events\ShareLinkCreated;
 use App\Modules\Events\ShareLinkRevoked;
+use App\Support\AccessLog;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,6 +69,7 @@ class ShareLinkController extends Controller
         if ($events->listening(ShareLinkCreated::class)) {
             $events->publishAfterResponse(new ShareLinkCreated($website->id, $link->id, array_values($data['sections']), $link->password_hash !== null, $expires?->toIso8601String()));
         }
+        AccessLog::record(AccessLog::SHARE_CREATED, $request->user(), $request, ['site_id' => $website->id, 'link_id' => $link->id]);
 
         return redirect()->route('sites.sharing', $website)->with('share_created', ['url' => route('share.show', $token, false)]);
     }

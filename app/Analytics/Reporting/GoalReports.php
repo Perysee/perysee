@@ -13,6 +13,18 @@ class GoalReports
 {
     public const BREAKDOWNS = ['source', 'campaign', 'country', 'device'];
 
+    /** A goal of this site, or null: a goal of another site is never found. */
+    public function definition(Website $site, int $id): ?object
+    {
+        return DB::table('goals')->where('website_id', $site->id)->where('id', $id)->first();
+    }
+
+    /** One version of a goal (its current one by default), or null when it does not exist. */
+    public function version(object $definition, ?int $version = null): ?object
+    {
+        return DB::table('goal_versions')->where('goal_id', $definition->id)->where('version', $version ?? $definition->current_version)->first();
+    }
+
     public function query(Website $site, int $goal, int $version, array $period): Builder
     {
         $query = DB::table('stats_goal_daily')->where('website_id', $site->id)->where('goal_id', $goal)->where('version', $version)->whereBetween('stat_date', [$period['from'], $period['to']]);

@@ -29,7 +29,7 @@ class GoalController extends Controller
 
     private function definition(Website $site, int $id): object
     {
-        return DB::table('goals')->where('website_id', $site->id)->where('id', $id)->firstOrFail();
+        return app(GoalReports::class)->definition($site, $id) ?? abort(404);
     }
 
     private function data(Request $request): array
