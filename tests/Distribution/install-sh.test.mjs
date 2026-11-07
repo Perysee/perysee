@@ -24,9 +24,9 @@ function findPhp(t, { onPath = [], cpanel = [], env = {} } = {}) {
     for (const [version, recent] of cpanel) {
         fakePhp(join(root, 'cpanel', `ea-php${version}`, 'root/usr/bin/php'), recent);
     }
-    const result = spawnSync('bash', ['-c', `source "$1"; find_php`, 'bash', script], {
+    const result = spawnSync('/bin/bash', ['-c', `source "$1"; find_php`, 'bash', script], {
         encoding: 'utf8',
-        env: { PATH: `${bin}:/usr/bin:/bin`, PERYSEE_INSTALL_SOURCED: '1', PERYSEE_CPANEL_ROOT: join(root, 'cpanel'), ...env },
+        env: { PATH: bin, PERYSEE_INSTALL_SOURCED: '1', PERYSEE_CPANEL_ROOT: join(root, 'cpanel'), ...env },
     });
     return { result, root, bin };
 }
@@ -70,9 +70,9 @@ function detectMode(t, { tools = [], cpanelBin = false, dockerWorks = true }) {
     if (cpanelBin) {
         fakePhp(join(root, 'cpanel/bin/uapi'), true);
     }
-    return spawnSync('bash', ['-c', 'source "$1"; detect_mode', 'bash', script], {
+    return spawnSync('/bin/bash', ['-c', 'source "$1"; detect_mode', 'bash', script], {
         encoding: 'utf8',
-        env: { PATH: `${bin}:/usr/bin:/bin`, PERYSEE_INSTALL_SOURCED: '1', PERYSEE_UAPI_PATH: join(root, 'cpanel/bin/uapi') },
+        env: { PATH: bin, PERYSEE_INSTALL_SOURCED: '1', PERYSEE_UAPI_PATH: join(root, 'cpanel/bin/uapi') },
     }).stdout.trim();
 }
 

@@ -358,11 +358,15 @@ test('the release publishes the Docker files under the same checksum list as the
     }
 });
 // docker is faked: it records every call, and `compose version` succeeds.
+// The fake docker comes first in PATH, so a docker installed on the machine running the tests is never reached.
+// With PERYSEE_TEST_DOCKER_BROKEN set it behaves like a docker without the compose plugin.
 function addDocker(f) {
     const docker = join(f.root, 'bin', 'docker');
     writeFileSync(docker, `#!/usr/bin/env node
 import { appendFileSync } from 'node:fs';
-appendFileSync(process.env.PERYSEE_TEST_DOCKER_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');
+const args = process.argv.slice(2);
+if (process.env.PERYSEE_TEST_DOCKER_BROKEN && args[0] === 'compose' && args[1] === 'version') process.exit(1);
+appendFileSync(process.env.PERYSEE_TEST_DOCKER_LOG, JSON.stringify(args) + '\\n');
 `);
     chmodSync(docker, 0o755);
 }
@@ -370,8 +374,9 @@ function dockerEnvironment(f, { withDocker = true } = {}) {
     const env = bootstrapEnvironment(f);
     env.PERYSEE_TEST_DOCKER_LOG = join(f.root, 'docker.log');
     env.PERYSEE_PHP = '/nonexistent/php'; // the Docker mode must not need PHP on the host
-    if (withDocker) {
-        addDocker(f);
+    addDocker(f);
+    if (!withDocker) {
+        env.PERYSEE_TEST_DOCKER_BROKEN = '1';
     }
     return env;
 }
@@ -417,7 +422,7 @@ test('the Docker mode refuses a missing docker, an unverified file and a used fo
     assert.match(missing.stderr, /Docker with the compose plugin/);
     assert.equal(existsSync(target), false);
 
-    addDocker(f);
+    delete env.PERYSEE_TEST_DOCKER_BROKEN;
     writeFileSync(join(f.output, 'Dockerfile'), 'FROM scratch\n');
     const tampered = dockerInstall(f, env, ['--target', target]);
     assert.notEqual(tampered.status, 0);
