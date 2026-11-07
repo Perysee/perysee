@@ -29,6 +29,22 @@ class GoalPurgeTest extends TestCase
         $this->assertSame(2, (int) DB::table('stats_goal_daily')->sum('conversions'));
     }
 
+    public function test_goal_counters_older_than_the_statistics_retention_are_purged_like_the_other_statistics(): void
+    {
+        $site = Website::factory()->create(['tracking_mode' => 'sessions']);
+        foreach ([1200, 10] as $days) {
+            $day = now('UTC')->subDays($days)->startOfDay();
+            DB::table('stats_goal_daily')->insert([
+                'website_id' => $site->id, 'goal_id' => 1, 'version' => 1, 'stat_date' => $day->toDateString(), 'bucket_start' => $day->format('Y-m-d H:i:s'),
+                'segment_hash' => str_repeat('a', 64), 'dimensions' => '{}', 'conversions' => 1, 'hits' => 1,
+            ]);
+        }
+
+        $this->artisan('perysee:maintenance', ['--limit' => 100])->assertSuccessful();
+
+        $this->assertSame([now('UTC')->subDays(10)->toDateString()], DB::table('stats_goal_daily')->pluck('stat_date')->map(fn ($date) => substr((string) $date, 0, 10))->all());
+    }
+
     public function test_deleting_a_site_removes_its_goal_data(): void
     {
         $site = Website::factory()->create(['tracking_mode' => 'sessions']);
