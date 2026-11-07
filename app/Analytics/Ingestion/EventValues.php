@@ -2,7 +2,6 @@
 
 namespace App\Analytics\Ingestion;
 
-use App\Analytics\InstanceHealth;
 use App\Models\Website;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -76,8 +75,7 @@ class EventValues
             }
         }
         if ($errors !== []) {
-            app(InstanceHealth::class)->failure('collection_rejections');
-
+            // Counted and filed as an invalid payload by the collector's ValidationException handler.
             throw ValidationException::withMessages($errors);
         }
 
