@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Analytics\Ingestion\CollectionRejected;
 use App\Analytics\Ingestion\Dimensions;
 use App\Analytics\Ingestion\Geolocation;
+use App\Analytics\Ingestion\ProbeToken;
 use App\Analytics\Ingestion\RejectionCause;
 use App\Analytics\Ingestion\RejectionLog;
 use App\Analytics\InstanceHealth;
@@ -60,6 +61,13 @@ class TrackingController extends Controller
                 'utm_source' => ['sometimes', 'nullable', 'string', 'max:100'], 'utm_medium' => ['sometimes', 'nullable', 'string', 'max:100'], 'utm_campaign' => ['sometimes', 'nullable', 'string', 'max:100'],
                 'consent' => ['required', 'boolean'], 'session' => ['nullable', 'string', 'regex:/^[a-f0-9]{32}$/'],
             ])->validate();
+            // Installation check: a signed "Test now" request proves the collector and the database without storing an event.
+            if ($request->headers->has(ProbeToken::HEADER) && app(ProbeToken::class)->valid($request->header(ProbeToken::HEADER), $data['site'])) {
+                $probe = $this->probe($request, $data['site']);
+                if ($probe) {
+                    return $probe;
+                }
+            }
             DB::transaction(function () use ($data, $request, $normalize): void {
                 $site = Website::where('public_id', $data['site'])->sharedLock()->first();
                 CollectionRejected::unless($site && ! $site->deleting_at, RejectionCause::UnknownSite, 404, origin: $request->header('Origin'));
@@ -103,5 +111,24 @@ class TrackingController extends Controller
         }
 
         return response('', 204, ['Access-Control-Allow-Origin' => '*', 'Vary' => 'Origin', 'Cache-Control' => 'no-store']);
+    }
+
+    /** Answers a valid installation test; null when the site does not exist, so that the usual path refuses it. */
+    private function probe(Request $request, string $publicId): ?Response
+    {
+        $site = Website::where('public_id', $publicId)->first();
+        if (! $site || $site->deleting_at) {
+            return null;
+        }
+        CollectionRejected::unless(app(Coordination::class)->throttle('probe:'.$site->id, 12, 60), RejectionCause::Quota, 429, $site);
+        app(RejectionLog::class)->probe($site->id);
+
+        return response('', 204, ['Access-Control-Allow-Origin' => '*', 'Access-Control-Expose-Headers' => ProbeToken::HEADER, ProbeToken::HEADER => $request->header(ProbeToken::HEADER), 'Vary' => 'Origin', 'Cache-Control' => 'no-store']);
+    }
+
+    /** Lets the administration, when served from another origin than the script, send its signed test. */
+    public function preflight(): Response
+    {
+        return response('', 204, ['Access-Control-Allow-Origin' => '*', 'Access-Control-Allow-Methods' => 'POST', 'Access-Control-Allow-Headers' => 'Content-Type, '.ProbeToken::HEADER, 'Access-Control-Max-Age' => '600', 'Vary' => 'Origin', 'Cache-Control' => 'no-store']);
     }
 }

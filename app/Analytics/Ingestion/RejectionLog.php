@@ -34,19 +34,32 @@ class RejectionLog
                 // Only requests that named a real site are filed under it; a forged key never reaches the table.
                 $websiteId = DB::table('websites')->where('public_id', $siteKey)->whereNull('deleting_at')->value('id');
             }
-            $now = now('UTC');
-            $host = in_array($cause, [RejectionCause::DomainNotAllowed, RejectionCause::UnknownSite], true) ? $this->host($origin) : null;
-            $update = ['hits' => DB::raw('hits + 1'), 'last_at' => $now->format('Y-m-d H:i:s')];
-            if ($host !== null) {
-                $update['sample_host'] = $host;
-            }
-            DB::table('collection_diagnostics')->upsert([[
-                'website_id' => (int) ($websiteId ?? 0), 'bucket_start' => $now->copy()->startOfHour()->format('Y-m-d H:i:s'), 'cause' => $cause->value,
-                'hits' => 1, 'sample_host' => $host, 'first_at' => $now->format('Y-m-d H:i:s'), 'last_at' => $now->format('Y-m-d H:i:s'),
-            ]], ['website_id', 'bucket_start', 'cause'], $update);
+            $this->upsert($cause, (int) ($websiteId ?? 0), in_array($cause, [RejectionCause::DomainNotAllowed, RejectionCause::UnknownSite], true) ? $this->host($origin) : null);
         } catch (Throwable) {
             // A diagnostic must never replace the answer given to the tracker.
         }
+    }
+
+    /**
+     * Notes that a signed installation test reached the collector and the database. Unlike a refusal, a failure
+     * here is not swallowed: the test must tell that the database could not be written.
+     */
+    public function probe(int $websiteId): void
+    {
+        $this->upsert(RejectionCause::ProbeOk, $websiteId, null);
+    }
+
+    private function upsert(RejectionCause $cause, int $websiteId, ?string $host): void
+    {
+        $now = now('UTC');
+        $update = ['hits' => DB::raw('hits + 1'), 'last_at' => $now->format('Y-m-d H:i:s')];
+        if ($host !== null) {
+            $update['sample_host'] = $host;
+        }
+        DB::table('collection_diagnostics')->upsert([[
+            'website_id' => $websiteId, 'bucket_start' => $now->copy()->startOfHour()->format('Y-m-d H:i:s'), 'cause' => $cause->value,
+            'hits' => 1, 'sample_host' => $host, 'first_at' => $now->format('Y-m-d H:i:s'), 'last_at' => $now->format('Y-m-d H:i:s'),
+        ]], ['website_id', 'bucket_start', 'cause'], $update);
     }
 
     /** The host of an Origin header when it is a plain host name (no port, path, credentials or address of a visitor). */
