@@ -160,4 +160,41 @@ class ComparisonReportTest extends TestCase
             ->where('report.totals.sessions', null)
             ->where('comparison.reliability.sessions.reason', 'unavailable'));
     }
+
+    public function test_partial_coverage_and_pending_rebuild_withhold_percent(): void
+    {
+        $site = $this->memberSite();
+        $this->measured($site, '2026-10-01 00:00:00', 'pageviews', '2026-10-20 00:00:00');
+        $this->measured($site, '2026-10-20 00:00:00');
+        foreach (['2026-10-13', '2026-10-20'] as $date) {
+            DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => $date, 'pageviews' => 6, 'session_pageviews' => 6, 'sessions' => 3, 'custom_events' => 2]);
+        }
+        $url = '/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous';
+
+        $this->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('report.availability.sessions', 'partial')
+            ->where('comparison.reliability.sessions.reason', 'partial_coverage')
+            ->where('comparison.reliability.sessions.percent_allowed', false)
+            ->where('comparison.reliability.pageviews.reason', null));
+
+        DB::table('events')->insert(['website_id' => $site->id, 'received_at' => '2026-10-24 10:00:00', 'event_type' => 1, 'path' => '/', 'consent_given' => true]);
+        $this->get($url)->assertInertia(fn (Assert $page) => $page
+            ->where('report.freshness.pending', true)
+            ->where('comparison.reliability.pageviews.reason', 'rebuilding')
+            ->where('comparison.reliability.sessions.reason', 'rebuilding')
+            ->where('comparison.reliability.custom_events.reason', 'rebuilding'));
+    }
+
+    public function test_sessions_missing_from_the_cross_filter_tables_withhold_the_percent(): void
+    {
+        $site = $this->memberSite();
+        $this->measured($site, '2026-10-01 00:00:00');
+        DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => '2026-10-20', 'pageviews' => 6, 'session_pageviews' => 6, 'sessions' => 3]);
+        DB::table('measured_sessions')->insert(['website_id' => $site->id, 'session_key' => str_repeat('a', 64), 'first_seen_at' => '2026-10-20 10:00:00', 'last_seen_at' => '2026-10-20 10:05:00']);
+
+        $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous&filters[device][]=mobile')->assertInertia(fn (Assert $page) => $page
+            ->where('report.segment_coverage.missing_sessions', 1)
+            ->where('comparison.segment_coverage.missing_sessions', 0)
+            ->where('comparison.reliability.sessions.reason', 'partial_coverage'));
+    }
 }

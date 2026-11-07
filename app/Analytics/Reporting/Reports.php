@@ -83,6 +83,7 @@ class Reports
             'availability' => $overview['availability'],
             'coverage' => $overview['coverage'],
             'freshness' => $overview['freshness'],
+            ...(isset($overview['segment_coverage']) ? ['segment_coverage' => $overview['segment_coverage']] : []),
             'reliability' => $this->reliability($site, $period, $current, $overview),
         ];
     }
@@ -93,16 +94,23 @@ class Reports
     private function reliability(Website $site, array $period, array $current, array $previous): array
     {
         $includesToday = $period['to'] >= now($site->timezone)->toDateString();
+        $sides = [$current, $previous];
+        $rebuilding = ($current['freshness']['pending'] ?? false) || collect($sides)->contains(fn (array $side): bool => ($side['segment_coverage']['status'] ?? null) === 'rebuilding');
+        $sessionsGone = collect($sides)->contains(fn (array $side): bool => $side['availability']['sessions'] === 'unavailable');
+        $sessionsPartial = collect($sides)->contains(fn (array $side): bool => $side['availability']['sessions'] === 'partial' || ($side['segment_coverage']['missing_sessions'] ?? 0) > 0);
         $verdict = [];
         foreach (['pageviews', 'sessions', 'custom_events'] as $metric) {
-            $reason = null;
-            if ($metric === 'sessions' && ($current['totals'][$metric] === null || $previous['totals'][$metric] === null)) {
-                $reason = 'unavailable';
-            } elseif ($includesToday) {
-                $reason = 'current_period';
-            } elseif (($previous['totals'][$metric] ?? 0) === 0) {
-                $reason = 'previous_zero';
-            }
+            $sessions = $metric === 'sessions';
+            $reason = match (true) {
+                $metric !== 'custom_events' && ! empty($period['filters']['event']) => 'not_applicable',
+                $rebuilding => 'rebuilding',
+                $sessions && $sessionsGone => 'unavailable',
+                $sessions && $sessionsPartial => 'partial_coverage',
+                $sessions && ($current['totals'][$metric] === null || $previous['totals'][$metric] === null) => 'unavailable',
+                $includesToday => 'current_period',
+                ($previous['totals'][$metric] ?? 0) === 0 => 'previous_zero',
+                default => null,
+            };
             $verdict[$metric] = ['percent_allowed' => $reason === null, 'reason' => $reason];
         }
 
