@@ -47,7 +47,7 @@ class TrackerCheck
         return $check;
     }
 
-    /** @return list<array{cause: string, hits: int, host: ?string, last_at: string}> */
+    /** @return list<array{cause: string, hits: ?int, host: ?string, last_at: string, approximate: bool}> */
     private function rejections(Website $site, Carbon $now): array
     {
         $since = $now->copy()->subDay()->startOfHour()->format('Y-m-d H:i:s');
@@ -55,13 +55,17 @@ class TrackerCheck
             ->orderBy('bucket_start')->get(['website_id', 'cause', 'hits', 'sample_host', 'last_at']);
         $grouped = [];
         foreach ($rows as $row) {
-            // An instance-wide row is shown to a site only when it came from one of that site's own domains: it is
-            // then most likely this site with a wrong key, and nothing about other sites is disclosed.
-            if ((int) $row->website_id === 0 && ! ($row->cause === 'unknown_site' && $row->sample_host !== null && in_array($row->sample_host, $site->allowed_domains ?? [], true))) {
+            // An instance-wide row is a hint, not a fact about this site: it is shown only when its (forgeable) host
+            // is one of this site's own domains, it is marked approximate and its count (instance-wide) is withheld.
+            $instanceWide = (int) $row->website_id === 0;
+            if ($instanceWide && ! ($row->cause === 'unknown_site' && $row->sample_host !== null && in_array($row->sample_host, $site->allowed_domains ?? [], true))) {
                 continue;
             }
-            $entry = $grouped[$row->cause] ?? ['cause' => $row->cause, 'hits' => 0, 'host' => null, 'last_at' => null];
-            $entry['hits'] += (int) $row->hits;
+            $entry = $grouped[$row->cause] ?? ['cause' => $row->cause, 'hits' => null, 'host' => null, 'last_at' => null, 'approximate' => true];
+            if (! $instanceWide) {
+                $entry['hits'] = (int) ($entry['hits'] ?? 0) + (int) $row->hits;
+                $entry['approximate'] = false;
+            }
             $entry['host'] = $row->sample_host ?? $entry['host'];
             $entry['last_at'] = max((string) $entry['last_at'], Carbon::parse($row->last_at, 'UTC')->toIso8601String());
             $grouped[$row->cause] = $entry;
@@ -92,7 +96,7 @@ class TrackerCheck
         foreach ($check['rejections'] as $rejection) {
             $text = $texts[$rejection['cause']];
             // Refusals next to accepted events are a nuisance to look at; with none accepted they are the answer.
-            $level = $rejection['cause'] === 'path_excluded' ? 'info' : ($receiving ? 'warning' : 'error');
+            $level = $rejection['cause'] === 'path_excluded' || $rejection['approximate'] ? 'info' : ($receiving ? 'warning' : 'error');
             $host = $rejection['host'];
             $out[] = ['code' => $rejection['cause'], 'level' => $level, 'title' => $text[0], 'message' => $this->fill($text[1], $host), 'action' => $this->fill($text[2], $host), 'hits' => $rejection['hits'], 'host' => $host];
         }

@@ -173,7 +173,9 @@ class TrackerCheckTest extends TestCase
         $this->diagnostic(0, 'unknown_site', 5, 'theirs.example', now('UTC')->subHour());
 
         $this->assertSame(['unknown_site'], $this->codes($site, $this->member($site)));
-        $this->check($site, $this->member($site))->assertInertia(fn (Assert $page) => $page->where('check.diagnoses.0.host', 'mine.example'));
+        $this->check($site, $this->member($site))->assertInertia(fn (Assert $page) => $page
+            ->where('check.diagnoses.0.host', 'mine.example')->where('check.diagnoses.0.hits', null)->where('check.diagnoses.0.level', 'info')
+            ->where('check.rejections.0.hits', null)->where('check.rejections.0.approximate', true));
         $this->assertNotContains('mine.example', array_column(json_decode(json_encode($this->check($stranger, $this->member($stranger))->viewData('page')['props']['check']['rejections']), true), 'host'));
     }
 
