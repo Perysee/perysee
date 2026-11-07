@@ -241,7 +241,7 @@ function installPerysee(array $options): void
 
         return;
     }
-    $extensions = ['ctype', 'curl', 'dom', 'fileinfo', 'filter', 'hash', 'mbstring', 'openssl', 'pcre', 'pdo', 'pdo_mysql', 'session', 'tokenizer', 'xml', 'zip'];
+    $extensions = ['ctype', 'curl', 'dom', 'fileinfo', 'filter', 'hash', 'iconv', 'mbstring', 'openssl', 'pcre', 'pdo', 'pdo_mysql', 'session', 'tokenizer', 'xml', 'xmlwriter', 'zip'];
     $missing = array_filter($extensions, fn (string $extension): bool => ! extension_loaded($extension));
     if (PHP_VERSION_ID < 80300 || $missing) {
         throw new RuntimeException('PHP 8.3+ is required. Missing extensions: '.implode(', ', $missing));
