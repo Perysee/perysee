@@ -81,7 +81,7 @@ const processing = computed(() =>
         variant="subtle"
         icon="i-tabler-clock"
         title="Scheduler heartbeat missing or late"
-        description="Check the cron in your hosting panel. Unprocessed events are preserved."
+        description="The scheduler has not reported in. Add the cron job shown under “Scheduled task” in your hosting panel, then allow up to five minutes: the heartbeat is recorded every five minutes. Unprocessed events are preserved."
     /><UAlert
         v-if="health.aggregate_error"
         color="error"
@@ -149,7 +149,12 @@ const processing = computed(() =>
             </p>
             <pre class="code-block"><code>{{cron}}</code></pre>
             <p class="data-note mt-4">
-                Check that the heartbeat advances after saving your cron.
+                Add this line to the crontab of the account that owns the
+                application. It uses the PHP command line that matches this
+                site. If the heartbeat does not advance within five minutes,
+                run the part after “&amp;&amp;” in a terminal to see the error;
+                errors are also kept in
+                <code>storage/logs/cron.log</code>.
             </p></UCard
         >
     </div>
