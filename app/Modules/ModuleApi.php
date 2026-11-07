@@ -13,4 +13,11 @@ namespace App\Modules;
 final class ModuleApi
 {
     public const VERSION = 1;
+
+    /**
+     * The first Perysee release with domain events and the notification and report registries. These are additions
+     * inside API 1, so the version does not change: a module that uses them states this release (or a later one) in
+     * the "core" field of `module.json`, and an older Core refuses to enable it instead of failing while it runs.
+     */
+    public const DOMAIN_EVENTS_SINCE = '0.4.0';
 }

@@ -28,6 +28,14 @@ final class ModuleScope
     }
 
     /**
+     * Same as {@see isActiveFor()} for a site known by its id only, such as the one of a domain event.
+     */
+    public function isActiveForSiteId(string $module, int $siteId): bool
+    {
+        return $this->coversAllSites($module) || in_array($siteId, $this->state()['sites'][$module] ?? [], true);
+    }
+
+    /**
      * @return list<int>
      */
     public function siteIds(string $module): array
