@@ -113,7 +113,7 @@ const day = (iso) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "m
                 </UFormField>
                 <UButton type="submit" label="Invite" :loading="invite.processing" />
             </UForm>
-            <p class="data-note mt-4">Without a configured mailer, you get a link to send yourself. Viewers read the reports; owners also manage the site and its team.</p>
+            <p class="data-note mt-4">Invitations are e-mailed through the server set up by an administrator under Administration, Mail (or in .env). Without one, you get a link to send yourself. Viewers read the reports; owners also manage the site and its team.</p>
         </UCard>
         <UCard v-if="invitations.length" class="mt-6">
             <template #header><h2 class="text-sm font-medium">Pending invitations</h2></template>
