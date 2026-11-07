@@ -13,7 +13,8 @@ use Throwable;
  * lock is released and its health markers are written. Nothing here runs inside a transaction, because a transaction
  * can be replayed and an event must not be.
  *
- * Delivery is at most once: if the process stops between the commit and the publication, the event is lost.
+ * Delivery is at most once: if the process stops between the commit and the publication, the event is lost. A pass
+ * that fails part-way still announces the conversions of its committed batches, and only those.
  */
 final class PassEvents
 {
@@ -55,21 +56,39 @@ final class PassEvents
     {
         try {
             $events = app(DomainEvents::class);
-            $from = $this->startedAt->toIso8601String();
             $to = now('UTC')->toIso8601String();
-            if ($events->listening(GoalConverted::class)) {
-                foreach ($this->conversions as $row) {
-                    // A conversion moved to another day nets out at zero: only real new conversions are announced.
-                    if ($row['count'] > 0) {
-                        $events->publish(new GoalConverted($row['site'], $row['goal'], $row['version'], $row['count'], $from, $to));
-                    }
-                }
-            }
+            $this->publishConversions();
             if ($processed > 0 && $events->listening(AggregationCompleted::class)) {
                 $events->publish(new AggregationCompleted($processed, intdiv(hrtime(true) - $this->startedNs, 1_000_000), $to));
             }
             if ($wholeInstance && $events->listening(BacklogExceeded::class)) {
                 $this->backlog($events, $stoppedForTime, $processed);
+            }
+        } catch (Throwable) {
+            // An event must never change the outcome of the pass.
+        }
+    }
+
+    /**
+     * Announces the conversions of the batches committed so far, then forgets them: calling it again publishes
+     * nothing. It is also what a pass that fails part-way calls, since those batches stay committed.
+     */
+    public function publishConversions(): void
+    {
+        try {
+            $events = app(DomainEvents::class);
+            $conversions = $this->conversions;
+            $this->conversions = [];
+            if ($conversions === [] || ! $events->listening(GoalConverted::class)) {
+                return;
+            }
+            $from = $this->startedAt->toIso8601String();
+            $to = now('UTC')->toIso8601String();
+            foreach ($conversions as $row) {
+                // A conversion moved to another day nets out at zero: only real new conversions are announced.
+                if ($row['count'] > 0) {
+                    $events->publish(new GoalConverted($row['site'], $row['goal'], $row['version'], $row['count'], $from, $to));
+                }
             }
         } catch (Throwable) {
             // An event must never change the outcome of the pass.
