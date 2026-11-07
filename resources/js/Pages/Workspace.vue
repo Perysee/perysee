@@ -24,6 +24,9 @@ const HealthPage = defineAsyncComponent(
     () => import("../Components/HealthPage.vue"),
 );
 const MailSettingsPage = defineAsyncComponent(() => import("../Components/MailSettingsPage.vue"));
+const SecurityPage = defineAsyncComponent(() => import("../Components/SecurityPage.vue"));
+const SecuritySettingsPage = defineAsyncComponent(() => import("../Components/SecuritySettingsPage.vue"));
+const TwoFactorChallengePage = defineAsyncComponent(() => import("../Components/TwoFactorChallengePage.vue"));
 const AccountPage = defineAsyncComponent(
     () => import("../Components/AccountPage.vue"),
 );
@@ -80,6 +83,7 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
     <template v-if="!p.auth || p.screen === 'install'">
         <InstallerPage v-if="p.screen === 'install'" v-bind="p" />
         <InvitationPage v-else-if="p.screen === 'invitation'" v-bind="p" />
+        <TwoFactorChallengePage v-else-if="p.screen === 'auth.two-factor'" v-bind="p" />
         <AccountPage v-else v-bind="p" />
     </template>
     <template v-else>
@@ -113,6 +117,8 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
         <ModulesPage v-else-if="p.screen === 'modules'" v-bind="p" />
         <ModuleSettingsPage v-else-if="p.screen === 'modules.settings'" v-bind="p" />
         <AccountPage v-else-if="p.screen === 'auth.password'" v-bind="p" />
+        <SecurityPage v-else-if="p.screen === 'account.security'" v-bind="p" />
+        <SecuritySettingsPage v-else-if="p.screen === 'settings.security'" v-bind="p" />
         <template v-else-if="p.screen === 'settings'"
             ><div class="page-heading">
                 <div>

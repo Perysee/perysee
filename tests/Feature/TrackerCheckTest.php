@@ -246,7 +246,8 @@ class TrackerCheckTest extends TestCase
         });
         $this->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'Workspace', 'X-Inertia-Partial-Data' => 'check', 'X-Requested-With' => 'XMLHttpRequest', 'X-Inertia-Version' => Inertia::getVersion()])->get('/sites/'.$site->id.'/tracking/verify')->assertOk();
 
-        $this->assertEmpty(array_filter($queries, fn (string $sql): bool => (bool) preg_match('/^(insert|update|delete)/', $sql)));
+        // The open-sessions registry (two-factor) may stamp a request that starts a new session; only the check itself must not write.
+        $this->assertEmpty(array_filter($queries, fn (string $sql): bool => (bool) preg_match('/^(insert|update|delete)/', $sql) && ! str_contains($sql, 'user_sessions')));
         $checkQueries = array_filter($queries, fn (string $sql): bool => str_contains($sql, '"events"') || str_contains($sql, '`events`') || str_contains($sql, 'collection_diagnostics'));
         $this->assertLessThanOrEqual(4, count($checkQueries), implode(' | ', $queries));
     }

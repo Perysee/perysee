@@ -6,6 +6,7 @@ use App\Http\Requests\AcceptInvitationRequest;
 use App\Models\SiteInvitation;
 use App\Models\User;
 use App\Models\Website;
+use App\Support\AccessLog;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,6 +83,7 @@ class InvitationAcceptanceController extends Controller
             return $outcome;
         }
         $request->session()->regenerate();
+        AccessLog::record(AccessLog::INVITATION_ACCEPTED, $request->user(), $request, ['site_id' => $outcome->id]);
 
         return redirect()->route('sites.show', $outcome);
     }

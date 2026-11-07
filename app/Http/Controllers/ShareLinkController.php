@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ShareLink;
 use App\Models\Website;
+use App\Support\AccessLog;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,7 +60,8 @@ class ShareLinkController extends Controller
             'expires_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
         ]);
         $expires = isset($data['expires_on']) ? Carbon::parse($data['expires_on'], $website->timezone)->endOfDay()->utc() : null;
-        [, $token] = ShareLink::issue($website, $request->user(), $data['label'] ?? '', $data['sections'], $data['password'] ?? null, $expires);
+        [$link, $token] = ShareLink::issue($website, $request->user(), $data['label'] ?? '', $data['sections'], $data['password'] ?? null, $expires);
+        AccessLog::record(AccessLog::SHARE_CREATED, $request->user(), $request, ['site_id' => $website->id, 'link_id' => $link->id]);
 
         return redirect()->route('sites.sharing', $website)->with('share_created', ['url' => route('share.show', $token, false)]);
     }

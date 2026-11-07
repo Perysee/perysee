@@ -212,6 +212,16 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 
 `ComparisonReportTest` (18), `TeamManagementTest` (11), `TeamMariaDbTest` (1, MariaDB seulement), `InvitationAcceptanceTest` (6), `ShareLinkTest` (12), `GoalDefinitionTest` (4), `GoalConversionTest` (7), `GoalBackfillTest` (6), `GoalReportingTest` (6), `GoalCostTest` (3), `GoalPurgeTest` (2), plus `tests/Charts/comparison.test.mjs`. Sur SQLite, ces 76 tests PHP passent (un ignoré). La suite MariaDB (voir « Vérifications ») rejoue les mêmes classes avec le conteneur Apple `perysee-mariadb` (`bash scripts/mariadb.sh test-db`, `php scripts/configure-testing.php`, `composer test:mariadb`) ; elle est la seule à exécuter `TeamMariaDbTest`. Les tests d'objectifs ne supposent aucun identifiant fixe : MariaDB ne remet pas l'auto-incrément à zéro entre deux tests.
 
+## Double authentification, appareils connectés et journal d'accès
+
+Décision : [ADR 007](docs/adr/007-two-factor-authentication-open-sessions-and-the-access-log.md). Quatre migrations additives (`2026_11_08_1200*`) : `user_two_factor`, `user_recovery_codes`, `user_sessions`, `access_log`. Aucune ne touche `users`.
+
+- **Dépendances** : `pragmarx/google2fa` (TOTP) et `bacon/bacon-qr-code` (QR en SVG côté serveur). Elles exigent les extensions `iconv` et `xmlwriter`, vérifiées par l'installateur. Le ZIP de release embarque tout `vendor/`.
+- **Connexion** : `AuthController::store` n'authentifie jamais un compte doté d'un second facteur ; l'état en attente vit dans la session (`login.2fa`, 5 minutes) et `TwoFactorChallengeController` appelle `Auth::login()` après un code valide. Un compte sans second facteur suit le chemin d'origine (`LoginFlowCharacterizationTest` le fige).
+- **Tests** : `TwoFactorEnrollmentTest`, `TwoFactorLoginTest`, `RequiredTwoFactorTest`, `UserSessionsTest`, `AccessLogTest`, `AccessLogPurgeTest`, `TwoFactorRecoveryCommandTest`, `TwoFactorMariaDbTest` (MariaDB seulement : deux tentatives simultanées avec le même code), `npm run test:security`. Le client de test de Laravel ne renvoie pas le cookie de session : `KeepsSessionCookie::browser()` le fait quand un test dépend de l'identifiant de session.
+- **Purge** : `php artisan perysee:prune-access-log` (90 jours, lots de 1000, 20 lots au plus par passage), planifiée toutes les heures sans chevauchement. Le passage à vide de `perysee:maintenance` n'est pas modifié.
+- **Perte du téléphone** : codes de secours, puis `php artisan perysee:recover-admin <email> --reset-2fa` pour un administrateur. Perdre `APP_KEY` rend les secrets illisibles.
+
 ## Fiabilité et laboratoire de performances
 
 ```sh

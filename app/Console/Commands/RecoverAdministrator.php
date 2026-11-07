@@ -4,7 +4,11 @@ namespace App\Console\Commands;
 
 use App\Installation\InstallationState;
 use App\Models\User;
+use App\Models\UserSession;
 use App\Rules\BcryptPassword;
+use App\Support\AccessLog;
+use App\Support\TwoFactor;
+use App\Support\UserSessions;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -12,7 +16,7 @@ use Illuminate\Validation\Rules\Password;
 
 class RecoverAdministrator extends Command
 {
-    protected $signature = 'perysee:recover-admin {email : Existing administrator email}';
+    protected $signature = 'perysee:recover-admin {email : Existing administrator email} {--reset-2fa : Also remove the administrator\'s two-factor authentication (lost phone and recovery codes)}';
 
     protected $description = 'Reset an existing administrator password using a hidden prompt and restore the installation lock';
 
@@ -36,6 +40,18 @@ class RecoverAdministrator extends Command
             $user->forceFill(['password' => $password, 'remember_token' => Str::random(60)])->save();
             app(InstallationState::class)->complete();
         });
+        if ($this->option('reset-2fa')) {
+            // Shell access already means control of the instance, so this is allowed, but it is never silent.
+            app(TwoFactor::class)->disable($user);
+            AccessLog::record(AccessLog::TWOFACTOR_DISABLED, $user, null, ['actor' => 'cli']);
+            $this->info('Two-factor authentication removed. Set it up again after signing in.');
+        }
+        // The password already ends the old sessions; the list must not keep showing them.
+        try {
+            app(UserSessions::class)->revokeOthers($user);
+        } catch (\Throwable $exception) {
+            UserSession::where('user_id', $user->getKey())->delete();
+        }
         $this->info('Administrator password updated. Installation is locked. Existing sessions must sign in again.');
 
         return self::SUCCESS;
