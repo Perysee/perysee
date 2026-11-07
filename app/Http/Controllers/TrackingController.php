@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Analytics\Ingestion\Dimensions;
+use App\Analytics\Ingestion\EventValues;
 use App\Analytics\Ingestion\Geolocation;
 use App\Analytics\InstanceHealth;
 use App\Analytics\Privacy\NormalizePath;
@@ -42,6 +43,8 @@ class TrackingController extends Controller
         abort_unless(in_array($contentType, ['application/json', 'text/plain'], true), 415);
         $data = json_decode($request->getContent(), true);
         abort_unless(is_array($data), 422);
+        $values = app(EventValues::class);
+        $extra = $values->take($data);
         abort_if(array_diff(array_keys($data), ['v', 'site', 'type', 'mode', 'host', 'path', 'session', 'consent', 'event_name', 'ref', 'utm_source', 'utm_medium', 'utm_campaign', 'device_hint']), 422);
         $data = Validator::make($data, [
             'v' => ['required', 'integer', 'in:1'], 'site' => ['required', 'uuid'], 'type' => ['required', 'in:pageview,event'],
@@ -53,8 +56,10 @@ class TrackingController extends Controller
             'utm_source' => ['sometimes', 'nullable', 'string', 'max:100'], 'utm_medium' => ['sometimes', 'nullable', 'string', 'max:100'], 'utm_campaign' => ['sometimes', 'nullable', 'string', 'max:100'],
             'consent' => ['required', 'boolean'], 'session' => ['nullable', 'string', 'regex:/^[a-f0-9]{32}$/'],
         ])->validate();
+        $prepared = $values->prepare($extra, $data);
+        $duplicate = false;
         try {
-            DB::transaction(function () use ($data, $request, $normalize): void {
+            DB::transaction(function () use ($data, $request, $normalize, $values, $prepared, &$duplicate): void {
                 $site = Website::where('public_id', $data['site'])->sharedLock()->first();
                 abort_unless($site && ! $site->deleting_at, 404);
                 $origin = $request->header('Origin', '');
@@ -73,11 +78,16 @@ class TrackingController extends Controller
                 if (! $site->first_collected_at) {
                     DB::table('websites')->where('id', $site->id)->whereNull('first_collected_at')->update(['first_collected_at' => $received]);
                 }
+                if (! $values->claim($prepared, $site, $data['event_name'] ?? '', substr($received, 0, 19))) {
+                    $duplicate = true;
+
+                    return;
+                }
                 DB::table('events')->insert(array_merge([
                     'website_id' => $site->id, 'received_at' => $received, 'event_type' => $data['type'] === 'event' ? 2 : 1,
                     'path' => $path, 'consent_given' => (bool) $data['consent'],
                     'session_key' => $site->tracking_mode === 'sessions' ? hash_hmac('sha256', $site->public_id.':'.$data['session'], config('app.key')) : null,
-                ], app(Dimensions::class)->values($data, $request, $site), app(Geolocation::class)->lookup($request->ip() ?? '')));
+                ], app(Dimensions::class)->values($data, $request, $site), app(Geolocation::class)->lookup($request->ip() ?? ''), $prepared['columns']));
             }, 3);
         } catch (HttpExceptionInterface $exception) {
             app(InstanceHealth::class)->failure('collection_rejections');
@@ -89,6 +99,16 @@ class TrackingController extends Controller
             return response('', 503);
         }
 
-        return response('', 204, ['Access-Control-Allow-Origin' => '*', 'Vary' => 'Origin', 'Cache-Control' => 'no-store']);
+        $headers = ['Access-Control-Allow-Origin' => '*', 'Vary' => 'Origin', 'Cache-Control' => 'no-store'];
+        // Event values: what was dropped or masked, and an order that was already counted. The event itself is kept.
+        if (! $duplicate && ($truncated = $values->header($prepared))) {
+            app(InstanceHealth::class)->failure('property_truncations');
+            $headers += ['X-Perysee-Truncated' => $truncated, 'Access-Control-Expose-Headers' => 'X-Perysee-Truncated'];
+        }
+        if ($duplicate) {
+            $headers += ['X-Perysee-Duplicate' => 'order', 'Access-Control-Expose-Headers' => 'X-Perysee-Duplicate'];
+        }
+
+        return response('', 204, $headers);
     }
 }
