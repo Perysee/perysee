@@ -7,6 +7,7 @@ use App\Analytics\Privacy\NormalizePath;
 use App\Analytics\Reporting\GoalReports;
 use App\Analytics\Reporting\Reports;
 use App\Models\Website;
+use App\Support\CsvSafe;
 use App\Support\Ui;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -148,12 +149,13 @@ class GoalController extends Controller
             if ($website->is_demo) {
                 fputcsv($stream, ['# demonstration data: synthetic events'], escape: '');
             }
-            $safe = fn ($value) => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'".$value : $value;
-            fputcsv($stream, ['dimension', 'value', 'conversions', 'sessions', 'rate_percent'], escape: '');
-            fputcsv($stream, ['total', 'all', $report['totals']['conversions'], $report['totals']['sessions'], $report['totals']['rate']], escape: '');
+            // The value columns come last and only when a hit of the period carried a value, so an export without values keeps its shape.
+            $valued = $report['amounts']['valued_hits'] > 0;
+            fputcsv($stream, array_merge(['dimension', 'value', 'conversions', 'sessions', 'rate_percent'], $valued ? ['value_total', 'value_average'] : []), escape: '');
+            fputcsv($stream, CsvSafe::row(array_merge(['total', 'all', $report['totals']['conversions'], $report['totals']['sessions'], $report['totals']['rate']], $valued ? [$report['amounts']['total'], $report['amounts']['average']] : [])), escape: '');
             foreach ($report['breakdown'] as $dimension => $rows) {
                 foreach ($rows as $row) {
-                    fputcsv($stream, array_map($safe, [$dimension, $row['label'], $row['conversions'], $row['sessions'], $row['rate']]), escape: '');
+                    fputcsv($stream, CsvSafe::row(array_merge([$dimension, $row['label'], $row['conversions'], $row['sessions'], $row['rate']], $valued ? [$row['amount'], $row['average']] : [])), escape: '');
                 }
             }
             fclose($stream);

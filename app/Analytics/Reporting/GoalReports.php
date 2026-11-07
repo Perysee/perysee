@@ -32,18 +32,18 @@ class GoalReports
         $coverage = $this->coverage($site, $goal, $version, $period);
         $segments = app(SegmentReports::class);
         $rateAvailable = $sessionsMode && $coverage['missing_sessions'] === 0;
-        $totals = (clone $this->query($site, $goal, $version, $period))->selectRaw('SUM(conversions) AS conversions, SUM(hits) AS hits')->first();
+        $totals = (clone $this->query($site, $goal, $version, $period))->selectRaw('SUM(conversions) AS conversions, SUM(hits) AS hits, SUM(value_sum) AS value_sum, SUM(valued_hits) AS valued_hits')->first();
         $sessions = (int) (clone $segments->query($site, $period))->sum('sessions');
         $conversions = (int) $totals->conversions;
 
-        $goalDaily = $this->query($site, $goal, $version, $period)->select('stat_date')->selectRaw('SUM(conversions) AS conversions, SUM(hits) AS hits')->groupBy('stat_date')->get()->keyBy('stat_date');
+        $goalDaily = $this->query($site, $goal, $version, $period)->select('stat_date')->selectRaw('SUM(conversions) AS conversions, SUM(hits) AS hits, SUM(value_sum) AS value_sum')->groupBy('stat_date')->get()->keyBy('stat_date');
         $sessionDaily = $segments->query($site, $period)->select('stat_date')->selectRaw('SUM(sessions) AS sessions')->groupBy('stat_date')->get()->keyBy('stat_date');
         $series = [];
         for ($day = Carbon::parse($period['from']); $day->toDateString() <= $period['to']; $day->addDay()) {
             $date = $day->toDateString();
             $daily = (int) ($goalDaily->get($date)->conversions ?? 0);
             $daySessions = (int) ($sessionDaily->get($date)->sessions ?? 0);
-            $series[] = ['date' => $date, 'label' => $date, 'conversions' => $sessionsMode ? $daily : null, 'hits' => (int) ($goalDaily->get($date)->hits ?? 0), 'sessions' => $rateAvailable ? $daySessions : null, 'rate' => $rateAvailable ? $this->rate($daily, $daySessions) : null];
+            $series[] = ['date' => $date, 'label' => $date, 'conversions' => $sessionsMode ? $daily : null, 'hits' => (int) ($goalDaily->get($date)->hits ?? 0), 'amount' => $this->money((int) ($goalDaily->get($date)->value_sum ?? 0)), 'sessions' => $rateAvailable ? $daySessions : null, 'rate' => $rateAvailable ? $this->rate($daily, $daySessions) : null];
         }
         $breakdown = [];
         foreach (self::BREAKDOWNS as $dimension) {
@@ -53,6 +53,8 @@ class GoalReports
         return [
             'mode' => $sessionsMode ? 'sessions' : 'pageviews',
             'totals' => ['conversions' => $sessionsMode ? $conversions : null, 'hits' => (int) $totals->hits, 'sessions' => $rateAvailable ? $sessions : null, 'rate' => $rateAvailable ? $this->rate($conversions, $sessions) : null],
+            // The value of the hits, apart from the totals so that the figures above keep their shape.
+            'amounts' => ['currency' => $site->currency, 'total' => $this->money((int) $totals->value_sum), 'valued_hits' => (int) $totals->valued_hits, 'average' => $this->average((int) $totals->value_sum, (int) $totals->valued_hits)],
             'series' => $series, 'breakdown' => $breakdown, 'coverage' => $coverage, 'filters' => $period['filters'] ?? [],
         ];
     }
@@ -63,7 +65,7 @@ class GoalReports
     private function breakdown(Website $site, int $goal, int $version, array $period, string $dimension, bool $sessionsMode, bool $rateAvailable): array
     {
         $metric = $sessionsMode ? 'conversions' : 'hits';
-        $rows = $this->query($site, $goal, $version, $period)->whereNotNull($dimension)->select($dimension.' AS value')->selectRaw('SUM(conversions) AS conversions, SUM(hits) AS hits')->groupBy($dimension)
+        $rows = $this->query($site, $goal, $version, $period)->whereNotNull($dimension)->select($dimension.' AS value')->selectRaw('SUM(conversions) AS conversions, SUM(hits) AS hits, SUM(value_sum) AS value_sum, SUM(valued_hits) AS valued_hits')->groupBy($dimension)
             ->havingRaw('SUM('.$metric.') > 0')->orderByDesc(DB::raw('SUM('.$metric.')'))->orderBy($dimension)->limit(100)->get();
         $sessions = $rateAvailable && $rows->isNotEmpty()
             ? app(SegmentReports::class)->query($site, $period)->whereIn($dimension, $rows->pluck('value'))->select($dimension.' AS value')->selectRaw('SUM(sessions) AS sessions')->groupBy($dimension)->pluck('sessions', 'value')
@@ -72,8 +74,24 @@ class GoalReports
         return $rows->map(function ($row) use ($dimension, $sessionsMode, $rateAvailable, $sessions): array {
             $count = $rateAvailable ? (int) ($sessions->get($row->value) ?? 0) : null;
 
-            return ['value' => $row->value, 'label' => $dimension === 'campaign' ? $this->campaign($row->value) : $row->value, 'conversions' => $sessionsMode ? (int) $row->conversions : null, 'hits' => (int) $row->hits, 'sessions' => $count, 'rate' => $rateAvailable ? $this->rate((int) $row->conversions, $count) : null];
+            return ['value' => $row->value, 'label' => $dimension === 'campaign' ? $this->campaign($row->value) : $row->value, 'conversions' => $sessionsMode ? (int) $row->conversions : null, 'hits' => (int) $row->hits, 'amount' => $this->money((int) $row->value_sum), 'valued_hits' => (int) $row->valued_hits, 'average' => $this->average((int) $row->value_sum, (int) $row->valued_hits), 'sessions' => $count, 'rate' => $rateAvailable ? $this->rate((int) $row->conversions, $count) : null];
         })->all();
+    }
+
+    /**
+     * Thousandths of the site currency as an amount.
+     */
+    private function money(int $thousandths): int|float
+    {
+        return round($thousandths / 1000, 3);
+    }
+
+    /**
+     * The mean value of the hits that carried one; hits without value do not lower it.
+     */
+    private function average(int $thousandths, int $valued): ?float
+    {
+        return $valued > 0 ? round($thousandths / $valued / 1000, 2) : null;
     }
 
     private function rate(int $conversions, ?int $sessions): ?float
