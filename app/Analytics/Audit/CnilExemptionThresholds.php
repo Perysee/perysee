@@ -8,11 +8,16 @@ namespace App\Analytics\Audit;
  * The thresholds of the optional `cnil_exemption` audit profile: the conditions the French regulator (CNIL) lists for
  * audience measurement that may run without consent, as the maintainers read them.
  *
- * TO BE VALIDATED ON cnil.fr BEFORE PUBLICATION. Every figure below is a working value written from memory of those
- * conditions, not copied from a dated page of the regulator. Before the profile is mentioned in the public
- * documentation, each one must be checked against the current text on cnil.fr, and the date of the page it comes from
- * must be written next to it. Until then the interface calls the thresholds indicative, and so should anything that
- * quotes them. They describe a configuration; they are not legal advice and meeting them is not a statement of compliance.
+ * Checked on 8 November 2026 against the CNIL page "Cookies : solutions pour les outils de mesure d'audience"
+ * (published 4 July 2025, https://www.cnil.fr/fr/cookies-solutions-pour-les-outils-de-mesure-daudience). It gives 13 months
+ * as the example of a tracker life that allows audiences to be compared over time, not extended automatically at new
+ * visits; a collection of at most 25 months; a periodic review of both durations; a purpose limited to audience
+ * measurement for the publisher alone, anonymous statistical data, no cross-referencing and no global tracking.
+ * Not on that page: the truncation of the last byte of the address and the right to object, which are in the CNIL sheet
+ * n°16 of 11 June 2020. The CNIL self-assessment tool of July 2025 (PDF) was not read in full: its number of objectives
+ * and criteria is not confirmed, so nothing here cites it. The interface still calls the thresholds indicative, and so
+ * should anything that quotes them: they describe a configuration, they are not legal advice and meeting them is not a
+ * statement of compliance.
  *
  * The conditions the profile looks at:
  *  - the cookie lasts 13 months at most and is not renewed automatically past that limit ({@see self::COOKIE_MAX_MONTHS});
@@ -25,13 +30,13 @@ namespace App\Analytics\Audit;
  */
 final class CnilExemptionThresholds
 {
-    /** Longest life of the measurement cookie, in months. To be validated on cnil.fr. */
+    /** Longest life of the measurement cookie, in months: the CNIL's own example of a life that allows comparison. */
     public const COOKIE_MAX_MONTHS = 13;
 
-    /** Longest time audience data is kept, in months. To be validated on cnil.fr. */
+    /** Longest time audience data is kept, in months: the maximum the CNIL page states. */
     public const DATA_MAX_MONTHS = 25;
 
-    /** Measurement modes that may run without asking for consent. To be validated on cnil.fr. */
+    /** Measurement modes the profile treats as able to run without asking for consent: Perysee's two modes. */
     public const CONSENT_EXEMPT_MODES = ['pageviews', 'sessions'];
 
     /** The length of an average month, to turn months into the days and seconds the settings are written in. */
