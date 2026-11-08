@@ -13,5 +13,6 @@ Decisions that shape the code and that a contributor would otherwise have to red
 | [007](007-two-factor-authentication-open-sessions-and-the-access-log.md) | Two-factor authentication, open sessions and the access log | proposed |
 | [008](008-event-values-and-bounded-properties.md) | Event values, bounded properties and order de-duplication | proposed |
 | [009](009-continuity-log-and-configuration-audit.md) | Continuity log and configuration audit | proposed |
+| [010](010-session-purge-beyond-statistics-retention.md) | Session purge beyond the statistics retention | proposed |
 
 To add one, copy the structure of an existing record (Context, Decision, Consequences), take the next number and update this table.
