@@ -7,6 +7,13 @@ const retention = useForm({
     raw_retention_days: props.health.raw_retention_days,
     stats_retention_days: props.health.stats_retention_days,
 });
+const quota = useForm({
+    storage_quota_mib:
+        props.health.storage_quota_bytes === null
+            ? ""
+            : Math.round(props.health.storage_quota_bytes / 1048576),
+});
+const projection = computed(() => props.health.storage_projection);
 const upload = useForm({ database: null });
 const updateRequest = useForm({ password: "", dump: "auto" });
 const updateCheck = useForm({});
@@ -38,6 +45,14 @@ const backlogLate = computed(
         props.health.oldest_pending &&
         Date.now() - new Date(props.health.oldest_pending + "Z").getTime() >
             900000,
+);
+const mebibytes = (bytes) => (bytes / 1048576).toFixed(1);
+const largestTables = computed(() =>
+    props.health.largest_tables.map((table) => ({
+        name: table.name,
+        size: mebibytes(table.data_bytes + table.index_bytes),
+        rows: table.row_estimate === null ? "—" : table.row_estimate.toLocaleString(),
+    })),
 );
 const processing = computed(() =>
     Object.entries({
@@ -108,7 +123,7 @@ const processing = computed(() =>
                     value:
                         health.database_bytes === null
                             ? '—'
-                            : (health.database_bytes / 1048576).toFixed(1),
+                            : mebibytes(health.database_bytes),
                     unit: 'MiB · database and indexes',
                 },
                 {
@@ -128,6 +143,56 @@ const processing = computed(() =>
             <p class="text-[11px] text-muted mt-2">{{ item.unit }}</p></UCard
         >
     </div>
+    <UCard v-if="largestTables.length" class="mb-6" :ui="{ body: 'p-0 sm:p-0' }"
+        ><template #header
+            ><h2 class="text-sm font-medium">Largest tables</h2></template
+        ><UTable
+            :data="largestTables"
+            :columns="[
+                { accessorKey: 'name', header: 'Table' },
+                { accessorKey: 'size', header: 'MiB · data and indexes' },
+                { accessorKey: 'rows', header: 'Rows (estimate)' },
+            ]"
+    /></UCard>
+    <UCard class="mb-6"
+        ><template #header
+            ><h2 class="text-sm font-medium">Storage quota</h2></template
+        ><UAlert
+            v-if="projection.message"
+            class="mb-5"
+            :color="projection.status === 'reached' || (projection.status === 'projected' && projection.days < 30) ? 'warning' : 'neutral'"
+            variant="subtle"
+            :description="projection.message"
+        /><UForm
+            :state="quota"
+            class="space-y-5"
+            @submit="
+                quota.put(page.props.links['health.storage'], {
+                    preserveScroll: true,
+                })
+            "
+            ><UFormField
+                label="Quota (MiB)"
+                name="storage_quota_mib"
+                :error="quota.errors.storage_quota_mib"
+                ><UInput
+                    v-model="quota.storage_quota_mib"
+                    type="number"
+                    min="1"
+                    max="16777216"
+                    class="w-full"
+            /></UFormField>
+            <p class="data-note">
+                The disk space your hosting plan gives the database. Leave empty
+                for no quota. The date is estimated from the last 30 days of
+                daily measurements, once 7 days are available.
+            </p>
+            <UButton
+                type="submit"
+                label="Save quota"
+                :loading="quota.processing"
+        /></UForm>
+    </UCard>
     <div class="grid lg:grid-cols-2 gap-6 mb-6">
         <UCard :ui="{ body: 'p-0 sm:p-0' }"
             ><template #header

@@ -39,6 +39,21 @@ class InstanceHealthController extends Controller
         return back()->with('status', 'Country database updated. Historical events are unchanged.');
     }
 
+    public function storage(Request $request, InstanceHealth $health): RedirectResponse
+    {
+        abort_unless($request->user()->is_admin, 403);
+        // Up to 16 TiB, entered in MiB like the figures of the page; empty removes the quota.
+        $mebibytes = $request->validate(['storage_quota_mib' => ['nullable', 'integer', 'between:1,16777216']])['storage_quota_mib'] ?? null;
+        if ($mebibytes === null) {
+            $health->forget('storage_quota_bytes');
+
+            return back()->with('status', 'Storage quota removed.');
+        }
+        $health->put('storage_quota_bytes', (int) $mebibytes * 1048576);
+
+        return back()->with('status', 'Storage quota saved.');
+    }
+
     public function update(Request $request, InstanceHealth $health): RedirectResponse
     {
         abort_unless($request->user()->is_admin, 403);

@@ -38,7 +38,8 @@ class InstanceHealth
     /**
      * What an administrator should look at first, cheap enough to run on the home page. It mirrors the two
      * warnings of the Instance health page: a scheduler silent for ten minutes, and events waiting for fifteen.
-     * A silent scheduler explains the waiting events, so only it is reported then.
+     * A silent scheduler explains the waiting events, so only it is reported then. The storage quota is announced
+     * when the projection puts it less than thirty days away.
      *
      * @return list<array{code: string, message: string}>
      */
@@ -54,18 +55,20 @@ class InstanceHealth
         $oldest = DB::table('events')->whereNull('processed_at')->min('received_at');
         $waitingMinutes = $oldest === null ? 0 : intdiv(max(0, now('UTC')->timestamp - Carbon::parse($oldest, 'UTC')->timestamp), 60);
 
-        return $waitingMinutes >= 15
+        $attention = $waitingMinutes >= 15
             ? [['code' => 'backlog', 'message' => "Events are waiting to be consolidated, the oldest for {$waitingMinutes} minutes. The latest figures may be missing."]]
             : [];
+        // Reads the snapshots only once an administrator has entered a quota.
+        $storage = app(StorageProjection::class)->alert();
+
+        return $storage === null ? $attention : [...$attention, $storage];
     }
 
     public function snapshot(): array
     {
         $pending = DB::table('events')->whereNull('processed_at');
-        $size = null;
-        if (DB::getDriverName() === 'mariadb' || DB::getDriverName() === 'mysql') {
-            $size = (int) DB::selectOne('SELECT SUM(data_length + index_length) AS bytes FROM information_schema.tables WHERE table_schema = DATABASE()')->bytes;
-        }
+        $tables = app(StorageMeter::class)->tables();
+        $projection = app(StorageProjection::class)->forecast();
 
         return [
             'journey_reports_pending' => DB::table('journey_reports')->whereIn('status', ['scanning', 'reducing'])->count(),
@@ -74,7 +77,10 @@ class InstanceHealth
             'geolocation' => app(Geolocation::class)->status(),
             'heartbeat' => $this->get('heartbeat'), 'aggregate_success' => $this->get('aggregate_success'),
             'aggregate_error' => $this->get('aggregate_error'), 'backlog' => (clone $pending)->count(),
-            'oldest_pending' => (clone $pending)->min('received_at'), 'database_bytes' => $size,
+            'oldest_pending' => (clone $pending)->min('received_at'), 'database_bytes' => $tables === null ? null : StorageMeter::total($tables),
+            'largest_tables' => array_slice($tables ?? [], 0, 8),
+            'storage_quota_bytes' => $projection['quota_bytes'],
+            'storage_projection' => $projection,
             'collection_failures' => app(Coordination::class)->failures('collection_failures'),
             'collection_rejections' => app(Coordination::class)->failures('collection_rejections'),
             'property_truncations' => app(Coordination::class)->failures('property_truncations'),
