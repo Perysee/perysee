@@ -16,7 +16,7 @@ class PruneTracking extends Command
     public function handle(): int
     {
         $limit = filter_var($this->option('limit'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 10000]]);
-        $days = (int) app(InstanceHealth::class)->get('raw_retention_days', config('perysee.raw_retention_days', 90));
+        $days = app(InstanceHealth::class)->effectiveRetentionDays('raw_retention_days');
         if ($limit === false || $days < 1) {
             $this->error('Use a limit between 1 and 10000 and a retention of at least one day.');
 

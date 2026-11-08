@@ -189,9 +189,9 @@ class PurgeData extends Command
     private function retention(string $target, InstanceHealth $health): ?int
     {
         return match ($target) {
-            'events' => $health->retentionDays('raw_retention_days'),
+            'events' => $health->effectiveRetentionDays('raw_retention_days'),
             'share-links' => null,
-            default => $health->retentionDays('stats_retention_days'),
+            default => $health->effectiveRetentionDays('stats_retention_days'),
         };
     }
 }

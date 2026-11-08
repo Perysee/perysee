@@ -9,6 +9,7 @@ use App\Modules\Events\BacklogExceeded;
 use App\Modules\Events\DomainEvents;
 use App\Modules\Events\GoalConverted;
 use App\Modules\Events\HeartbeatMissed;
+use App\Modules\Events\StorageBudgetExceeded;
 use App\Modules\ModuleFailures;
 use App\Modules\ModuleRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,7 +65,7 @@ class DomainEventCriticalPathTest extends TestCase
         $without = $this->collect($site, str_repeat('a', 32));
 
         $calls = 0;
-        foreach ([AggregationCompleted::class, GoalConverted::class, HeartbeatMissed::class, BacklogExceeded::class] as $event) {
+        foreach ([AggregationCompleted::class, GoalConverted::class, HeartbeatMissed::class, BacklogExceeded::class, StorageBudgetExceeded::class] as $event) {
             app(DomainEvents::class)->listen('watcher', $event, function () use (&$calls): void {
                 $calls++;
             });

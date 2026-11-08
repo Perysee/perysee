@@ -38,3 +38,6 @@ Schedule::command('perysee:prune-continuity-log --limit=1000')->hourly()->withou
 Schedule::command('perysee:prune-sessions --limit=1000')->hourly()->withoutOverlapping();
 Schedule::command('perysee:prune-share-links --limit=1000')->hourly()->withoutOverlapping();
 Schedule::command('perysee:prune-cache --limit=1000')->hourly()->withoutOverlapping();
+
+// Storage budget (ADR 011): one read when no budget is set; otherwise one measurement and, at most, a tier change.
+Schedule::command('perysee:storage-budget')->hourly()->withoutOverlapping();

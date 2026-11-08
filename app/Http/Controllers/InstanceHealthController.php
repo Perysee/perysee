@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Analytics\Continuity\ContinuityLog;
 use App\Analytics\Ingestion\Geolocation;
 use App\Analytics\InstanceHealth;
+use App\Analytics\StorageBudget;
+use App\Analytics\StorageTiers;
 use App\Modules\ModuleExtensions;
 use App\Modules\ModuleFailures;
+use App\Support\AccessLog;
 use App\Support\CliPhp;
 use App\Support\Ui;
 use App\Updates\UpdateStatus;
@@ -14,6 +17,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Response;
 
 class InstanceHealthController extends Controller
@@ -56,6 +61,42 @@ class InstanceHealthController extends Controller
         $health->put('storage_quota_bytes', (int) $mebibytes * 1048576);
 
         return back()->with('status', 'Storage quota saved.');
+    }
+
+    /** The storage budget and its mode (ADR 011). Choosing `auto` is an explicit decision, kept in the access log. */
+    public function budget(Request $request, InstanceHealth $health, StorageBudget $budget): RedirectResponse
+    {
+        abort_unless($request->user()->is_admin, 403);
+        $data = $request->validate([
+            'storage_budget_mib' => ['nullable', 'integer', 'between:1,16777216'],
+            'storage_mode' => ['required', Rule::in(StorageBudget::MODES)],
+        ]);
+        $mebibytes = $data['storage_budget_mib'] ?? null;
+        if ($mebibytes === null && $data['storage_mode'] !== 'off') {
+            throw ValidationException::withMessages(['storage_mode' => 'Enter a budget to use the ask or auto mode.']);
+        }
+        $before = $budget->settings();
+        $bytes = $mebibytes === null ? null : (int) $mebibytes * 1048576;
+        $bytes === null ? $health->forget(StorageBudget::BUDGET) : $health->put(StorageBudget::BUDGET, $bytes);
+        $health->put(StorageBudget::MODE, $data['storage_mode']);
+        if ($before['budget_bytes'] !== $bytes || $before['mode'] !== $data['storage_mode']) {
+            AccessLog::record(AccessLog::STORAGE_SETTINGS, $request->user(), $request, ['mode' => $data['storage_mode'], 'budget_mib' => $mebibytes === null ? null : (int) $mebibytes]);
+        }
+
+        return back()->with('status', 'Storage budget saved. It is checked every hour.');
+    }
+
+    /** The administrator allows the step the page proposed in `ask` mode. */
+    public function agree(Request $request, StorageBudget $budget): RedirectResponse
+    {
+        abort_unless($request->user()->is_admin, 403);
+        $tier = (int) $request->validate(['tier' => ['required', 'integer', 'between:1,'.StorageTiers::MAX]])['tier'];
+        if (! $budget->agree($tier)) {
+            throw ValidationException::withMessages(['tier' => 'This reduction is not proposed any more. Reload the page.']);
+        }
+        AccessLog::record(AccessLog::STORAGE_AGREED, $request->user(), $request, ['tier' => $tier]);
+
+        return back()->with('status', 'Agreed. The retention is reduced at the next hourly check.');
     }
 
     public function update(Request $request, InstanceHealth $health, ContinuityLog $continuity): RedirectResponse

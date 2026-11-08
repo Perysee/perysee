@@ -9,8 +9,8 @@ use App\Models\User;
 use Illuminate\Http\Request;
 
 /**
- * The single writer of the access log: sign-ins, two-factor changes, accepted invitations, created share links and
- * revoked sessions of the back office. It never concerns the visitors of a measured site.
+ * The single writer of the access log: sign-ins, two-factor changes, accepted invitations, created share links,
+ * revoked sessions and storage budget decisions of the back office. It never concerns the visitors of a measured site.
  *
  * Privacy: the address is truncated before it is stored (/24 for IPv4, /48 for IPv6), the browser is reduced to a
  * short label, and a failed sign-in keeps the typed address only when it belongs to an existing account.
@@ -33,9 +33,15 @@ final class AccessLog
 
     public const SESSION_REVOKED = 'session.revoked';
 
+    /** The storage budget or its mode changed, `auto` included (ADR 011). */
+    public const STORAGE_SETTINGS = 'storage.settings';
+
+    /** An administrator agreed to the next step of the adaptive retention. */
+    public const STORAGE_AGREED = 'storage.agreed';
+
     public const EVENTS = [
         self::LOGIN_SUCCESS, self::LOGIN_FAILED, self::TWOFACTOR_ENABLED, self::TWOFACTOR_DISABLED,
-        self::INVITATION_ACCEPTED, self::SHARE_CREATED, self::SESSION_REVOKED,
+        self::INVITATION_ACCEPTED, self::SHARE_CREATED, self::SESSION_REVOKED, self::STORAGE_SETTINGS, self::STORAGE_AGREED,
     ];
 
     /**

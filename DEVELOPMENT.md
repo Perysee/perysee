@@ -171,6 +171,26 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 | `perysee:prune-sessions --limit=1000` | toutes les heures, sans chevauchement | Supprime `measured_sessions` et `segment_sessions` au-delà de la rétention des statistiques plus un jour UTC, sauf tant qu'un événement non traité plus ancien existe (ADR 010). Verrou d'agrégation, 20 lots au plus par passage. À vide : deux lectures. |
 | `perysee:prune-share-links --limit=1000` | toutes les heures, sans chevauchement | Supprime les liens de partage expirés ou révoqués depuis plus de 30 jours. À vide : une lecture. |
 | `perysee:prune-cache --limit=1000` | toutes les heures, sans chevauchement | Supprime les fichiers expirés du magasin de cache `file` (`storage/framework/cache/data`, celui que l'installateur configure) : les compteurs de limitation de débit créent un fichier par clé et un hébergement mutualisé compte les inodes. Lecture du seul préfixe d'expiration, 50 000 fichiers examinés au plus par passage, départ tournant selon l'heure. Aucune requête SQL. |
+| `perysee:storage-budget` | toutes les heures, sans chevauchement | Compare la taille de la base au budget de stockage (ADR 011) et fait monter ou descendre le palier de rétention. Sans budget : une lecture. Avec un budget : une mesure (statistiques du moteur) et l'enregistrement du dernier chiffre. Ne supprime rien : les purges lisent la rétention effective. |
+
+### Budget de stockage et rétention adaptative (ADR 011)
+
+Page Santé, carte « Storage budget » : un budget en Mio (`storage_budget_bytes`) et un mode `storage_mode` (`off` par défaut, `ask`, `auto`), tous deux dans `analytics_state`. Les réglages de rétention de l'administrateur ne sont jamais réécrits : un palier calculé (`storage_tier`) les plafonne.
+
+| Palier | Effet (plafond, jamais une augmentation) |
+| --- | --- |
+| 0 | Normal. |
+| 1 | Événements bruts 30 jours au plus. |
+| 2 | Événements bruts 7 jours au plus. |
+| 3 | Agrégats horaires (`stats_hourly`, `stats_segment_hourly`) 90 jours au plus. |
+| 4 | Agrégats horaires 30 jours au plus. |
+
+- Un palier de plus à 100 % du budget, au plus un par 24 h ; tous levés sous 80 % (entre les deux, le palier tient). Les agrégats journaliers et les registres de sessions ne sont jamais touchés.
+- `off` : l'alerte Santé seulement. `ask` : l'alerte porte un bouton d'accord (`PUT /health/storage/agreement`, palier validé) pour chaque palier ; l'accord est oublié sous 80 %. `auto` : choisi explicitement, journalisé dans le journal d'accès (`storage.settings`, `storage.agreed`).
+- Point d'accès unique aux purges : `InstanceHealth::effectiveRetention()` (une lecture). `perysee:prune-tracking`, `perysee:maintenance`, `perysee:prune-sessions` et `perysee:purge` l'utilisent ; `retentionDays()` reste le réglage de l'administrateur.
+- Chaque changement de palier écrit une ligne `storage_tier` dans le journal de continuité (`breaks` à la montée, `note` à la levée).
+- Événement de domaine `ingest.storage_budget_exceeded` (`tier`, `ratio_percent`, `days_left`), à partir de la version 0.5.0 : un module qui l'écoute le déclare dans `core` de `module.json` (`ModuleProvider::listen()` le vérifie). Publié par `perysee:storage-budget` à chaque montée de palier, une seule fois par palier et par incident, jamais par la collecte.
+- Les purges restent des lots bornés : après une montée de palier, la suppression suit le rythme des passes (1 000 lignes par table et par passe de cinq minutes). Pour aller plus vite : `perysee:purge`.
 
 ### Purge manuelle (`perysee:purge`)
 

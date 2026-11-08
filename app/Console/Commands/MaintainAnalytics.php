@@ -61,7 +61,16 @@ class MaintainAnalytics extends Command
             }
             // Conservative UTC cutoff keeps every site's current local retention day intact; pending work can still move
             // session counters in historical buckets, so the purge waits for it (RetentionPurge).
-            app(RetentionPurge::class)->purge([...RetentionPurge::tables('stats'), ...RetentionPurge::tables('segments')], now('UTC')->subDays($health->retentionDays('stats_retention_days')), $limit, 1);
+            // The storage tiers (ADR 011) can keep the hourly aggregates for less time than the daily ones.
+            $retention = $health->effectiveRetention();
+            $purge = app(RetentionPurge::class);
+            $aggregates = [...RetentionPurge::tables('stats'), ...RetentionPurge::tables('segments')];
+            if ($retention['hourly'] >= $retention['stats']) {
+                $purge->purge($aggregates, now('UTC')->subDays($retention['stats']), $limit, 1);
+            } else {
+                $purge->purge(array_diff($aggregates, RetentionPurge::HOURLY), now('UTC')->subDays($retention['stats']), $limit, 1);
+                $purge->purge(RetentionPurge::HOURLY, now('UTC')->subDays($retention['hourly']), $limit, 1);
+            }
             $expiredReports = DB::table('journey_reports')->where('created_at', '<', now('UTC')->subDay())->orderBy('id')->limit($limit)->pluck('id');
             if ($expiredReports->isNotEmpty()) {
                 $sessions = DB::table('journey_report_sessions')->whereIn('report_id', $expiredReports)->limit($limit)->pluck('id');

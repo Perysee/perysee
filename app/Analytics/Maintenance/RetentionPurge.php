@@ -31,6 +31,9 @@ final class RetentionPurge
         'share-links' => ['share_links'],
     ];
 
+    /** The hourly aggregates, which the storage tiers can keep for less time than the daily ones (ADR 011). */
+    public const HOURLY = ['stats_hourly', 'stats_segment_hourly'];
+
     /** The tables that follow the pending events guard: the aggregates and registries a late event can still move. */
     private const GUARDED = ['stats_daily', 'stats_hourly', 'stats_dimension_daily', 'stats_goal_daily', 'stats_segment_daily', 'stats_segment_hourly', 'measured_sessions', 'segment_sessions'];
 

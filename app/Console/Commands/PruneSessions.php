@@ -31,7 +31,7 @@ class PruneSessions extends Command
 
             return self::FAILURE;
         }
-        $cutoff = now('UTC')->subDays($health->retentionDays('stats_retention_days'));
+        $cutoff = now('UTC')->subDays($health->effectiveRetentionDays('stats_retention_days'));
         // The usual hourly pass: nothing is old enough, and this single read is the whole cost.
         if (! $purge->pending('sessions', $cutoff)) {
             return self::SUCCESS;
