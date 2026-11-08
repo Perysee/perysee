@@ -22,7 +22,9 @@ class InstanceHealthController extends Controller
     {
         abort_unless($request->user()->is_admin, 403);
 
-        return Ui::render('health', ['health' => $health->snapshot(), 'geolocation' => app(Geolocation::class)->status(), 'moduleCards' => app(ModuleExtensions::class)->healthCards(), 'moduleFailures' => app(ModuleFailures::class)->summary(), 'softwareUpdate' => app(UpdateStatus::class)->snapshot(), 'cron' => app(CliPhp::class)->cronLine(base_path())]);
+        $snapshot = $health->snapshot();
+
+        return Ui::render('health', ['health' => $snapshot, 'geolocation' => $snapshot['geolocation'], 'moduleCards' => app(ModuleExtensions::class)->healthCards(), 'moduleFailures' => app(ModuleFailures::class)->summary(), 'softwareUpdate' => app(UpdateStatus::class)->snapshot(), 'cron' => app(CliPhp::class)->cronLine(base_path())]);
     }
 
     public function api(Request $request, InstanceHealth $health): JsonResponse
