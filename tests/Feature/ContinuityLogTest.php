@@ -200,6 +200,35 @@ class ContinuityLogTest extends TestCase
         $this->assertEqualsCanonicalizing([$other->id, null], DB::table('continuity_log')->pluck('website_id')->map(fn ($id) => $id === null ? null : (int) $id)->all());
     }
 
+    public function test_between_lists_the_entries_of_the_period_without_their_payload(): void
+    {
+        $other = Website::factory()->create();
+        $log = app(ContinuityLog::class);
+        $log->record('consent', $this->site->id, 'breaks', 'all', ['from' => true, 'to' => false], '2026-10-20');
+        $log->record('timezone', $this->site->id, 'note', 'all', [], '2026-10-10');
+        $log->record('retention_change', null, 'breaks', 'all', [], '2026-10-24');
+        $log->record('consent', $other->id, 'breaks', 'all', [], '2026-10-21');
+        $log->record('currency', $this->site->id, 'breaks', 'events', [], '2026-10-25');
+
+        $entries = $log->between($this->site, '2026-10-18', '2026-10-24');
+
+        $this->assertSame([
+            ['at' => '2026-10-20', 'kind' => 'consent', 'scope' => 'all', 'severity' => 'breaks'],
+            ['at' => '2026-10-24', 'kind' => 'retention_change', 'scope' => 'all', 'severity' => 'breaks'],
+        ], $entries);
+    }
+
+    public function test_an_undated_entry_applies_on_the_local_day_it_was_written(): void
+    {
+        $this->site->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+        DB::table('continuity_log')->insert(['website_id' => $this->site->id, 'occurred_at' => '2026-10-20 18:30:00.000', 'kind' => 'consent', 'severity' => 'breaks', 'scope' => 'all', 'payload' => '{}']);
+
+        $entries = app(ContinuityLog::class)->between($this->site->fresh(), '2026-10-21', '2026-10-21');
+
+        $this->assertSame(['2026-10-21'], array_column($entries, 'at'));
+        $this->assertSame([], app(ContinuityLog::class)->between($this->site->fresh(), '2026-10-20', '2026-10-20'));
+    }
+
     private function logInserts(callable $work): int
     {
         $inserts = 0;

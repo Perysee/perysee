@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Analytics\Continuity\ContinuityLog;
 use App\Analytics\Reporting\Reports;
 use App\Installation\InstallationState;
 use App\Models\User;
@@ -198,6 +199,92 @@ class ComparisonReportTest extends TestCase
             ->where('comparison.reliability.sessions.reason', 'partial_coverage'));
     }
 
+    private function change(Website $site, string $scope, string $dataFrom, string $severity = 'breaks', string $kind = 'consent'): void
+    {
+        app(ContinuityLog::class)->record($kind, $site->id, $severity, $scope, [], $dataFrom);
+    }
+
+    public function test_percent_is_withheld_after_consent_change(): void
+    {
+        $site = $this->memberSite();
+        $this->measured($site, '2026-10-01 00:00:00');
+        foreach (['2026-10-13' => 4, '2026-10-20' => 10] as $date => $pageviews) {
+            DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => $date, 'pageviews' => $pageviews, 'session_pageviews' => $pageviews, 'sessions' => 2, 'custom_events' => 3]);
+        }
+        $url = '/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous';
+        $this->get($url)->assertInertia(fn (Assert $page) => $page->where('comparison.reliability.pageviews.reason', null));
+
+        $this->change($site, 'all', '2026-10-17');
+
+        $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('comparison.reliability.pageviews', ['percent_allowed' => false, 'reason' => 'config_change'])
+            ->where('comparison.reliability.sessions', ['percent_allowed' => false, 'reason' => 'config_change'])
+            ->where('comparison.reliability.custom_events', ['percent_allowed' => false, 'reason' => 'config_change']));
+    }
+
+    public function test_a_break_in_either_period_counts_but_one_outside_both_does_not(): void
+    {
+        $site = $this->memberSite();
+        $this->day($site, '2026-10-13', 4);
+        $this->day($site, '2026-10-20', 10);
+        $url = '/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous';
+
+        $this->change($site, 'all', '2026-10-10');
+        $this->get($url)->assertInertia(fn (Assert $page) => $page->where('comparison.reliability.pageviews.reason', null));
+
+        $this->change($site, 'all', '2026-10-12');
+        $this->get($url)->assertInertia(fn (Assert $page) => $page->where('comparison.reliability.pageviews.reason', 'config_change'));
+    }
+
+    public function test_a_scope_that_does_not_concern_a_metric_keeps_its_percent(): void
+    {
+        $site = $this->memberSite();
+        $this->measured($site, '2026-10-01 00:00:00');
+        foreach (['2026-10-13' => 4, '2026-10-20' => 10] as $date => $pageviews) {
+            DB::table('stats_daily')->insert(['website_id' => $site->id, 'stat_date' => $date, 'pageviews' => $pageviews, 'session_pageviews' => $pageviews, 'sessions' => 2, 'custom_events' => 3]);
+        }
+        $this->change($site, 'sessions', '2026-10-17', kind: 'tracking_mode');
+        $this->change($site, 'goals', '2026-10-17');
+
+        $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous')->assertInertia(fn (Assert $page) => $page
+            ->where('comparison.reliability.pageviews', ['percent_allowed' => true, 'reason' => null])
+            ->where('comparison.reliability.custom_events', ['percent_allowed' => true, 'reason' => null])
+            ->where('comparison.reliability.sessions.reason', 'config_change'));
+    }
+
+    public function test_a_note_does_not_withhold_the_percent(): void
+    {
+        $site = $this->memberSite();
+        $this->day($site, '2026-10-13', 4);
+        $this->day($site, '2026-10-20', 10);
+        $this->change($site, 'all', '2026-10-17', 'note', 'timezone');
+
+        $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24&compare=previous')->assertInertia(fn (Assert $page) => $page->where('comparison.reliability.pageviews.reason', null));
+    }
+
+    public function test_the_comparison_reads_the_log_once(): void
+    {
+        $site = $this->memberSite();
+        $this->change($site, 'all', '2026-10-17');
+
+        $queries = $this->queriesDuring(fn () => $this->comparisonFor($site, ['from' => '2026-10-18', 'to' => '2026-10-24']));
+
+        $this->assertCount(1, array_filter($queries, fn (array $query): bool => str_contains($query['sql'], 'continuity_log')));
+    }
+
+    public function test_the_report_gets_the_continuity_entries_of_its_period_with_or_without_comparison(): void
+    {
+        $site = $this->memberSite();
+        $this->change($site, 'sessions', '2026-10-20', kind: 'tracking_mode');
+        $this->change($site, 'all', '2026-10-12');
+        $expected = [['at' => '2026-10-20', 'kind' => 'tracking_mode', 'scope' => 'sessions', 'severity' => 'breaks']];
+
+        foreach (['', '&compare=previous'] as $compare) {
+            $this->get('/sites/'.$site->id.'?from=2026-10-18&to=2026-10-24'.$compare)->assertOk()->assertInertia(fn (Assert $page) => $page->where('continuity', $expected));
+            $this->get('/sites/'.$site->id.'/sources?from=2026-10-18&to=2026-10-24'.$compare)->assertOk()->assertInertia(fn (Assert $page) => $page->where('continuity', $expected));
+        }
+    }
+
     private function comparisonFor(Website $site, array $query): array
     {
         $reports = app(Reports::class);
@@ -347,7 +434,7 @@ class ComparisonReportTest extends TestCase
             ->missing('comparisons.'.$site->id.'.series')
             ->where('comparisons.'.$rebuilding->id.'.totals', null)
             ->where('comparisons.'.$rebuilding->id.'.reliability.pageviews.reason', 'rebuilding')));
-        $previousReads = array_filter($queries, fn (array $query): bool => in_array('2026-10-11', $query['bindings'], true));
+        $previousReads = array_filter($queries, fn (array $query): bool => in_array('2026-10-11', $query['bindings'], true) && str_contains($query['sql'], 'stats_daily'));
         $this->assertCount(1, $previousReads, 'Only the site that is not rebuilding reads its previous daily rows.');
 
         $this->get('/dashboard?from='.now('UTC')->subDays(6)->toDateString().'&to='.now('UTC')->toDateString().'&compare=previous')->assertInertia(fn (Assert $page) => $page

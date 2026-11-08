@@ -6,6 +6,7 @@ namespace App\Analytics\Continuity;
 
 use App\Models\Website;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -114,6 +115,33 @@ final class ContinuityLog
             ->orderBy('occurred_at')->orderBy('id')
             ->get(['kind', 'scope', 'occurred_at', 'data_from', 'payload'])
             ->map(fn ($row) => ['kind' => $row->kind, 'scope' => $row->scope, 'occurred_at' => $row->occurred_at, 'data_from' => $row->data_from, 'payload' => json_decode($row->payload, true, flags: JSON_THROW_ON_ERROR)])
+            ->all();
+    }
+
+    /**
+     * The entries that apply to the site (or to the whole instance) on the local days $from to $to, oldest first,
+     * in one read: what a report shows next to its period, never the payload. An entry applies from its
+     * `data_from` day, or from the local day it was written on when it has none.
+     *
+     * @param  string  $from  Y-m-d, in the timezone of the site
+     * @param  string  $to  Y-m-d, in the timezone of the site
+     * @return list<array{at: string, kind: string, scope: string, severity: string}>
+     */
+    public function between(Website $site, string $from, string $to): array
+    {
+        $start = Carbon::createFromFormat('!Y-m-d', $from, $site->timezone)->utc();
+        $end = Carbon::createFromFormat('!Y-m-d', $to, $site->timezone)->addDay()->utc();
+
+        return DB::table('continuity_log')
+            ->where(fn ($query) => $query->where('website_id', $site->id)->orWhereNull('website_id'))
+            ->where(fn ($query) => $query->whereBetween('data_from', [$from, $to])
+                ->orWhere(fn ($undated) => $undated->whereNull('data_from')->where('occurred_at', '>=', $start->format('Y-m-d H:i:s.v'))->where('occurred_at', '<', $end->format('Y-m-d H:i:s.v'))))
+            ->orderBy('occurred_at')->orderBy('id')
+            ->get(['kind', 'scope', 'severity', 'occurred_at', 'data_from'])
+            ->map(fn ($row) => [
+                'at' => $row->data_from ?? Carbon::parse($row->occurred_at, 'UTC')->setTimezone($site->timezone)->toDateString(),
+                'kind' => $row->kind, 'scope' => $row->scope, 'severity' => $row->severity,
+            ])
             ->all();
     }
 

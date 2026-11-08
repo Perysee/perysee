@@ -972,6 +972,7 @@
                           "enum": [
                             "current_period",
                             "previous_zero",
+                            "config_change",
                             "unavailable",
                             "partial_coverage",
                             "rebuilding",

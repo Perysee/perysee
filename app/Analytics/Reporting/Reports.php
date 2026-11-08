@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Reporting;
 
+use App\Analytics\Continuity\ContinuityLog;
 use App\Models\Website;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -40,6 +41,17 @@ class Reports
     public function comparison(Website $site, array $period, ?array $current = null, bool $totalsOnly = false): array
     {
         return app(ComparisonReliability::class)->comparison($site, $period, $current, $totalsOnly);
+    }
+
+    /**
+     * The entries of the continuity log on the days of $period (date, kind, scope, severity, never the payload).
+     *
+     * @param  array<string, mixed>  $period
+     * @return list<array{at: string, kind: string, scope: string, severity: string}>
+     */
+    public function continuity(Website $site, array $period): array
+    {
+        return app(ContinuityLog::class)->between($site, $period['from'], $period['to']);
     }
 
     /**

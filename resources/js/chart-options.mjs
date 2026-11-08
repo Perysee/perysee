@@ -18,6 +18,7 @@ export function lineOption(
         background = "#F8F8F8",
         font = "Geist, sans-serif",
         comparison = null,
+        markers = [],
     } = {},
 ) {
     const option = {
@@ -82,12 +83,28 @@ export function lineOption(
             },
         ],
     };
+    let markerSentence = "";
+    if (markers.length) {
+        // A dotted vertical line and a short text, so a break is never told by its colour alone.
+        option.series[0].markLine = {
+            silent: true,
+            symbol: "none",
+            animation: false,
+            lineStyle: { color: text, width: 1.5, type: "dotted", opacity: 0.8 },
+            data: markers.map((marker) => ({
+                xAxis: marker.x,
+                label: { show: true, formatter: marker.text, position: "insideEndTop", color: text, fontSize: 11 },
+            })),
+        };
+        markerSentence = `Dotted vertical lines mark changes after which figures are not comparable: ${markers.map((marker) => marker.description).join("; ")}.`;
+        option.aria.label = { description: `${metricLabels[metric]} over time. ${markerSentence}` };
+    }
     if (!comparison) return option;
     // Align by the rank the server gives each previous point (day rank, or local hour slot); plain arrays fall back to their index.
     const byRank = alignByRank(comparison);
     const when = previousLabel;
     option.aria.label = {
-        description: `${metricLabels[metric]} over time, with a dashed line with diamond markers for the previous period of the same length.`,
+        description: `${metricLabels[metric]} over time, with a dashed line with diamond markers for the previous period of the same length.${markerSentence && ` ${markerSentence}`}`,
     };
     option.legend = { show: !compact, top: 0, right: 0, textStyle: { color: text, fontSize: 12 } };
     option.tooltip.formatter = (points) => {

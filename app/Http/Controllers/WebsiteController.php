@@ -63,7 +63,7 @@ class WebsiteController extends Controller
             return redirect()->route('sites.section', ['website' => $website, 'section' => 'pages'] + $request->only(['from', 'to', 'period', 'value']));
         }
 
-        $props = ['website' => $website, 'period' => $period, 'report' => $reports->overview($website, $period), 'series' => $reports->series($website, $period), 'dimensions' => $reports->dimensions($website, $period, 'path', $request->input('value')), 'dimension' => 'path', 'breakdowns' => ['source' => $reports->dimensions($website, $period, 'source')]];
+        $props = ['website' => $website, 'period' => $period, 'report' => $reports->overview($website, $period), 'series' => $reports->series($website, $period), 'dimensions' => $reports->dimensions($website, $period, 'path', $request->input('value')), 'continuity' => $reports->continuity($website, $period), 'dimension' => 'path', 'breakdowns' => ['source' => $reports->dimensions($website, $period, 'source')]];
         if ($period['compare'] === 'previous') {
             $props['comparison'] = $reports->comparison($website, $period, $props['report']);
         }

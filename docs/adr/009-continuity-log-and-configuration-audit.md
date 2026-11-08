@@ -31,7 +31,7 @@ Separately, the same settings can make a site silently under-count or collect mo
 ## Consequences
 
 - Every change of a tracked setting costs one INSERT, in an admin request that already runs a locked transaction. Saving a site without changing anything costs none.
-- The log answers "what changed and when", not "who was affected": it holds no figures. A report that wants to flag a break reads `breaksSince` for its window; wiring that into the reports and the API is a later slice.
+- The log answers "what changed and when", not "who was affected": it holds no figures. The reports read it in one SELECT (`ContinuityLog::between`): a comparison whose two periods (or the gap between them) contain a `breaks` entry whose scope concerns the metric withholds the percentage with the reason `config_change`, and the site screens show the entries (date, kind, scope, severity, never the payload) as markers on the chart and in the notes. Public share links never carry the log.
 - A change made directly in the database, or by an import that does not go through the controllers, leaves no entry. The log is as complete as the code paths that write it.
 - The timestamp of an entry is the moment of the save; `data_from` is the local day of the site, and that day is a mix of before and after.
 - The first migration creates one table, is guarded by `Schema::hasTable` and can be run again. Existing sites start with an empty log; their earlier changes are not reconstructed.
