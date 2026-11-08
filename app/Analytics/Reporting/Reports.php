@@ -268,13 +268,25 @@ class Reports
         if (! empty($period['filters'])) {
             return app(SegmentReports::class)->dimensionReport($site, $period, $type, $value)['data'];
         }
-        $expression = $this->dimensionExpression($type);
 
-        return $this->dimensionQuery($site, $period, $type, $value)->selectRaw($expression.' AS dimension_value, SUM(metric_count) AS count')->groupByRaw($expression)->orderByDesc('count')->orderBy('dimension_value')->limit(100)->get()->map(function ($row) use ($type): array {
+        return $this->topDimensions($site, $period, $type, $value)['data'];
+    }
+
+    /**
+     * The 100 largest values with the number of distinct values behind them, from one grouped query (the window counts the groups before the limit).
+     *
+     * @return array{data: list<array<string, mixed>>, distinct: int}
+     */
+    private function topDimensions(Website $site, array $period, string $type, ?string $value): array
+    {
+        $expression = $this->dimensionExpression($type);
+        $rows = $this->dimensionQuery($site, $period, $type, $value)->selectRaw($expression.' AS dimension_value, SUM(metric_count) AS count, COUNT(*) OVER () AS distinct_values')->groupByRaw($expression)->orderByDesc('count')->orderBy('dimension_value')->limit(100)->get();
+
+        return ['distinct' => (int) ($rows->first()->distinct_values ?? 0), 'data' => $rows->map(function ($row) use ($type): array {
             $result = ['value' => $row->dimension_value, 'count' => (int) $row->count];
 
             return $type === 'source' ? $result + app(Sources::class)->describe($row->dimension_value) : $result;
-        })->all();
+        })->all()];
     }
 
     public function dimensionReport(Website $site, array $period, string $type, ?string $value = null): array
@@ -283,9 +295,8 @@ class Reports
             return app(SegmentReports::class)->dimensionReport($site, $period, $type, $value);
         }
         $query = $this->dimensionQuery($site, $period, $type, $value);
-        $total = (int) (clone $query)->sum('metric_count');
-        $distinct = (int) (clone $query)->selectRaw('COUNT(DISTINCT ('.$this->dimensionExpression($type).')) AS aggregate')->value('aggregate');
         $daily = (clone $query)->select('stat_date')->selectRaw('SUM(metric_count) AS count')->groupBy('stat_date')->get()->keyBy('stat_date');
+        $top = $this->topDimensions($site, $period, $type, $value);
         $series = [];
         for ($day = Carbon::parse($period['from']); $day->toDateString() <= $period['to']; $day->addDay()) {
             $date = $day->toDateString();
@@ -293,7 +304,7 @@ class Reports
             $series[] = ['date' => $date, 'label' => $date, 'pageviews' => $type === 'event' ? 0 : $count, 'custom_events' => $type === 'event' ? $count : 0, 'sessions' => null];
         }
 
-        return ['map' => $type === 'country' ? (clone $query)->select('dimension_value AS value')->selectRaw('SUM(metric_count) AS count')->groupBy('dimension_value')->limit(300)->get()->map(fn ($row) => ['value' => $row->value, 'count' => (int) $row->count])->all() : [], 'total' => $total, 'distinct_values' => $distinct, 'granularity' => 'day', 'series' => $series, 'data' => $this->dimensions($site, $period, $type, $value)];
+        return ['map' => $type === 'country' ? (clone $query)->select('dimension_value AS value')->selectRaw('SUM(metric_count) AS count')->groupBy('dimension_value')->limit(300)->get()->map(fn ($row) => ['value' => $row->value, 'count' => (int) $row->count])->all() : [], 'total' => (int) $daily->sum('count'), 'distinct_values' => $top['distinct'], 'granularity' => 'day', 'series' => $series, 'data' => $top['data']];
     }
 
     public function clientCoverage(Website $site, array $period): array
