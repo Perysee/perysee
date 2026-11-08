@@ -141,7 +141,7 @@ php artisan perysee:maintenance --limit=1000
 
 En développement, lancer `php artisan schedule:work` dans un terminal distinct pour assurer la consolidation pendant les essais locaux. En hébergement, le cron appelle `schedule:run` chaque minute ou toutes les cinq minutes. Agrégation et maintenance se déclenchent toutes les cinq minutes, avec exclusion mutuelle via un verrou nommé MariaDB, indépendant du cache. Chaque transaction prend les événements non traités avec `FOR UPDATE SKIP LOCKED`, met à jour synthèses et déduplication, puis marque exactement les IDs du lot. Aucun curseur dernier ID ne sert de garantie. Un ID antérieur peut être repris après un commit tardif. Une session se compte à la première page vue reçue ; le registre conserve son premier et dernier instant et corrige le créneau si une réception antérieure devient visible.
 
-Le budget est vérifié entre les lots : le temps d'une requête SQL bloquée dépend aussi des timeouts SQL/hébergeur. Les clés de déduplication restent jusqu'à suppression du site pour préserver cette garantie ; elles participent à la croissance du stockage. La purge statistique prend une marge d'un jour UTC pour préserver les calendriers locaux et attend les événements historiques encore en attente. Les données brutes non traitées ne sont jamais purgées. Les suppressions de site retirent au plus un lot par passage puis reprennent à l'appel suivant. Les erreurs affichées ne contiennent ni payload, ni SQL avec valeurs.
+Le budget est vérifié entre les lots : le temps d'une requête SQL bloquée dépend aussi des timeouts SQL/hébergeur. Les clés de déduplication restent jusqu'à suppression du site pour préserver cette garantie ; elles participent à la croissance du stockage. Les registres de sessions (`measured_sessions`, `segment_sessions`) sont conservés tant que les statistiques le sont, puis purgés par `perysee:prune-sessions` (ADR 010) : une session plus ancienne que la rétention des statistiques plus un jour n'est plus recomptable, et rien n'est supprimé tant qu'un événement non traité plus ancien existe. La purge statistique prend une marge d'un jour UTC pour préserver les calendriers locaux et attend les événements historiques encore en attente. Les données brutes non traitées ne sont jamais purgées. Les suppressions de site retirent au plus un lot par passage puis reprennent à l'appel suivant. Les erreurs affichées ne contiennent ni payload, ni SQL avec valeurs.
 
 Les rapports privés utilisent la session web, le service commun `Reports` et les permissions de site, sans accès implicite de l'admin. Le CSV journalier expose la disponibilité des sessions ; les tables de dimensions et leur export sont limités aux 100 premières valeurs et acceptent un filtre exact. Les rapports de dimensions calculent leurs totaux et séries quotidiennes sur la sélection complète (avant la limite de 100 valeurs affichées), avec le même filtre exact que le CSV. La navigation conserve la période et les sélecteurs de dates conservent le filtre. Le brut est réservé au contrôle de réception, borné à 100 lignes et quinze minutes ; les compteurs de réception couvrent toute la fenêtre et ne sont pas plafonnés au nombre de lignes affichées. Une configuration connue depuis la migration ne reconstitue pas le mode de mesure des années antérieures.
 
@@ -168,6 +168,49 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 | `perysee:prune-diagnostics` | toutes les heures, sans chevauchement | Supprime les diagnostics de collecte de plus de 7 jours. |
 | `perysee:prune-event-values --limit=1000` | toutes les heures, sans chevauchement | Supprime les identifiants de commande hors fenêtre et les propriétés d'événements hors rétention. |
 | `perysee:storage-snapshot` | toutes les heures, sans chevauchement | Enregistre une fois par jour la taille de chaque table (`table_size_snapshots`, estimation du moteur, sans `COUNT(*)`) et supprime les instantanés de plus de 400 jours. Une fois l'instantané du jour pris, le coût est une lecture. `perysee:storage-report [--json]` affiche les tailles en lecture seule. Avec un quota saisi sur la page Santé (`storage_quota_bytes`), la droite des moindres carrés sur 30 jours (7 jours minimum) donne la date d'atteinte, et l'alerte `storage` s'affiche sous 30 jours. |
+| `perysee:prune-sessions --limit=1000` | toutes les heures, sans chevauchement | Supprime `measured_sessions` et `segment_sessions` au-delà de la rétention des statistiques plus un jour UTC, sauf tant qu'un événement non traité plus ancien existe (ADR 010). Verrou d'agrégation, 20 lots au plus par passage. À vide : deux lectures. |
+| `perysee:prune-share-links --limit=1000` | toutes les heures, sans chevauchement | Supprime les liens de partage expirés ou révoqués depuis plus de 30 jours. À vide : une lecture. |
+| `perysee:prune-cache --limit=1000` | toutes les heures, sans chevauchement | Supprime les fichiers expirés du magasin de cache `file` (`storage/framework/cache/data`, celui que l'installateur configure) : les compteurs de limitation de débit créent un fichier par clé et un hébergement mutualisé compte les inodes. Lecture du seul préfixe d'expiration, 50 000 fichiers examinés au plus par passage, départ tournant selon l'heure. Aucune requête SQL. |
+| `perysee:storage-budget` | toutes les heures, sans chevauchement | Compare la taille de la base au budget de stockage (ADR 011) et fait monter ou descendre le palier de rétention. Sans budget : une lecture. Avec un budget : une mesure (statistiques du moteur) et l'enregistrement du dernier chiffre. Ne supprime rien : les purges lisent la rétention effective. |
+
+### Budget de stockage et rétention adaptative (ADR 011)
+
+Page Santé, carte « Storage budget » : un budget en Mio (`storage_budget_bytes`) et un mode `storage_mode` (`off` par défaut, `ask`, `auto`), tous deux dans `analytics_state`. Les réglages de rétention de l'administrateur ne sont jamais réécrits : un palier calculé (`storage_tier`) les plafonne.
+
+| Palier | Effet (plafond, jamais une augmentation) |
+| --- | --- |
+| 0 | Normal. |
+| 1 | Événements bruts 30 jours au plus. |
+| 2 | Événements bruts 7 jours au plus. |
+| 3 | Agrégats horaires (`stats_hourly`, `stats_segment_hourly`) 90 jours au plus. |
+| 4 | Agrégats horaires 30 jours au plus. |
+
+- Un palier de plus à 100 % du budget, au plus un par 24 h ; tous levés sous 80 % (entre les deux, le palier tient). Les agrégats journaliers et les registres de sessions ne sont jamais touchés.
+- `off` : l'alerte Santé seulement. `ask` : l'alerte porte un bouton d'accord (`PUT /health/storage/agreement`, palier validé) pour chaque palier ; l'accord est oublié sous 80 %. `auto` : choisi explicitement, journalisé dans le journal d'accès (`storage.settings`, `storage.agreed`).
+- Point d'accès unique aux purges : `InstanceHealth::effectiveRetention()` (une lecture). `perysee:prune-tracking`, `perysee:maintenance`, `perysee:prune-sessions` et `perysee:purge` l'utilisent ; `retentionDays()` reste le réglage de l'administrateur.
+- Chaque changement de palier écrit une ligne `storage_tier` dans le journal de continuité (`breaks` à la montée, `note` à la levée).
+- Événement de domaine `ingest.storage_budget_exceeded` (`tier`, `ratio_percent`, `days_left`), à partir de la version 0.5.0 : un module qui l'écoute le déclare dans `core` de `module.json` (`ModuleProvider::listen()` le vérifie). Publié par `perysee:storage-budget` à chaque montée de palier, une seule fois par palier et par incident, jamais par la collecte.
+- Les purges restent des lots bornés : après une montée de palier, la suppression suit le rythme des passes (1 000 lignes par table et par passe de cinq minutes). Pour aller plus vite : `perysee:purge`.
+
+### Récupérer l'espace (`perysee:storage-optimize`)
+
+Supprimer des lignes ne rend pas l'espace au disque : il reste libre dans la table. `php artisan perysee:storage-optimize <table> [--dry-run] [--force]` reconstruit une table (`OPTIMIZE TABLE`) pour le rendre. Jamais planifiée, une table à la fois.
+
+- **Simulation par défaut** : taille de la table, espace récupérable estimé (`data_free`), `innodb_file_per_table` (une requête `SHOW VARIABLES`), espace libre nécessaire (environ la taille de la table, plus la croissance d'un jour d'après la projection) et espace libre du quota saisi. `--force` lance la reconstruction.
+- **Liste blanche** : le nom doit être un identifiant simple ET une table que la base elle-même liste (`StorageMeter`) ; il est quoté, jamais injecté tel quel.
+- **Gardes** : refus, même avec `--force`, si le quota saisi laisse moins que l'espace nécessaire, ou si `innodb_file_per_table` est `OFF` (l'espace partagé ne rétrécit jamais). Sans quota saisi, la simulation dit pourquoi l'espace libre est inconnu ; `--force` passe outre, aux risques de l'opérateur.
+- Sur hébergement mutualisé, le quota peut être dépassé pendant la reconstruction. Une attente de verrou de plus de 15 s abandonne l'opération (les requêtes s'empilent derrière un `OPTIMIZE` en attente). Une sauvegarde est conseillée.
+- SQLite : message « Not applicable », code de sortie 0.
+
+### Purge manuelle (`perysee:purge`)
+
+Outil de l'opérateur pour purger plus tôt que la rétention quand la base est trop grosse. `php artisan perysee:purge <cible> --older-than=<durée>` avec la cible `events`, `stats`, `segments`, `sessions` ou `share-links`, et une durée `90d`, `12w`, `6m` ou `2y` (un mois = 30 jours, une année = 365 ; minimum 1 jour).
+
+- **Simulation par défaut** : décompte exact par table, sans aucun DELETE. `--dry-run` l'impose même avec `--force`.
+- **Exécution** : `--force`, puis confirmation interactive ; `--yes` la remplace dans un script, et sans terminal ni `--yes` rien n'est supprimé. `--yes` seul est refusé. `--limit` (1 à 10 000, 1 000 par défaut) borne chaque lot ; au plus 50 lots par table et par appel, la commande dit s'il faut la relancer.
+- **Mêmes règles que les purges horaires** (`App\Analytics\Maintenance\RetentionPurge`) : jamais d'événement non traité (`processed_at` nul), statistiques, compteurs de segments et registres de sessions conservés tant qu'un événement non traité plus ancien existe, verrou d'agrégation pris pendant la suppression.
+- **Journal de continuité** : une purge plus courte que la rétention en vigueur écrit une ligne `retention_purge` (instance, gravité `breaks`, `data_from` = date de coupe) ; une purge qui ne fait qu'avancer l'échéance normale n'écrit rien.
+- La sortie rappelle qu'une sauvegarde est conseillée et ce qui est perdu (rapports, comparaisons, filtres croisés, recalcul d'objectifs et de segments).
 
 ### Équipe et invitations
 
@@ -187,7 +230,7 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 - Le jeton (32 octets aléatoires, base64url) n'est jamais stocké : `share_links.token_hash` (SHA-256) et un indice de six caractères pour la liste. Le lien complet n'est affiché qu'une fois, à la création. Le jeton est dans l'URL (historique du navigateur, journaux d'un proxy) : mot de passe, expiration et révocation sont les réponses prévues.
 - Mot de passe : 5 essais par lien en 15 minutes, 20 par adresse IP en une heure. Le modifier ou le retirer incrémente `secret_version` et déconnecte les visiteurs qui l'avaient saisi.
 - Coque séparée (`Pages/Share/Show.vue`, `Unlock.vue`) : pour les routes `share.*`, `HandleInertiaRequests` ne partage que `currentUrl`, `assets`, `flash` et `errors` ; aucun compte, aucune navigation, aucun module. Réponses en `Cache-Control: no-store, private`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex, nofollow`. Aucun filtre, export ou identifiant de site n'est lu depuis la requête.
-- L'usage est enregistré au plus une fois par heure et par lien (`last_used_at`, `use_count`). Les liens expirés ou révoqués ne sont pas purgés ; les lignes disparaissent avec le site (clé étrangère en cascade).
+- L'usage est enregistré au plus une fois par heure et par lien (`last_used_at`, `use_count`). Les liens expirés ou révoqués depuis plus de 30 jours sont supprimés par `perysee:prune-share-links` (un lien révoqué ou expiré répondait déjà par la même page 404) ; les autres lignes disparaissent avec le site (clé étrangère en cascade).
 
 ### API de lecture (`/api/v1`)
 

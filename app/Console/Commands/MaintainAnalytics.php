@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Analytics\InstanceHealth;
 use App\Analytics\Maintenance\KeyedDelete;
+use App\Analytics\Maintenance\RetentionPurge;
 use App\Analytics\Maintenance\SiteTables;
 use App\Modules\Events\SchedulerWatch;
 use Illuminate\Console\Command;
@@ -58,23 +59,17 @@ class MaintainAnalytics extends Command
                     DB::table('websites')->where('id', $site->id)->delete();
                 });
             }
-            $days = (int) $health->get('stats_retention_days', 1095);
-            // Conservative UTC cutoff keeps every site's current local retention day intact.
-            $cutoff = now('UTC')->subDays($days + 1)->toDateString();
-            // Pending work can still move session counters in historical buckets.
-            $statsLocked = DB::table('events')->whereNull('processed_at')->where('received_at', '<', $cutoff)->exists();
-            foreach ($statsLocked ? [] : ['stats_daily', 'stats_hourly', 'stats_dimension_daily', 'stats_segment_daily', 'stats_segment_hourly', 'stats_goal_daily'] as $table) {
-                $keys = match ($table) {
-                    'stats_segment_daily', 'stats_segment_hourly' => ['website_id', 'bucket_start', 'segment_hash'],
-                    'stats_goal_daily' => ['website_id', 'goal_id', 'version', 'bucket_start', 'segment_hash'],
-                    'stats_daily' => ['website_id', 'stat_date'], 'stats_hourly' => ['website_id', 'bucket_start'],
-                    default => ['website_id', 'stat_date', 'dimension_type', 'dimension_hash'],
-                };
-                $expired = DB::table($table)->where('stat_date', '<', $cutoff)->orderBy('stat_date');
-                $rows = $expired->limit($limit)->get($keys);
-                if ($rows->isNotEmpty()) {
-                    KeyedDelete::rows($table, $keys, $rows);
-                }
+            // Conservative UTC cutoff keeps every site's current local retention day intact; pending work can still move
+            // session counters in historical buckets, so the purge waits for it (RetentionPurge).
+            // The storage tiers (ADR 011) can keep the hourly aggregates for less time than the daily ones.
+            $retention = $health->effectiveRetention();
+            $purge = app(RetentionPurge::class);
+            $aggregates = [...RetentionPurge::tables('stats'), ...RetentionPurge::tables('segments')];
+            if ($retention['hourly'] >= $retention['stats']) {
+                $purge->purge($aggregates, now('UTC')->subDays($retention['stats']), $limit, 1);
+            } else {
+                $purge->purge(array_diff($aggregates, RetentionPurge::HOURLY), now('UTC')->subDays($retention['stats']), $limit, 1);
+                $purge->purge(RetentionPurge::HOURLY, now('UTC')->subDays($retention['hourly']), $limit, 1);
             }
             $expiredReports = DB::table('journey_reports')->where('created_at', '<', now('UTC')->subDay())->orderBy('id')->limit($limit)->pluck('id');
             if ($expiredReports->isNotEmpty()) {

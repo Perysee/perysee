@@ -40,6 +40,7 @@ final class DomainEvents
         ShareLinkCreated::class,
         ShareLinkRevoked::class,
         ModuleQuarantined::class,
+        StorageBudgetExceeded::class,
     ];
 
     /** Events published while another one is being delivered wait for it; this caps how many follow one publication. */

@@ -9,6 +9,7 @@ use App\Modules\Events\AggregationCompleted;
 use App\Modules\Events\DomainEvents;
 use App\Modules\Events\GoalConverted;
 use App\Modules\Events\ModuleQuarantined;
+use App\Modules\Events\StorageBudgetExceeded;
 use App\Modules\ModuleApi;
 use App\Modules\ModuleFailures;
 use App\Modules\ModuleLoader;
@@ -424,6 +425,30 @@ class DomainEventsTest extends TestCase
         $reason = app(ModuleLoader::class)->failures()['provider-old'];
         $this->assertStringContainsString('needs Perysee '.ModuleApi::DOMAIN_EVENTS_SINCE, $reason);
         $this->assertFalse($this->events()->listening(AggregationCompleted::class));
+    }
+
+    public function test_an_event_added_after_the_bus_needs_its_own_release_in_the_manifest(): void
+    {
+        $this->makeProviderModule('provider-budget', '0.4.0', '$this->listen(\\App\\Modules\\Events\\StorageBudgetExceeded::class, fn () => null);');
+
+        app(ModuleRegistry::class)->enable('provider-budget');
+        app(ModuleLoader::class)->load();
+
+        $reason = app(ModuleLoader::class)->failures()['provider-budget'];
+        $this->assertStringContainsString('needs Perysee 0.5.0', $reason);
+        $this->assertFalse($this->events()->listening(StorageBudgetExceeded::class));
+    }
+
+    public function test_a_module_that_requires_the_release_of_the_event_can_listen_to_it(): void
+    {
+        config(['perysee.version' => '0.5.0']);
+        $this->makeProviderModule('provider-budget-ok', '0.5.0', '$this->listen(\\App\\Modules\\Events\\StorageBudgetExceeded::class, fn () => null);');
+
+        app(ModuleRegistry::class)->enable('provider-budget-ok');
+        app(ModuleLoader::class)->load();
+
+        $this->assertSame([], app(ModuleLoader::class)->failures());
+        $this->assertTrue($this->events()->listening(StorageBudgetExceeded::class));
     }
 
     public function test_the_api_version_stays_one_and_a_module_needing_a_newer_core_is_refused_when_enabled(): void

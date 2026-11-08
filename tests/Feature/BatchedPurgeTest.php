@@ -121,7 +121,7 @@ class BatchedPurgeTest extends TestCase
         $deletes = $this->deletes(fn () => $this->artisan('perysee:prune-tracking', ['--limit' => 1000])->assertSuccessful());
 
         $this->assertSame(['recent'], DB::table('goal_sessions')->pluck('session_key')->all());
-        $this->assertCount(3, $deletes, implode(' | ', $deletes));
+        $this->assertCount(1, $deletes, implode(' | ', $deletes), 'One statement for the 30 sessions; no event is expired, so no empty events delete.');
     }
 
     public function test_the_site_tables_cover_every_table_that_belongs_to_a_site(): void
