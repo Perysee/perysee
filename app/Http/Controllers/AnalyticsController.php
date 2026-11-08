@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Continuity\ContinuityLog;
 use App\Analytics\Reporting\Filters;
 use App\Analytics\Reporting\Reports;
 use App\Analytics\Reporting\SegmentReports;
@@ -45,6 +46,19 @@ class AnalyticsController extends Controller
         return $period['compare'] === 'previous' ? $overview + ['comparison' => $reports->comparison($website, $period, $overview)] : $overview;
     }
 
+    /**
+     * The latest day of the period from which an earlier figure of the export is not comparable, if any: a break
+     * of the continuity log that reaches pageviews, sessions or events (a goals-only break is not in this file).
+     *
+     * @param  list<array{at: string, kind: string, scope: string, severity: string}>  $entries
+     */
+    private function incomparableSince(array $entries): ?string
+    {
+        $days = array_column(array_filter($entries, fn (array $entry): bool => $entry['severity'] === ContinuityLog::BREAKS && in_array($entry['scope'], ['all', 'sessions', 'pageviews', 'events'], true)), 'at');
+
+        return $days === [] ? null : max($days);
+    }
+
     public function filterOptions(Request $request, Website $website, Reports $reports): JsonResponse
     {
         $this->authorizeSite($website);
@@ -63,6 +77,9 @@ class AnalyticsController extends Controller
             $stream = fopen('php://output', 'w');
             if ($website->is_demo) {
                 fputcsv($stream, ['# demonstration data: synthetic events'], escape: '');
+            }
+            if ($since = $this->incomparableSince($reports->continuity($website, $period))) {
+                fputcsv($stream, CsvSafe::row(['# not comparable before '.$since]), escape: '');
             }
             if ($dimension) {
                 fputcsv($stream, ['value', 'count'], escape: '');

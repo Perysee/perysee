@@ -229,6 +229,36 @@ class ContinuityLogTest extends TestCase
         $this->assertSame([], app(ContinuityLog::class)->between($this->site->fresh(), '2026-10-20', '2026-10-20'));
     }
 
+    public function test_the_csv_says_since_when_the_figures_are_not_comparable(): void
+    {
+        $log = app(ContinuityLog::class);
+        $this->actingAs($this->owner);
+        $csv = fn (string $query = ''): string => $this->get('/sites/'.$this->site->id.'/export?from=2026-10-18&to=2026-10-24'.$query)->assertOk()->streamedContent();
+        $this->assertStringStartsWith('date,', $csv());
+
+        $log->record('timezone', $this->site->id, 'note', 'all', [], '2026-10-19');
+        $log->record('retention_purge', $this->site->id, 'breaks', 'goals', [], '2026-10-19');
+        $log->record('consent', $this->site->id, 'breaks', 'all', [], '2026-10-25');
+        $this->assertStringStartsWith('date,', $csv(), 'a note, a goals-only break or a later one say nothing');
+
+        $log->record('consent', $this->site->id, 'breaks', 'all', [], '2026-10-20');
+        $log->record('tracking_mode', $this->site->id, 'breaks', 'sessions', [], '2026-10-22');
+        $this->assertStringStartsWith("\"# not comparable before 2026-10-22\"\ndate,pageviews,", $csv());
+        $this->assertStringStartsWith("\"# not comparable before 2026-10-22\"\nvalue,count", $csv('&dimension=path'));
+    }
+
+    public function test_the_comment_line_comes_after_the_demonstration_line_and_cannot_carry_a_formula(): void
+    {
+        $this->site->forceFill(['is_demo' => true])->save();
+        app(ContinuityLog::class)->record('consent', $this->site->id, 'breaks', 'all', [], '2026-10-20');
+
+        $lines = explode("\n", $this->actingAs($this->owner)->get('/sites/'.$this->site->id.'/export?from=2026-10-18&to=2026-10-24')->streamedContent());
+
+        $this->assertSame('"# demonstration data: synthetic events"', $lines[0]);
+        $this->assertSame('"# not comparable before 2026-10-20"', $lines[1]);
+        $this->assertMatchesRegularExpression('/^"# not comparable before \d{4}-\d{2}-\d{2}"$/', $lines[1]);
+    }
+
     private function logInserts(callable $work): int
     {
         $inserts = 0;
