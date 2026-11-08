@@ -6,6 +6,17 @@ return [
     // its own: raise it when a change of the script can move the figures. 1.0.0 counted pageviews and events; 1.1.0 added
     // the value, props and id of an event. FinalizeUpdate writes a continuity note when it changes (ADR 009).
     'tracker_version' => '1.1.0',
+    // What the tracker does with its session cookie, as the configuration audit reads it. resources/js/lueur.js has the
+    // same numbers written in its code and does not read this file; TrackerConstantsTest fails when they differ, so
+    // change both together (and raise tracker_version, since the figures of a session depend on them).
+    'tracker' => [
+        // A session ends after this many milliseconds without a page view or event.
+        'session_idle_ms' => 1800000,
+        // A session ends this many milliseconds after it began, whatever the activity: the cookie is never renewed past it.
+        'session_lifetime_ms' => 86400000,
+        // Max-Age of the cookie, in seconds, at most: it is renewed at each page view up to the end of the lifetime.
+        'cookie_max_age_seconds' => 1800,
+    ],
     'modules_path' => env('PERYSEE_MODULES_PATH', storage_path('app/modules')),
     // "docker" when the instance runs from the image built by the Docker installer: code is replaced by rebuilding
     // the image, never in place, so the in-place updater refuses to run.
@@ -41,6 +52,9 @@ return [
         'budget_seconds' => (int) env('PERYSEE_AGGREGATE_BUDGET_SECONDS', 15),
     ],
     'raw_retention_days' => (int) env('PERYSEE_RAW_RETENTION_DAYS', 90),
+    // Default retention of the daily statistics, in days, for an instance whose administrator never saved a value
+    // (InstanceHealth::retentionDays). A saved value always wins; changing this changes those instances.
+    'stats_retention_days' => 1095,
     // How long the identifier of an order is remembered to ignore a reloaded confirmation page (ADR 008).
     'order_dedup_days' => (int) env('PERYSEE_ORDER_DEDUP_DAYS', 30),
     // A site that has received events but none for this many days is flagged as silent.
