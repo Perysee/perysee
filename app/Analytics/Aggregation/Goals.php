@@ -334,10 +334,7 @@ class Goals
     private function flushDeltas(array $deltas): void
     {
         $rows = array_values(array_filter($deltas, fn (array $row): bool => $row['conversions'] !== 0 || $row['hits'] !== 0 || $row['value_sum'] !== 0 || $row['valued_hits'] !== 0));
-        $expressions = [];
-        foreach (['conversions', 'hits', 'value_sum', 'valued_hits'] as $metric) {
-            $expressions[$metric] = DB::raw($metric.' + '.(DB::getDriverName() === 'sqlite' ? 'excluded.'.$metric : 'VALUES('.$metric.')'));
-        }
+        $expressions = UpsertIncrement::columns(['conversions', 'hits', 'value_sum', 'valued_hits']);
         foreach (array_chunk($rows, 200) as $chunk) {
             DB::table('stats_goal_daily')->upsert($chunk, ['website_id', 'goal_id', 'version', 'bucket_start', 'segment_hash'], $expressions);
         }
