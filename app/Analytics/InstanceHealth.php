@@ -21,6 +21,12 @@ class InstanceHealth
         return $value === null ? $default : json_decode($value, true, flags: JSON_THROW_ON_ERROR);
     }
 
+    /** The retention in force for `raw_retention_days` or `stats_retention_days`, its default when nobody set it. */
+    public function retentionDays(string $name): int
+    {
+        return (int) $this->get($name, $name === 'raw_retention_days' ? config('perysee.raw_retention_days', 90) : 1095);
+    }
+
     public function forget(string $name): void
     {
         DB::table('analytics_state')->where('name', $name)->delete();
@@ -84,8 +90,8 @@ class InstanceHealth
             'collection_failures' => app(Coordination::class)->failures('collection_failures'),
             'collection_rejections' => app(Coordination::class)->failures('collection_rejections'),
             'property_truncations' => app(Coordination::class)->failures('property_truncations'),
-            'raw_retention_days' => (int) $this->get('raw_retention_days', config('perysee.raw_retention_days', 90)),
-            'stats_retention_days' => (int) $this->get('stats_retention_days', 1095),
+            'raw_retention_days' => $this->retentionDays('raw_retention_days'),
+            'stats_retention_days' => $this->retentionDays('stats_retention_days'),
             'deleting_sites' => DB::table('websites')->whereNotNull('deleting_at')->count(),
             'checked_at' => now('UTC')->toIso8601String(),
         ];

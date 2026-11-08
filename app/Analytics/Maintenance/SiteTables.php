@@ -36,6 +36,7 @@ final class SiteTables
         'stats_event_property_daily' => ['stat_date', 'event_name', 'prop_key', 'value_hash'],
         'event_order_ids' => ['order_hash'],
         'collection_diagnostics' => ['bucket_start', 'cause'],
+        'continuity_log' => ['id'],
     ];
 
     /**

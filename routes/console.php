@@ -29,3 +29,6 @@ Schedule::command('perysee:storage-snapshot')->hourly()->withoutOverlapping();
 
 // Event values and properties: retention of the order identifiers and of the property statistics (ADR 008).
 Schedule::command('perysee:prune-event-values --limit=1000')->hourly()->withoutOverlapping();
+
+// Continuity log: 1095 days and 500 entries per site (ADR 009), kept out of the idle maintenance pass on purpose.
+Schedule::command('perysee:prune-continuity-log --limit=1000')->hourly()->withoutOverlapping();

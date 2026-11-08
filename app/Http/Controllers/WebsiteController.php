@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Continuity\ContinuityLog;
 use App\Analytics\Diagnostics\SiteActivity;
 use App\Analytics\Reporting\Reports;
 use App\Http\Requests\SaveWebsiteRequest;
@@ -98,15 +99,16 @@ class WebsiteController extends Controller
         return Ui::render('sites.form', compact('website') + ['currencies' => Currencies::CODES]);
     }
 
-    public function update(SaveWebsiteRequest $request, Website $website): RedirectResponse
+    public function update(SaveWebsiteRequest $request, Website $website, ContinuityLog $continuity): RedirectResponse
     {
-        DB::transaction(function () use ($request, $website): void {
+        DB::transaction(function () use ($request, $website, $continuity): void {
             $locked = Website::whereKey($website->id)->lockForUpdate()->firstOrFail();
             $data = $request->siteAttributes();
             if (($locked->first_collected_at || DB::table('events')->where('website_id', $locked->id)->exists()) && $data['timezone'] !== $locked->timezone) {
                 throw ValidationException::withMessages(['timezone' => 'The reporting timezone is fixed after the first collected event.']);
             }
             abort_if($locked->deleting_at, 409);
+            $continuity->diffWebsite($locked, $data, $request->user()->id);
             if (isset($data['tracking_mode']) && $data['tracking_mode'] !== $locked->tracking_mode) {
                 $changed = now('UTC')->format('Y-m-d H:i:s.v');
                 DB::table('site_measurement_periods')->where('website_id', $locked->id)->whereNull('ended_at')->update(['ended_at' => $changed]);
