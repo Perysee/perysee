@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Analytics\Aggregation\Aggregator;
+use App\Analytics\Continuity\ContinuityLog;
 use App\Installation\InstallationState;
 use App\Models\ApiToken;
 use App\Models\User;
@@ -52,7 +53,7 @@ class ApiV1ReportsTest extends TestCase
         $json = $response->json();
 
         $this->assertSame(['data', 'meta'], array_keys($json));
-        $this->assertSame(['period', 'totals', 'coverage', 'availability', 'freshness', 'measurement_periods'], array_keys($json['data']));
+        $this->assertSame(['period', 'totals', 'coverage', 'availability', 'freshness', 'measurement_periods', 'continuity'], array_keys($json['data']));
         $this->assertSame(['aggregated_at', 'pending'], array_keys($json['data']['freshness']));
         $this->assertSame(['api_version' => 1], $json['meta']);
 
@@ -70,6 +71,48 @@ class ApiV1ReportsTest extends TestCase
         foreach (['attribution_v2_since', 'public_id', $site->public_id] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $content);
         }
+    }
+
+    public function test_continuity_lists_the_period_entries_without_any_payload(): void
+    {
+        [$site, , $auth] = $this->token(['overview']);
+        [$other] = $this->token(['overview']);
+        $log = app(ContinuityLog::class);
+        $log->record('consent', $site->id, 'breaks', 'all', ['from' => true, 'to' => false, 'secret_marker' => 'x'], '2026-10-22');
+        $log->record('timezone', $site->id, 'note', 'all', [], '2026-10-01');
+        $log->record('currency', $site->id, 'breaks', 'events', [], '2026-10-23');
+        $log->record('consent', $other->id, 'breaks', 'all', [], '2026-10-22');
+        $expected = [
+            ['at' => '2026-10-22', 'kind' => 'consent', 'scope' => 'all', 'severity' => 'breaks'],
+            ['at' => '2026-10-23', 'kind' => 'currency', 'scope' => 'events', 'severity' => 'breaks'],
+        ];
+
+        $overview = $this->getJson('/api/v1/overview?from=2026-10-20&to=2026-10-26', $auth)->assertOk();
+        $this->assertSame($expected, $overview->json('data.continuity'));
+        $series = $this->getJson('/api/v1/timeseries?from=2026-10-20&to=2026-10-26', $auth)->assertOk();
+        $this->assertSame($expected, $series->json('data.continuity'));
+        $this->assertSame([['at' => '2026-10-01', 'kind' => 'timezone', 'scope' => 'all', 'severity' => 'note']], $this->getJson('/api/v1/overview?from=2026-10-01&to=2026-10-02', $auth)->json('data.continuity'));
+        $this->assertSame([], $this->getJson('/api/v1/overview?from=2026-09-01&to=2026-09-02', $auth)->json('data.continuity'));
+        foreach ([$overview, $series] as $response) {
+            $this->assertStringNotContainsString('payload', $response->getContent());
+            $this->assertStringNotContainsString('secret_marker', $response->getContent());
+        }
+    }
+
+    public function test_continuity_costs_one_select_per_request(): void
+    {
+        [$site, , $auth] = $this->token(['overview']);
+        app(ContinuityLog::class)->record('consent', $site->id, 'breaks', 'all', [], '2026-10-22');
+        $reads = 0;
+        DB::listen(function ($query) use (&$reads): void {
+            $reads += str_contains($query->sql, 'continuity_log') ? 1 : 0;
+        });
+
+        $this->getJson('/api/v1/overview?from=2026-10-20&to=2026-10-26&compare=previous', $auth)->assertOk();
+        $this->assertSame(2, $reads, 'one read for the entries of the response, one for the comparison');
+        $reads = 0;
+        $this->getJson('/api/v1/timeseries?from=2026-10-20&to=2026-10-26', $auth)->assertOk();
+        $this->assertSame(1, $reads);
     }
 
     public function test_unavailable_sessions_are_null_never_zero(): void
@@ -125,7 +168,7 @@ class ApiV1ReportsTest extends TestCase
         $this->seedTraffic($site);
         $json = $this->getJson('/api/v1/timeseries?from=2026-10-23&to=2026-10-25', $auth)->assertOk()->json();
         $this->assertSame(['data', 'meta'], array_keys($json));
-        $this->assertSame(['period', 'granularity', 'points'], array_keys($json['data']));
+        $this->assertSame(['period', 'granularity', 'points', 'continuity'], array_keys($json['data']));
         $this->assertSame('day', $json['data']['granularity']);
         $this->assertCount(3, $json['data']['points']);
         $this->assertSame(['date', 'label', 'pageviews', 'custom_events', 'sessions', 'session_availability'], array_keys($json['data']['points'][1]));

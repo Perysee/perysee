@@ -6,6 +6,8 @@ import { zoomMap } from "../map-navigation.mjs";
 const props = defineProps({
     series: { type: Array, default: () => [] },
     comparison: { type: Array, default: null },
+    // Vertical markers from chartMarkers() (continuity.mjs): {x, text, description}.
+    markers: { type: Array, default: () => [] },
     metric: { type: String, default: "pageviews" },
     compact: Boolean,
     countries: Array,
@@ -70,6 +72,7 @@ async function draw() {
         chart.setOption(lineOption(props.series, props.metric, {
                 ...options(),
                 comparison: props.comparison,
+                markers: props.compact ? [] : props.markers,
             }), {
             notMerge: true,
         });
@@ -133,7 +136,7 @@ onMounted(async () => {
         chart = null;
     }
 });
-watch(() => [props.series, props.metric, props.comparison], draw, {
+watch(() => [props.series, props.metric, props.comparison, props.markers], draw, {
     deep: true,
 });
 watch(

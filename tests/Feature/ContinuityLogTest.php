@@ -200,6 +200,65 @@ class ContinuityLogTest extends TestCase
         $this->assertEqualsCanonicalizing([$other->id, null], DB::table('continuity_log')->pluck('website_id')->map(fn ($id) => $id === null ? null : (int) $id)->all());
     }
 
+    public function test_between_lists_the_entries_of_the_period_without_their_payload(): void
+    {
+        $other = Website::factory()->create();
+        $log = app(ContinuityLog::class);
+        $log->record('consent', $this->site->id, 'breaks', 'all', ['from' => true, 'to' => false], '2026-10-20');
+        $log->record('timezone', $this->site->id, 'note', 'all', [], '2026-10-10');
+        $log->record('retention_change', null, 'breaks', 'all', [], '2026-10-24');
+        $log->record('consent', $other->id, 'breaks', 'all', [], '2026-10-21');
+        $log->record('currency', $this->site->id, 'breaks', 'events', [], '2026-10-25');
+
+        $entries = $log->between($this->site, '2026-10-18', '2026-10-24');
+
+        $this->assertSame([
+            ['at' => '2026-10-20', 'kind' => 'consent', 'scope' => 'all', 'severity' => 'breaks'],
+            ['at' => '2026-10-24', 'kind' => 'retention_change', 'scope' => 'all', 'severity' => 'breaks'],
+        ], $entries);
+    }
+
+    public function test_an_undated_entry_applies_on_the_local_day_it_was_written(): void
+    {
+        $this->site->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+        DB::table('continuity_log')->insert(['website_id' => $this->site->id, 'occurred_at' => '2026-10-20 18:30:00.000', 'kind' => 'consent', 'severity' => 'breaks', 'scope' => 'all', 'payload' => '{}']);
+
+        $entries = app(ContinuityLog::class)->between($this->site->fresh(), '2026-10-21', '2026-10-21');
+
+        $this->assertSame(['2026-10-21'], array_column($entries, 'at'));
+        $this->assertSame([], app(ContinuityLog::class)->between($this->site->fresh(), '2026-10-20', '2026-10-20'));
+    }
+
+    public function test_the_csv_says_since_when_the_figures_are_not_comparable(): void
+    {
+        $log = app(ContinuityLog::class);
+        $this->actingAs($this->owner);
+        $csv = fn (string $query = ''): string => $this->get('/sites/'.$this->site->id.'/export?from=2026-10-18&to=2026-10-24'.$query)->assertOk()->streamedContent();
+        $this->assertStringStartsWith('date,', $csv());
+
+        $log->record('timezone', $this->site->id, 'note', 'all', [], '2026-10-19');
+        $log->record('retention_purge', $this->site->id, 'breaks', 'goals', [], '2026-10-19');
+        $log->record('consent', $this->site->id, 'breaks', 'all', [], '2026-10-25');
+        $this->assertStringStartsWith('date,', $csv(), 'a note, a goals-only break or a later one say nothing');
+
+        $log->record('consent', $this->site->id, 'breaks', 'all', [], '2026-10-20');
+        $log->record('tracking_mode', $this->site->id, 'breaks', 'sessions', [], '2026-10-22');
+        $this->assertStringStartsWith("\"# not comparable before 2026-10-22\"\ndate,pageviews,", $csv());
+        $this->assertStringStartsWith("\"# not comparable before 2026-10-22\"\nvalue,count", $csv('&dimension=path'));
+    }
+
+    public function test_the_comment_line_comes_after_the_demonstration_line_and_cannot_carry_a_formula(): void
+    {
+        $this->site->forceFill(['is_demo' => true])->save();
+        app(ContinuityLog::class)->record('consent', $this->site->id, 'breaks', 'all', [], '2026-10-20');
+
+        $lines = explode("\n", $this->actingAs($this->owner)->get('/sites/'.$this->site->id.'/export?from=2026-10-18&to=2026-10-24')->streamedContent());
+
+        $this->assertSame('"# demonstration data: synthetic events"', $lines[0]);
+        $this->assertSame('"# not comparable before 2026-10-20"', $lines[1]);
+        $this->assertMatchesRegularExpression('/^"# not comparable before \d{4}-\d{2}-\d{2}"$/', $lines[1]);
+    }
+
     private function logInserts(callable $work): int
     {
         $inserts = 0;

@@ -6,6 +6,7 @@ use App\Installation\InstallationState;
 use App\Models\Website;
 use App\Modules\Contracts\DomainEvent;
 use App\Modules\Events\AggregationCompleted;
+use App\Modules\Events\ContinuityBreakRecorded;
 use App\Modules\Events\DomainEvents;
 use App\Modules\Events\GoalConverted;
 use App\Modules\Events\ModuleQuarantined;
@@ -437,6 +438,17 @@ class DomainEventsTest extends TestCase
         $reason = app(ModuleLoader::class)->failures()['provider-budget'];
         $this->assertStringContainsString('needs Perysee 0.5.0', $reason);
         $this->assertFalse($this->events()->listening(StorageBudgetExceeded::class));
+    }
+
+    public function test_the_continuity_event_needs_release_0_5_0_like_the_storage_one(): void
+    {
+        $this->makeProviderModule('provider-continuity', '0.4.0', '$this->listen(\\App\\Modules\\Events\\ContinuityBreakRecorded::class, fn () => null);');
+
+        app(ModuleRegistry::class)->enable('provider-continuity');
+        app(ModuleLoader::class)->load();
+
+        $this->assertStringContainsString('needs Perysee 0.5.0', app(ModuleLoader::class)->failures()['provider-continuity']);
+        $this->assertFalse($this->events()->listening(ContinuityBreakRecorded::class));
     }
 
     public function test_a_module_that_requires_the_release_of_the_event_can_listen_to_it(): void

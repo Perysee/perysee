@@ -69,6 +69,9 @@ test("the server reliability decides whether a percent is shown", () => {
     assert.equal(zero.previousText, "0");
     assert.equal(zero.reasonText, "No activity in the previous period");
     assert.equal(describeComparison(3, 4, undefined).percent, null);
+    const changed = describeComparison(150, 100, { percent_allowed: false, reason: "config_change" });
+    assert.equal(changed.percent, null);
+    assert.equal(changed.reasonText, "A setting that changes the figures was modified in these periods");
 });
 
 test("the comparison line is dashed and aligned with the current period by index", () => {

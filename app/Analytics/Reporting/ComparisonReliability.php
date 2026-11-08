@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Reporting;
 
+use App\Analytics\Continuity\ContinuityLog;
 use App\Models\Website;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +33,7 @@ class ComparisonReliability
             'freshness' => $current['freshness'],
         ];
         $overview = $report->overview($site, $previous, $known);
+        $changes = array_values(array_filter(app(ContinuityLog::class)->between($site, $previous['from'], $period['to']), fn (array $entry): bool => $entry['severity'] === ContinuityLog::BREAKS));
 
         return [
             'period' => ['from' => $previous['from'], 'to' => $previous['to']],
@@ -41,16 +43,17 @@ class ComparisonReliability
             'coverage' => $overview['coverage'],
             'freshness' => $overview['freshness'],
             ...(isset($overview['segment_coverage']) ? ['segment_coverage' => $overview['segment_coverage']] : []),
-            'reliability' => $this->reliability($site, $period, $current, $overview),
+            'reliability' => $this->reliability($site, $period, $current, $overview, $changes),
         ];
     }
 
     /**
      * The reasons are tried in order of priority: a new reason is a new arm of the match below, with the fact it needs read above it.
      *
+     * @param  list<array{at: string, kind: string, scope: string, severity: string}>  $changes  the breaks of the continuity log from the start of the previous period to the end of this one (one read)
      * @return array<string, array{percent_allowed: bool, reason: string|null}>
      */
-    private function reliability(Website $site, array $period, array $current, array $previous): array
+    private function reliability(Website $site, array $period, array $current, array $previous, array $changes): array
     {
         $includesToday = $period['to'] >= now($site->timezone)->toDateString();
         $sides = [$current, $previous];
@@ -58,6 +61,7 @@ class ComparisonReliability
         $sessionsGone = collect($sides)->contains(fn (array $side): bool => $side['availability']['sessions'] === 'unavailable');
         $sessionsPartial = collect($sides)->contains(fn (array $side): bool => $side['availability']['sessions'] === 'partial' || ($side['segment_coverage']['missing_sessions'] ?? 0) > 0);
         $verdict = [];
+        $scopes = ['pageviews' => ['all', 'pageviews'], 'sessions' => ['all', 'sessions'], 'custom_events' => ['all', 'events']];
         foreach (['pageviews', 'sessions', 'custom_events'] as $metric) {
             $sessions = $metric === 'sessions';
             $reason = match (true) {
@@ -66,6 +70,7 @@ class ComparisonReliability
                 $sessions && $sessionsGone => 'unavailable',
                 $sessions && $sessionsPartial => 'partial_coverage',
                 $sessions && ($current['totals'][$metric] === null || $previous['totals'][$metric] === null) => 'unavailable',
+                collect($changes)->contains(fn (array $entry): bool => in_array($entry['scope'], $scopes[$metric], true)) => 'config_change',
                 $includesToday => 'current_period',
                 ($previous['totals'][$metric] ?? 0) === 0 => 'previous_zero',
                 default => null,

@@ -22,6 +22,7 @@ export const reasonTexts = {
     previous_zero: "No activity in the previous period",
     unavailable: "Not measured in one of the periods",
     partial_coverage: "Incomplete data in one of the periods",
+    config_change: "A setting that changes the figures was modified in these periods",
     rebuilding: "Statistics are being rebuilt",
     not_applicable: "Not applicable with this filter",
 };

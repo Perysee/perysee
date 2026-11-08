@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Aggregation;
 
+use App\Analytics\Continuity\ContinuityLog;
 use App\Analytics\InstanceHealth;
 use App\Analytics\Reporting\Filters;
 use Closure;
@@ -127,6 +128,8 @@ class Goals
                 $this->process($rows->map(fn ($event): array => [$event, $site])->all(), [$site->id => [$goal]], fn (int $s, string $key): ?object => $firsts[$s.'|'.$key] ?? null, false);
                 if ($rows->count() < $limit) {
                     DB::table('analytics_state')->where('name', $job->name)->delete();
+                    // The goal now counts its past (up to the snapshot taken when it was defined).
+                    app(ContinuityLog::class)->record('rebuild', $site->id, ContinuityLog::NOTE, 'goals', ['target' => 'goals', 'goal_id' => (int) $goalId, 'version' => (int) $version, 'through' => (int) $state['snapshot']], now($site->timezone)->toDateString());
                 } else {
                     app(InstanceHealth::class)->put($job->name, ['cursor' => $rows->last()->id] + $state);
                 }

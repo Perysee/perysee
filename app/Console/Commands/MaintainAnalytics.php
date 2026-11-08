@@ -66,10 +66,10 @@ class MaintainAnalytics extends Command
             $purge = app(RetentionPurge::class);
             $aggregates = [...RetentionPurge::tables('stats'), ...RetentionPurge::tables('segments')];
             if ($retention['hourly'] >= $retention['stats']) {
-                $purge->purge($aggregates, now('UTC')->subDays($retention['stats']), $limit, 1);
+                $purge->purge($aggregates, now('UTC')->subDays($retention['stats']), $limit, 1, noteExpiry: true);
             } else {
-                $purge->purge(array_diff($aggregates, RetentionPurge::HOURLY), now('UTC')->subDays($retention['stats']), $limit, 1);
-                $purge->purge(RetentionPurge::HOURLY, now('UTC')->subDays($retention['hourly']), $limit, 1);
+                $purge->purge(array_diff($aggregates, RetentionPurge::HOURLY), now('UTC')->subDays($retention['stats']), $limit, 1, noteExpiry: true);
+                $purge->purge(RetentionPurge::HOURLY, now('UTC')->subDays($retention['hourly']), $limit, 1, noteExpiry: true);
             }
             $expiredReports = DB::table('journey_reports')->where('created_at', '<', now('UTC')->subDay())->orderBy('id')->limit($limit)->pluck('id');
             if ($expiredReports->isNotEmpty()) {
