@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Analytics\Aggregation\Aggregator;
+use App\Analytics\Aggregation\Segments;
+use App\Analytics\InstanceHealth;
 use App\Analytics\Reporting\Reports;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,5 +120,21 @@ class AggregationQueryBudgetTest extends TestCase
 
             $this->assertLessThanOrEqual(3, count($queries), $type.': '.implode(' | ', $queries));
         }
+    }
+
+    public function test_a_rebuild_batch_costs_a_bounded_number_of_queries_and_reports_the_exact_backlog(): void
+    {
+        $site = Website::factory()->create(['tracking_mode' => 'sessions']);
+        foreach (range(1, 8) as $minute) {
+            DB::table('events')->insert(['website_id' => $site->id, 'received_at' => sprintf('2026-10-24 10:%02d:00', $minute), 'event_type' => 1, 'path' => '/', 'tracking_mode' => 'sessions', 'session_key' => 'session-'.$minute, 'consent_given' => true, 'processed_at' => now()]);
+        }
+
+        $queries = $this->queriesDuring(fn () => $this->assertSame(5, app(Segments::class)->rebuild(5)));
+
+        // The Health page shows this figure: it stays a count, not a yes or no.
+        $this->assertSame(3, app(InstanceHealth::class)->get('segments_rebuild')['pending']);
+        $this->assertLessThanOrEqual(15, count($queries), implode(' | ', $queries));
+        $this->assertSame(3, app(Segments::class)->rebuild(5));
+        $this->assertSame(0, app(InstanceHealth::class)->get('segments_rebuild')['pending']);
     }
 }
