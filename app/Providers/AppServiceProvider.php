@@ -15,6 +15,9 @@ use App\Modules\Notifications\NotificationChannels;
 use App\Modules\Reports\ReportSources;
 use App\Support\CacheCoordination;
 use App\Support\Coordination;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -46,12 +49,33 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         app()->setLocale('en');
+        $this->namedLimiters();
         if (! app()->environment('local', 'testing')) {
             config(['session.secure' => true]);
         }
         if ($this->app->runningInConsole() || ! request()->is('up')) {
             // Once the application has booted, a module provider is registered and booted inside the loader's own try/catch.
             $this->app->booted(fn () => $this->app->make(ModuleLoader::class)->load());
+        }
+    }
+
+    /**
+     * Every route limiter has a name: an unnamed throttle:N,M keeps one counter per user for all the routes that use it.
+     * Routes that shared a counter before still share it (one name); the counter is the user, or the address of a guest.
+     */
+    private function namedLimiters(): void
+    {
+        $limits = [
+            'two-factor-challenge' => 30,
+            'instance-updates' => 6,
+            'journey-reports' => 30,
+            'mail-test' => 5,
+            'site-favicon' => 120,
+            'tracker-probe' => 6,
+            'account-security' => 10,
+        ];
+        foreach ($limits as $name => $perMinute) {
+            RateLimiter::for($name, fn (Request $request): Limit => Limit::perMinute($perMinute)->by((string) ($request->user()?->getAuthIdentifier() ?: $request->ip())));
         }
     }
 }

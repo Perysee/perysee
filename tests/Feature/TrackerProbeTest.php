@@ -190,7 +190,7 @@ class TrackerProbeTest extends TestCase
         $owner = User::factory()->create();
         $site->members()->attach($owner, ['role' => 'owner']);
         $this->actingAs($owner);
-        // Unnamed throttles share one counter per user: every page load fetches the favicon (throttle:120,1).
+        // Every page load fetches the favicon: it has its own named limiter, apart from the probe's.
         foreach (range(1, 10) as $ignored) {
             $this->get('/sites/'.$site->id.'/favicon');
         }
