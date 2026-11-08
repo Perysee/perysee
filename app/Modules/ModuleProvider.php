@@ -115,6 +115,8 @@ abstract class ModuleProvider extends ServiceProvider
      * (at most once, no ordering): do not rely on it for data that must not be lost.
      *
      * Available from the Perysee release in {@see ModuleApi::DOMAIN_EVENTS_SINCE}: `module.json` must require it in "core".
+     * An event added later (a `SINCE` constant on its class) needs the release it names, for instance 0.5.0 for
+     * `StorageBudgetExceeded`.
      *
      * @param  class-string<DomainEvent>  $event
      * @param  Closure(DomainEvent): mixed|class-string  $listener  A closure, or the name of a class with an __invoke method.
@@ -122,6 +124,11 @@ abstract class ModuleProvider extends ServiceProvider
     protected function listen(string $event, Closure|string $listener): void
     {
         $this->requireDomainEvents('listen');
+        // An event added after the first release of the bus names its own release: an older Core would not have the class at all.
+        $since = defined($event.'::SINCE') ? (string) constant($event.'::SINCE') : ModuleApi::DOMAIN_EVENTS_SINCE;
+        if (version_compare($this->module->manifest->core, $since, '<')) {
+            throw new InvalidManifest("Module {$this->module->manifest->id} listens to {$event}, which needs Perysee {$since} or later: set \"core\" to at least that version in module.json.");
+        }
         $this->app->make(DomainEvents::class)->listen($this->module->manifest->id, $event, $listener);
     }
 

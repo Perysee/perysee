@@ -10,7 +10,9 @@ import ClientReport from "./ClientReport.vue";
 import CampaignTable from "./CampaignTable.vue";
 import { queryUrl, reportFilters } from "../interface-query.mjs";
 import { describeComparison, comparisonRows } from "../comparison.mjs";
+import { chartMarkers, describeContinuity } from "../continuity.mjs";
 const props = defineProps([
+    "continuity",
     "website",
     "canUpdate",
     "siteLinks",
@@ -142,6 +144,8 @@ const chartColumns = computed(() => [
 const chartRows = computed(() =>
     comparisonRows(props.series, props.comparison?.series, chartKeys.value),
 );
+const markers = computed(() => chartMarkers(props.series, props.continuity, metric.value)),
+    changes = computed(() => describeContinuity(props.continuity));
 const recentColumns = [
     { accessorKey: "event_name", header: "Event" },
     { accessorKey: "path", header: "Page" },
@@ -501,7 +505,12 @@ const lastConsolidation = computed(() =>
                     :series="series"
                     :metric="metric"
                     :comparison="comparison?.series"
+                    :markers="markers"
                 />
+                <p v-if="markers.length" class="text-xs text-muted px-5 pb-3">
+                    Dotted lines mark a change after which figures are not
+                    comparable: {{ markers.map((marker) => marker.description).join("; ") }}.
+                </p>
                 <UCollapsible
                     v-model:open="dataOpen"
                     class="border-t border-default"
@@ -646,16 +655,22 @@ const lastConsolidation = computed(() =>
                         {{ report.attribution_v2_since || "this version" }}.
                         Earlier Direct traffic cannot be reconstructed.
                     </p>
-                    <ul class="list-disc ml-5">
-                        <li
-                            v-for="entry in report.measurement_periods"
-                            :key="entry.started_at"
-                        >
-                            {{ entry.started_at }} →
-                            {{ entry.ended_at || "Present" }} UTC ·
-                            {{ entry.mode }}
-                        </li>
-                    </ul>
+                    <p v-if="!changes.length">
+                        No change of measurement settings in this period.
+                    </p>
+                    <template v-else>
+                        <p>
+                            Changes of measurement settings in this period
+                            (dates in the site's timezone, {{ website.timezone }}):
+                        </p>
+                        <ul class="list-disc ml-5">
+                            <li v-for="change in changes" :key="change.key">
+                                {{ change.date }} · {{ change.label }}
+                                ({{ change.scopeText }}).
+                                {{ change.sentence }}
+                            </li>
+                        </ul>
+                    </template>
                 </div></template
             ></UCollapsible
         >

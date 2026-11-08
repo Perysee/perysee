@@ -23,7 +23,8 @@ const SiteForm = defineAsyncComponent(
 const HealthPage = defineAsyncComponent(
     () => import("../Components/HealthPage.vue"),
 );
-const MailSettingsPage = defineAsyncComponent(() => import("../Components/MailSettingsPage.vue"));
+const ConfigurationAuditPage = defineAsyncComponent(() => import("../Components/ConfigurationAuditPage.vue"));
+const MailSettingsPage =defineAsyncComponent(() => import("../Components/MailSettingsPage.vue"));
 const SecurityPage = defineAsyncComponent(() => import("../Components/SecurityPage.vue"));
 const SecuritySettingsPage = defineAsyncComponent(() => import("../Components/SecuritySettingsPage.vue"));
 const TwoFactorChallengePage = defineAsyncComponent(() => import("../Components/TwoFactorChallengePage.vue"));
@@ -115,6 +116,7 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
         <GoalReport v-else-if="p.screen === 'goal.report'" :key="p.goal?.id" v-bind="p" />
         <EventPropertiesPage v-else-if="p.screen === 'event.properties'" v-bind="p" />
         <HealthPage v-else-if="p.screen === 'health'" v-bind="p" />
+        <ConfigurationAuditPage v-else-if="p.screen === 'health.audit'" v-bind="p" />
         <MailSettingsPage v-else-if="p.screen === 'settings.mail'" v-bind="p" />
         <ModulesPage v-else-if="p.screen === 'modules'" v-bind="p" />
         <ModuleSettingsPage v-else-if="p.screen === 'modules.settings'" v-bind="p" />

@@ -39,7 +39,7 @@ class ReportController extends Controller
         $site = $this->site($request);
         $period = $this->period($request, 'overview');
         $overview = $this->reports->overview($site, $period);
-        $data = $this->presenter->apiOverviewOf($overview);
+        $data = $this->presenter->apiOverviewOf($overview, $this->reports->continuity($site, $period));
         if ($period['compare'] === 'previous') {
             $data['comparison'] = $this->presenter->apiComparisonOf($this->reports->comparison($site, $period, $overview));
         }
@@ -56,6 +56,7 @@ class ReportController extends Controller
             'period' => ['from' => $period['from'], 'to' => $period['to'], 'timezone' => $site->timezone],
             'granularity' => $period['granularity'],
             'points' => $this->presenter->apiPoints($this->reports->series($site, $period)),
+            'continuity' => $this->reports->continuity($site, $period),
         ], 'meta' => ['api_version' => 1]]);
     }
 

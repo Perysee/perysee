@@ -7,6 +7,7 @@ import {
     VisualMapComponent,
     AriaComponent,
     LegendComponent,
+    MarkLineComponent,
 } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
 use([
@@ -17,6 +18,7 @@ use([
     VisualMapComponent,
     AriaComponent,
     LegendComponent,
+    MarkLineComponent,
     SVGRenderer,
 ]);
 let worldData;

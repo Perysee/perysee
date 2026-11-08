@@ -47,8 +47,9 @@ class ReportPresenter
      * the history of measurement modes, and the coverage of cross-filtered statistics when filters apply.
      *
      * @param  array<string, mixed>  $report  a result of Reports::overview()
+     * @param  list<array{at: string, kind: string, scope: string, severity: string}>  $continuity  a result of Reports::continuity()
      */
-    public function apiOverviewOf(array $report): array
+    public function apiOverviewOf(array $report, array $continuity = []): array
     {
         $data = $this->overviewOf($report);
         $data['freshness']['pending'] = (bool) ($report['freshness']['pending'] ?? false);
@@ -56,6 +57,7 @@ class ReportPresenter
         if (isset($report['segment_coverage'])) {
             $data['segment_coverage'] = array_intersect_key($report['segment_coverage'], array_flip(['status', 'missing_sessions', 'unmeasured_dimensions']));
         }
+        $data['continuity'] = $continuity;
 
         return $data;
     }

@@ -3,6 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Analytics\InstanceHealth;
+use App\Analytics\Maintenance\KeyedDelete;
+use App\Analytics\Maintenance\RetentionPurge;
+use App\Analytics\Maintenance\SiteTables;
 use App\Modules\Events\SchedulerWatch;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -34,26 +37,20 @@ class MaintainAnalytics extends Command
             $site = DB::table('websites')->whereNotNull('deleting_at')->orderBy('id')->first();
             if ($site) {
                 $remaining = $limit;
-                foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions', 'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels', 'goal_sessions', 'stats_goal_daily', 'goal_versions', 'goals', 'stats_event_property_daily', 'event_order_ids', 'collection_diagnostics'] as $table) {
+                foreach (SiteTables::KEYS as $table => $keys) {
                     $query = DB::table($table)->where('website_id', $site->id);
-                    $keys = match ($table) {
-                        'stats_segment_daily', 'stats_segment_hourly' => ['bucket_start', 'segment_hash'], 'segment_events' => ['event_id'], 'segment_sessions' => ['session_key'],
-                        'journey_report_sessions', 'journey_reports', 'funnel_versions', 'funnels', 'goal_versions', 'goals' => ['id'],
-                        'goal_sessions' => ['goal_id', 'version', 'session_key'], 'stats_goal_daily' => ['goal_id', 'version', 'bucket_start', 'segment_hash'],
-                        'stats_event_property_daily' => ['stat_date', 'event_name', 'prop_key', 'value_hash'], 'event_order_ids' => ['order_hash'],
-                        'collection_diagnostics' => ['bucket_start', 'cause'], 'events' => ['id'], 'stats_daily' => ['stat_date'], 'stats_hourly' => ['bucket_start'],
-                        'stats_dimension_daily' => ['stat_date', 'dimension_type', 'dimension_hash'], 'measured_sessions' => ['session_key'], 'site_measurement_periods' => ['id'],
-                    };
                     foreach ($keys as $key) {
                         $query->orderBy($key);
                     }
-                    foreach ($query->limit(max(1, $remaining))->get($keys) as $row) {
-                        if ($remaining === 0) {
-                            return self::SUCCESS;
-                        }
-                        DB::table($table)->where('website_id', $site->id)->where((array) $row)->delete();
-                        $remaining--;
+                    $rows = $query->limit(max(1, $remaining))->get($keys);
+                    if ($rows->isEmpty()) {
+                        continue;
                     }
+                    if ($remaining === 0) {
+                        return self::SUCCESS;
+                    }
+                    KeyedDelete::rows($table, $keys, $rows, $site->id);
+                    $remaining -= $rows->count();
                 }
                 DB::transaction(function () use ($site): void {
                     DB::table('websites')->where('id', $site->id)->lockForUpdate()->first();
@@ -62,30 +59,29 @@ class MaintainAnalytics extends Command
                     DB::table('websites')->where('id', $site->id)->delete();
                 });
             }
-            $days = (int) $health->get('stats_retention_days', 1095);
-            // Conservative UTC cutoff keeps every site's current local retention day intact.
-            $cutoff = now('UTC')->subDays($days + 1)->toDateString();
-            // Pending work can still move session counters in historical buckets.
-            $statsLocked = DB::table('events')->whereNull('processed_at')->where('received_at', '<', $cutoff)->exists();
-            foreach ($statsLocked ? [] : ['stats_daily', 'stats_hourly', 'stats_dimension_daily', 'stats_segment_daily', 'stats_segment_hourly', 'stats_goal_daily'] as $table) {
-                $keys = match ($table) {
-                    'stats_segment_daily', 'stats_segment_hourly' => ['website_id', 'bucket_start', 'segment_hash'],
-                    'stats_goal_daily' => ['website_id', 'goal_id', 'version', 'bucket_start', 'segment_hash'],
-                    'stats_daily' => ['website_id', 'stat_date'], 'stats_hourly' => ['website_id', 'bucket_start'],
-                    default => ['website_id', 'stat_date', 'dimension_type', 'dimension_hash'],
-                };
-                $expired = DB::table($table)->where('stat_date', '<', $cutoff)->orderBy('stat_date');
-                foreach ($expired->limit($limit)->get($keys) as $row) {
-                    DB::table($table)->where((array) $row)->delete();
-                }
+            // Conservative UTC cutoff keeps every site's current local retention day intact; pending work can still move
+            // session counters in historical buckets, so the purge waits for it (RetentionPurge).
+            // The storage tiers (ADR 011) can keep the hourly aggregates for less time than the daily ones.
+            $retention = $health->effectiveRetention();
+            $purge = app(RetentionPurge::class);
+            $aggregates = [...RetentionPurge::tables('stats'), ...RetentionPurge::tables('segments')];
+            if ($retention['hourly'] >= $retention['stats']) {
+                $purge->purge($aggregates, now('UTC')->subDays($retention['stats']), $limit, 1, noteExpiry: true);
+            } else {
+                $purge->purge(array_diff($aggregates, RetentionPurge::HOURLY), now('UTC')->subDays($retention['stats']), $limit, 1, noteExpiry: true);
+                $purge->purge(RetentionPurge::HOURLY, now('UTC')->subDays($retention['hourly']), $limit, 1, noteExpiry: true);
             }
             $expiredReports = DB::table('journey_reports')->where('created_at', '<', now('UTC')->subDay())->orderBy('id')->limit($limit)->pluck('id');
-            foreach (DB::table('journey_report_sessions')->whereIn('report_id', $expiredReports)->limit($limit)->pluck('id') as $id) {
-                DB::table('journey_report_sessions')->where('id', $id)->delete();
-            }
-            foreach ($expiredReports as $id) {
-                if (! DB::table('journey_report_sessions')->where('report_id', $id)->exists()) {
-                    DB::table('journey_reports')->where('id', $id)->delete();
+            if ($expiredReports->isNotEmpty()) {
+                $sessions = DB::table('journey_report_sessions')->whereIn('report_id', $expiredReports)->limit($limit)->pluck('id');
+                if ($sessions->isNotEmpty()) {
+                    DB::table('journey_report_sessions')->whereIn('id', $sessions)->delete();
+                }
+                // A report goes once its sessions are gone; the limit may leave some for the next pass.
+                $withSessions = DB::table('journey_report_sessions')->whereIn('report_id', $expiredReports)->distinct()->pluck('report_id');
+                $finished = $expiredReports->diff($withSessions);
+                if ($finished->isNotEmpty()) {
+                    DB::table('journey_reports')->whereIn('id', $finished)->delete();
                 }
             }
             // Invitations that expired, were accepted or were revoked more than 30 days ago are of no use any more.

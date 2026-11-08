@@ -31,7 +31,7 @@ class PruneEventValues extends Command
         }
 
         // Same cutoff and same guard as the other statistics: a pending event can still land in an old day.
-        $cutoff = now('UTC')->subDays((int) $health->get('stats_retention_days', 1095) + 1)->toDateString();
+        $cutoff = now('UTC')->subDays($health->retentionDays('stats_retention_days') + 1)->toDateString();
         $days = 0;
         if (! DB::table('events')->whereNull('processed_at')->where('received_at', '<', $cutoff)->exists()) {
             foreach (DB::table('stats_event_property_daily')->where('stat_date', '<', $cutoff)->select('website_id', 'stat_date')->distinct()->orderBy('stat_date')->limit(max(1, intdiv($limit, 20)))->get() as $day) {

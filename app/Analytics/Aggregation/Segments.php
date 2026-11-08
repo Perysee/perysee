@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Aggregation;
 
+use App\Analytics\Continuity\ContinuityLog;
 use App\Analytics\InstanceHealth;
 use App\Analytics\Reporting\Filters;
 use Closure;
@@ -217,10 +218,7 @@ class Segments
             DB::table($table)->insertOrIgnore($row['insert']);
             DB::table($table)->where($row['identity'])->incrementEach(array_filter($row['metrics']));
         }
-        $expressions = [];
-        foreach (self::METRICS as $metric) {
-            $expressions[$metric] = DB::raw($metric.' + '.(DB::getDriverName() === 'sqlite' ? 'excluded.'.$metric : 'VALUES('.$metric.')'));
-        }
+        $expressions = UpsertIncrement::columns(self::METRICS);
         foreach (array_chunk($additions, 200) as $chunk) {
             DB::table($table)->upsert($chunk, ['website_id', 'bucket_start', 'segment_hash'], $expressions);
         }
@@ -258,6 +256,10 @@ class Segments
                 $this->flush();
                 $pending = $rows->count() < $limit ? 0 : $missing()->count();
                 app(InstanceHealth::class)->put('segments_rebuild', ['at' => now('UTC')->toIso8601String(), 'processed' => $rows->count(), 'pending' => $pending, 'through' => $pending === 0 ? $latest : 0]);
+                if ($pending === 0 && $rows->isNotEmpty()) {
+                    // The rebuild is over: counters of past events now exist that did not before (in the transaction, so a replay leaves one entry).
+                    app(ContinuityLog::class)->record('rebuild', null, ContinuityLog::NOTE, 'segments', ['target' => 'segments', 'through' => $latest], now('UTC')->toDateString());
+                }
 
                 return $rows->count();
             }, 3);

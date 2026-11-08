@@ -7,6 +7,35 @@ const retention = useForm({
     raw_retention_days: props.health.raw_retention_days,
     stats_retention_days: props.health.stats_retention_days,
 });
+const quota = useForm({
+    storage_quota_mib:
+        props.health.storage_quota_bytes === null
+            ? ""
+            : Math.round(props.health.storage_quota_bytes / 1048576),
+});
+const projection = computed(() => props.health.storage_projection);
+const budgetState = computed(() => props.health.storage_budget);
+const budget = useForm({
+    storage_budget_mib:
+        props.health.storage_budget.budget_bytes === null
+            ? ""
+            : Math.round(props.health.storage_budget.budget_bytes / 1048576),
+    storage_mode: props.health.storage_budget.mode,
+});
+const modeOptions = [
+    { label: "Off: alert only, nothing is deleted", value: "off" },
+    { label: "Ask: wait for my agreement before each reduction", value: "ask" },
+    { label: "Automatic: reduce retention by itself", value: "auto" },
+];
+const reduction = (caps) =>
+    [
+        caps.raw_days === null ? null : `raw events ${caps.raw_days} days`,
+        caps.hourly_days === null ? null : `hourly aggregates ${caps.hourly_days} days`,
+    ]
+        .filter(Boolean)
+        .join(", ");
+const agree = (tier) =>
+    router.put(page.props.links["health.storage.agreement"], { tier }, { preserveScroll: true });
 const upload = useForm({ database: null });
 const updateRequest = useForm({ password: "", dump: "auto" });
 const updateCheck = useForm({});
@@ -39,6 +68,14 @@ const backlogLate = computed(
         Date.now() - new Date(props.health.oldest_pending + "Z").getTime() >
             900000,
 );
+const mebibytes = (bytes) => (bytes / 1048576).toFixed(1);
+const largestTables = computed(() =>
+    props.health.largest_tables.map((table) => ({
+        name: table.name,
+        size: mebibytes(table.data_bytes + table.index_bytes),
+        rows: table.row_estimate === null ? "—" : table.row_estimate.toLocaleString(),
+    })),
+);
 const processing = computed(() =>
     Object.entries({
         heartbeat: "Last scheduler heartbeat",
@@ -63,17 +100,20 @@ const processing = computed(() =>
                 Collection, consolidation and data retention.
             </p>
         </div>
-        <UBadge
-            :color="cronLate || backlogLate ? 'warning' : 'success'"
-            variant="subtle"
-            >{{
-                cronLate
-                    ? "Check your scheduler"
-                    : backlogLate
-                      ? "Consolidation delayed"
-                      : "Scheduler active"
-            }}</UBadge
-        >
+        <div class="flex flex-wrap items-center gap-3">
+            <UButton :to="page.props.links['health.audit']" label="Configuration audit" icon="i-tabler-checklist" color="neutral" variant="outline" size="sm" />
+            <UBadge
+                :color="cronLate || backlogLate ? 'warning' : 'success'"
+                variant="subtle"
+                >{{
+                    cronLate
+                        ? "Check your scheduler"
+                        : backlogLate
+                          ? "Consolidation delayed"
+                          : "Scheduler active"
+                }}</UBadge
+            >
+        </div>
     </div>
     <UAlert
         v-if="cronLate"
@@ -108,7 +148,7 @@ const processing = computed(() =>
                     value:
                         health.database_bytes === null
                             ? '—'
-                            : (health.database_bytes / 1048576).toFixed(1),
+                            : mebibytes(health.database_bytes),
                     unit: 'MiB · database and indexes',
                 },
                 {
@@ -128,6 +168,145 @@ const processing = computed(() =>
             <p class="text-[11px] text-muted mt-2">{{ item.unit }}</p></UCard
         >
     </div>
+    <UCard v-if="largestTables.length" class="mb-6" :ui="{ body: 'p-0 sm:p-0' }"
+        ><template #header
+            ><h2 class="text-sm font-medium">Largest tables</h2></template
+        ><UTable
+            :data="largestTables"
+            :columns="[
+                { accessorKey: 'name', header: 'Table' },
+                { accessorKey: 'size', header: 'MiB · data and indexes' },
+                { accessorKey: 'rows', header: 'Rows (estimate)' },
+            ]"
+    /></UCard>
+    <UCard class="mb-6"
+        ><template #header
+            ><h2 class="text-sm font-medium">Storage quota</h2></template
+        ><UAlert
+            v-if="projection.message"
+            class="mb-5"
+            :color="projection.status === 'reached' || (projection.status === 'projected' && projection.days < 30) ? 'warning' : 'neutral'"
+            variant="subtle"
+            :description="projection.message"
+        /><UForm
+            :state="quota"
+            class="space-y-5"
+            @submit="
+                quota.put(page.props.links['health.storage'], {
+                    preserveScroll: true,
+                })
+            "
+            ><UFormField
+                label="Quota (MiB)"
+                name="storage_quota_mib"
+                :error="quota.errors.storage_quota_mib"
+                ><UInput
+                    v-model="quota.storage_quota_mib"
+                    type="number"
+                    min="1"
+                    max="16777216"
+                    class="w-full"
+            /></UFormField>
+            <p class="data-note">
+                The disk space your hosting plan gives the database. Leave empty
+                for no quota. The date is estimated from the last 30 days of
+                daily measurements, once 7 days are available.
+            </p>
+            <UButton
+                type="submit"
+                label="Save quota"
+                :loading="quota.processing"
+        /></UForm>
+    </UCard>
+    <UCard class="mb-6"
+        ><template #header
+            ><div class="flex items-center justify-between gap-3">
+                <h2 class="text-sm font-medium">Storage budget</h2>
+                <UBadge
+                    :color="budgetState.tier > 0 ? 'warning' : 'neutral'"
+                    variant="subtle"
+                    >Tier {{ budgetState.tier }} · mode {{ budgetState.mode }}</UBadge
+                >
+            </div></template
+        ><UAlert
+            v-if="budgetState.tier > 0"
+            class="mb-5"
+            color="warning"
+            variant="subtle"
+            :title="`Retention is reduced (tier ${budgetState.tier})`"
+            :description="`Kept at most: ${reduction(budgetState.caps)}. Your own settings are unchanged and apply again once the database is under 80% of the budget.`"
+        /><UAlert
+            v-if="budgetState.proposal"
+            class="mb-5"
+            color="warning"
+            variant="subtle"
+            icon="i-tabler-database-exclamation"
+            :title="`The database is at ${budgetState.ratio_percent}% of its budget`"
+            :description="`Nothing is deleted until you agree. Tier ${budgetState.proposal.tier} keeps at most: ${reduction(budgetState.proposal)}. Data older than that is removed by the hourly purges.`"
+        >
+            <template #actions
+                ><UButton
+                    :label="`Agree to tier ${budgetState.proposal.tier}`"
+                    color="warning"
+                    @click="agree(budgetState.proposal.tier)"
+            /></template>
+        </UAlert>
+        <p v-if="budgetState.ratio_percent !== null" class="text-sm mb-5">
+            Using {{ budgetState.ratio_percent }}% of the budget<span
+                v-if="budgetState.checked_at"
+                class="text-muted"
+            >
+                · measured {{ budgetState.checked_at }}</span
+            >.
+        </p>
+        <p v-if="budget.errors.tier" class="text-sm text-error mb-5">
+            {{ budget.errors.tier }}
+        </p>
+        <UForm
+            :state="budget"
+            class="space-y-5"
+            @submit="
+                budget.put(page.props.links['health.storage.budget'], {
+                    preserveScroll: true,
+                })
+            "
+            ><div class="form-grid">
+                <UFormField
+                    label="Budget (MiB)"
+                    name="storage_budget_mib"
+                    :error="budget.errors.storage_budget_mib"
+                    ><UInput
+                        v-model="budget.storage_budget_mib"
+                        type="number"
+                        min="1"
+                        max="16777216"
+                        class="w-full" /></UFormField
+                ><UFormField
+                    label="When the budget is reached"
+                    name="storage_mode"
+                    :error="budget.errors.storage_mode"
+                    ><USelect
+                        v-model="budget.storage_mode"
+                        :items="modeOptions"
+                        class="w-full"
+                /></UFormField>
+            </div>
+            <p class="data-note">
+                A size you want to stay under, checked every hour. At 100% the
+                retention is reduced one tier at a time, at most once a day:
+                raw events 30 days, then 7 days, then hourly aggregates 90 days,
+                then 30 days. Your retention settings are never rewritten and a
+                tier can only shorten them. Everything returns to normal under
+                80%. Daily statistics are never touched. Reduced data is
+                deleted for good: take a backup first. Choosing Automatic is
+                recorded in the access log.
+            </p>
+            <UButton
+                type="submit"
+                label="Save budget"
+                :loading="budget.processing"
+        /></UForm>
+    </UCard>
     <div class="grid lg:grid-cols-2 gap-6 mb-6">
         <UCard :ui="{ body: 'p-0 sm:p-0' }"
             ><template #header
@@ -340,7 +519,7 @@ const processing = computed(() =>
             </dl>
         </UCard>
     </div>
-    <UCard class="mb-6"
+    <UCard id="data-retention" class="mb-6"
         ><template #header
             ><h2 class="text-sm font-medium">Data retention</h2></template
         ><UForm
@@ -376,7 +555,8 @@ const processing = computed(() =>
             </div>
             <p class="data-note">
                 Deletion is permanent. Unprocessed events are preserved. Session
-                deduplication records remain until the site is deleted.
+                records follow the daily statistics retention. A storage budget
+                can shorten these values for a while without changing them.
             </p>
             <UButton
                 type="submit"

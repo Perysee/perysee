@@ -28,7 +28,7 @@ class HandleInertiaRequests extends Middleware
         }
         $user = $request->user();
         $links = [];
-        foreach (['sites.index', 'sites.create', 'sites.store', 'dashboard', 'login', 'login.store', 'logout', 'password.edit', 'password.update', 'health', 'health.update', 'health.geolocation', 'health.updates.check', 'health.updates.request', 'settings', 'settings.mail', 'settings.mail.test', 'install', 'install.unlock', 'install.database', 'install.administrator'] as $name) {
+        foreach (['sites.index', 'sites.create', 'sites.store', 'dashboard', 'login', 'login.store', 'logout', 'password.edit', 'password.update', 'health', 'health.audit', 'health.update', 'health.storage', 'health.storage.budget', 'health.storage.agreement', 'health.geolocation', 'health.updates.check', 'health.updates.request', 'settings', 'settings.mail', 'settings.mail.test', 'install', 'install.unlock', 'install.database', 'install.administrator'] as $name) {
             $links[$name] = route($name);
         }
         $links['modules'] = route('modules.index');

@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Analytics\Aggregation\Aggregator;
+use App\Analytics\Aggregation\Segments;
+use App\Analytics\InstanceHealth;
+use App\Analytics\Reporting\Reports;
 use App\Models\Website;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -100,5 +103,40 @@ class AggregationQueryBudgetTest extends TestCase
         $this->assertSame(1, (int) DB::table('stats_daily')->sum('sessions'));
         $this->assertSame(1, (int) DB::table('stats_hourly')->where('bucket_start', '2026-10-24 10:00:00')->sum('sessions'));
         $this->assertSame(0, (int) DB::table('stats_hourly')->where('bucket_start', '2026-10-24 12:00:00')->sum('sessions'));
+    }
+
+    public function test_a_dimension_report_reads_the_statistics_in_three_queries_at_most(): void
+    {
+        $site = Website::factory()->create();
+        foreach (['source' => ['ChatGPT', 'chatgpt', 'google'], 'country' => ['FR', 'US']] as $type => $values) {
+            foreach ($values as $value) {
+                DB::table('stats_dimension_daily')->insert(['website_id' => $site->id, 'stat_date' => '2026-10-24', 'dimension_type' => $type, 'dimension_hash' => hash('sha256', $type.$value), 'dimension_value' => $value, 'metric_count' => 2]);
+            }
+        }
+        $period = ['from' => '2026-10-20', 'to' => '2026-10-26', 'filters' => [], 'source_group' => 'all', 'provider' => null];
+
+        foreach (['source', 'country'] as $type) {
+            $queries = $this->queriesDuring(fn () => app(Reports::class)->dimensionReport($site, $period, $type));
+
+            $this->assertLessThanOrEqual(3, count($queries), $type.': '.implode(' | ', $queries));
+        }
+    }
+
+    public function test_a_rebuild_batch_costs_a_bounded_number_of_queries_and_reports_the_exact_backlog(): void
+    {
+        $site = Website::factory()->create(['tracking_mode' => 'sessions']);
+        foreach (range(1, 8) as $minute) {
+            DB::table('events')->insert(['website_id' => $site->id, 'received_at' => sprintf('2026-10-24 10:%02d:00', $minute), 'event_type' => 1, 'path' => '/', 'tracking_mode' => 'sessions', 'session_key' => 'session-'.$minute, 'consent_given' => true, 'processed_at' => now()]);
+        }
+
+        $queries = $this->queriesDuring(fn () => $this->assertSame(5, app(Segments::class)->rebuild(5)));
+
+        // The Health page shows this figure: it stays a count, not a yes or no.
+        $this->assertSame(3, app(InstanceHealth::class)->get('segments_rebuild')['pending']);
+        // MariaDB adds the GET_LOCK and the RELEASE_LOCK of the aggregation lock.
+        $budget = in_array(DB::getDriverName(), ['mariadb', 'mysql'], true) ? 17 : 15;
+        $this->assertLessThanOrEqual($budget, count($queries), implode(' | ', $queries));
+        $this->assertSame(3, app(Segments::class)->rebuild(5));
+        $this->assertSame(0, app(InstanceHealth::class)->get('segments_rebuild')['pending']);
     }
 }

@@ -88,7 +88,7 @@ class TrackingController extends Controller
                     CollectionRejected::if(str_ends_with($rule, '*') ? str_starts_with($path, substr($rule, 0, -1)) : $path === $rule, RejectionCause::PathExcluded, 403, $site);
                 }
                 $key = 'collect:'.$site->id.':'.hash_hmac('sha256', $request->ip() ?? '', config('app.key'));
-                CollectionRejected::unless(app(Coordination::class)->throttle($key, 120, 60), RejectionCause::Quota, 429, $site);
+                CollectionRejected::unless(app(Coordination::class)->throttle($key, (int) config('perysee.collect.rate_limit.max_attempts'), (int) config('perysee.collect.rate_limit.decay_seconds')), RejectionCause::Quota, 429, $site);
                 $received = now('UTC')->format('Y-m-d H:i:s.v');
                 if (! $site->first_collected_at) {
                     DB::table('websites')->where('id', $site->id)->whereNull('first_collected_at')->update(['first_collected_at' => $received]);

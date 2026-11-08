@@ -720,6 +720,51 @@
           }
         }
       },
+      "ContinuityEntry": {
+        "type": "object",
+        "description": "A change of a measurement setting recorded in the continuity log (ADR 009). Never carries the old or new values.",
+        "properties": {
+          "at": {
+            "type": "string",
+            "description": "First report day (YYYY-MM-DD, in the timezone of the site) the change applies to; that day mixes before and after."
+          },
+          "kind": {
+            "type": "string",
+            "description": "What changed. The list can grow.",
+            "examples": [
+              "consent",
+              "tracking_mode",
+              "allowed_domains",
+              "excluded_paths",
+              "currency",
+              "timezone",
+              "retention_change",
+              "retention_purge",
+              "storage_tier"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "sessions",
+              "pageviews",
+              "events",
+              "goals",
+              "segments"
+            ],
+            "description": "The figures concerned."
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "breaks",
+              "note"
+            ],
+            "description": "breaks: figures before and after should not be compared as is. note: they can."
+          }
+        }
+      },
       "Period": {
         "type": "object",
         "properties": {
@@ -931,6 +976,13 @@
                   }
                 }
               },
+              "continuity": {
+                "type": "array",
+                "description": "Continuity entries that fall in the period, oldest first. Added in v1 as a compatible addition.",
+                "items": {
+                  "$ref": "#/components/schemas/ContinuityEntry"
+                }
+              },
               "comparison": {
                 "type": "object",
                 "description": "Present with compare=previous. Never compute a percentage yourself: use reliability.",
@@ -972,6 +1024,7 @@
                           "enum": [
                             "current_period",
                             "previous_zero",
+                            "config_change",
                             "unavailable",
                             "partial_coverage",
                             "rebuilding",
@@ -1040,6 +1093,13 @@
                       ]
                     }
                   }
+                }
+              },
+              "continuity": {
+                "type": "array",
+                "description": "Continuity entries that fall in the period, oldest first. Added in v1 as a compatible addition.",
+                "items": {
+                  "$ref": "#/components/schemas/ContinuityEntry"
                 }
               }
             }

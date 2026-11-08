@@ -8,6 +8,8 @@ export const EVENT_LABELS = {
     "invitation.accepted": "Invitation accepted",
     "share.created": "Share link created",
     "session.revoked": "Session revoked",
+    "storage.settings": "Storage budget settings changed",
+    "storage.agreed": "Retention reduction agreed",
 };
 
 const METHOD_LABELS = { password: "a password", totp: "an authenticator code", recovery_code: "a recovery code" };
@@ -27,6 +29,12 @@ export function describeEntry(entry) {
     }
     if (entry.event === "session.revoked") {
         return context.count !== undefined ? `Other sessions revoked (${context.count})` : `Session revoked${context.device ? ": " + context.device : ""}`;
+    }
+    if (entry.event === "storage.settings" && context.mode) {
+        return `${base}: mode ${context.mode}`;
+    }
+    if (entry.event === "storage.agreed" && context.tier) {
+        return `${base} (tier ${context.tier})`;
     }
     return base;
 }

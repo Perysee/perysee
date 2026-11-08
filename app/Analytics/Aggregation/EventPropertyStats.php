@@ -129,10 +129,7 @@ class EventPropertyStats
                 $rows[$identity]['valued_count']++;
             }
         }
-        $expressions = [];
-        foreach (['metric_count', 'value_sum', 'valued_count'] as $metric) {
-            $expressions[$metric] = DB::raw($metric.' + '.(DB::getDriverName() === 'sqlite' ? 'excluded.'.$metric : 'VALUES('.$metric.')'));
-        }
+        $expressions = UpsertIncrement::columns(['metric_count', 'value_sum', 'valued_count']);
         foreach (array_chunk(array_values($rows), 200) as $chunk) {
             DB::table('stats_event_property_daily')->upsert($chunk, ['website_id', 'stat_date', 'event_name', 'prop_key', 'value_hash'], $expressions);
         }

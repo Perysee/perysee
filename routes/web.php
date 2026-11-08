@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountSecurityController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ConfigurationAuditController;
 use App\Http\Controllers\DemoController;
 use App\Http\Controllers\EventPropertyController;
 use App\Http\Controllers\FunnelController;
@@ -46,30 +47,34 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::post('/login', [AuthController::class, 'store'])->name('login.store');
         // two-factor: the second step of a sign-in (the visitor is still a guest here)
         Route::get('/login/two-factor', [TwoFactorChallengeController::class, 'show'])->name('login.two-factor');
-        Route::post('/login/two-factor', [TwoFactorChallengeController::class, 'store'])->middleware('throttle:30,1')->name('login.two-factor.store');
+        Route::post('/login/two-factor', [TwoFactorChallengeController::class, 'store'])->middleware('throttle:two-factor-challenge')->name('login.two-factor.store');
     });
     Route::middleware(['auth', RequireTwoFactor::class])->group(function (): void {
         Route::get('/dashboard', [WorkspaceController::class, 'dashboard'])->name('dashboard');
         Route::get('/pixels', [WorkspaceController::class, 'pixels'])->name('pixels');
         Route::get('/modules/{module}/assets/{file}', ModuleAssetController::class)->where('file', '[A-Za-z0-9_.-]+')->name('modules.assets');
         Route::get('/health', [InstanceHealthController::class, 'show'])->name('health');
+        Route::get('/health/audit', [ConfigurationAuditController::class, 'show'])->name('health.audit');
         Route::put('/health', [InstanceHealthController::class, 'update'])->name('health.update');
+        Route::put('/health/storage', [InstanceHealthController::class, 'storage'])->name('health.storage');
+        Route::put('/health/storage/budget', [InstanceHealthController::class, 'budget'])->name('health.storage.budget');
+        Route::put('/health/storage/agreement', [InstanceHealthController::class, 'agree'])->name('health.storage.agreement');
         Route::get('/api/instance/health', [InstanceHealthController::class, 'api'])->name('health.api');
         Route::post('/health/geolocation', [InstanceHealthController::class, 'importGeolocation'])->name('health.geolocation');
-        Route::post('/health/updates/check', [InstanceUpdateController::class, 'check'])->middleware('throttle:6,1')->name('health.updates.check');
-        Route::post('/health/updates', [InstanceUpdateController::class, 'request'])->middleware('throttle:6,1')->name('health.updates.request');
+        Route::post('/health/updates/check', [InstanceUpdateController::class, 'check'])->middleware('throttle:instance-updates')->name('health.updates.check');
+        Route::post('/health/updates', [InstanceUpdateController::class, 'request'])->middleware('throttle:instance-updates')->name('health.updates.request');
         Route::delete('/health/updates', [InstanceUpdateController::class, 'cancel'])->name('health.updates.cancel');
         Route::get('/api/sites/{website}/filter-options', [AnalyticsController::class, 'filterOptions'])->name('sites.filter-options');
         Route::get('/api/sites/{website}/events/recent', [AnalyticsController::class, 'api'])->defaults('report', 'recent')->name('sites.api.recent');
         Route::get('/api/sites/{website}/{report}', [AnalyticsController::class, 'api'])->whereIn('report', ['overview', 'timeseries', 'dimensions', 'recent'])->name('sites.api');
         Route::get('/sites/{website}/funnels', [FunnelController::class, 'index'])->name('sites.funnels.index');
         Route::post('/sites/{website}/funnels', [FunnelController::class, 'store'])->name('sites.funnels.store');
-        Route::post('/sites/{website}/funnels/{funnel}/calculate', [FunnelController::class, 'calculate'])->middleware('throttle:30,1')->name('sites.funnels.calculate');
-        Route::post('/sites/{website}/journeys/calculate', [FunnelController::class, 'calculate'])->middleware('throttle:30,1')->name('sites.journeys.calculate');
+        Route::post('/sites/{website}/funnels/{funnel}/calculate', [FunnelController::class, 'calculate'])->middleware('throttle:journey-reports')->name('sites.funnels.calculate');
+        Route::post('/sites/{website}/journeys/calculate', [FunnelController::class, 'calculate'])->middleware('throttle:journey-reports')->name('sites.journeys.calculate');
         Route::get('/sites/{website}/funnels/{funnel}', [FunnelController::class, 'show'])->name('sites.funnels.show');
         Route::put('/sites/{website}/funnels/{funnel}', [FunnelController::class, 'update'])->name('sites.funnels.update');
         Route::delete('/sites/{website}/funnels/{funnel}', [FunnelController::class, 'archive'])->name('sites.funnels.archive');
-        Route::get('/sites/{website}/journeys', [FunnelController::class, 'journeys'])->middleware('throttle:30,1')->name('sites.journeys');
+        Route::get('/sites/{website}/journeys', [FunnelController::class, 'journeys'])->middleware('throttle:journey-reports')->name('sites.journeys');
         Route::get('/api/sites/{website}/journey-reports/{report}', [FunnelController::class, 'status'])->name('sites.journeys.status');
         Route::get('/sites/{website}/journey-reports/{report}/export', [FunnelController::class, 'export'])->name('sites.journeys.export');
         Route::get('/sites/{website}/goals', [GoalController::class, 'index'])->name('sites.goals.index');
@@ -88,7 +93,7 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/settings/mail', [MailSettingsController::class, 'show'])->name('settings.mail');
         Route::put('/settings/mail', [MailSettingsController::class, 'update'])->name('settings.mail.update');
         Route::delete('/settings/mail', [MailSettingsController::class, 'reset'])->name('settings.mail.reset');
-        Route::post('/settings/mail/test', [MailSettingsController::class, 'test'])->middleware('throttle:5,1')->name('settings.mail.test');
+        Route::post('/settings/mail/test', [MailSettingsController::class, 'test'])->middleware('throttle:mail-test')->name('settings.mail.test');
         Route::get('/settings/modules', [ModuleController::class, 'index'])->name('modules.index');
         Route::post('/settings/modules/install', [ModuleController::class, 'install'])->name('modules.install');
         Route::post('/settings/modules/catalog/refresh', [ModuleController::class, 'refreshCatalog'])->name('modules.catalog.refresh');
@@ -98,7 +103,7 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::post('/settings/modules/{module}/scope', [ModuleController::class, 'updateScope'])->name('modules.scope');
         Route::post('/settings/modules/{module}/enable', [ModuleController::class, 'enable'])->name('modules.enable');
         Route::post('/settings/modules/{module}/disable', [ModuleController::class, 'disable'])->name('modules.disable');
-        Route::get('/sites/{website}/favicon', SiteFaviconController::class)->middleware('throttle:120,1')->name('sites.favicon');
+        Route::get('/sites/{website}/favicon', SiteFaviconController::class)->middleware('throttle:site-favicon')->name('sites.favicon');
         Route::get('/sites/{website}/sharing', [ShareLinkController::class, 'index'])->name('sites.sharing');
         Route::post('/sites/{website}/sharing', [ShareLinkController::class, 'store'])->name('sites.sharing.store');
         Route::put('/sites/{website}/sharing/{link}', [ShareLinkController::class, 'update'])->name('sites.sharing.update');
@@ -110,7 +115,7 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/sites/{website}/tracking', [WebsiteController::class, 'tracking'])->name('sites.tracking');
         // Installation check
         Route::get('/sites/{website}/tracking/verify', [TrackingCheckController::class, 'show'])->name('sites.verify');
-        Route::post('/sites/{website}/tracking/probe', [TrackingCheckController::class, 'probeToken'])->middleware('throttle:6,1,tracker-probe')->name('sites.verify.probe');
+        Route::post('/sites/{website}/tracking/probe', [TrackingCheckController::class, 'probeToken'])->middleware('throttle:tracker-probe')->name('sites.verify.probe');
         Route::get('/sites/{website}/team', [SiteMemberController::class, 'index'])->name('sites.team');
         Route::delete('/sites/{website}/team/me', [SiteMemberController::class, 'leave'])->name('sites.team.leave');
         Route::put('/sites/{website}/team/{member}', [SiteMemberController::class, 'update'])->whereNumber('member')->name('sites.team.update');
@@ -124,10 +129,10 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::put('/account/password', [AuthController::class, 'updatePassword'])->name('password.update');
         // two-factor: account security (2FA, open sessions, access log) and the instance switch
         Route::get('/account/security', [AccountSecurityController::class, 'show'])->name('account.security');
-        Route::post('/account/security/two-factor', [AccountSecurityController::class, 'start'])->middleware('throttle:10,1')->name('account.security.two-factor.start');
-        Route::post('/account/security/two-factor/confirm', [AccountSecurityController::class, 'confirm'])->middleware('throttle:10,1')->name('account.security.two-factor.confirm');
-        Route::delete('/account/security/two-factor', [AccountSecurityController::class, 'disable'])->middleware('throttle:10,1')->name('account.security.two-factor.disable');
-        Route::post('/account/security/recovery-codes', [AccountSecurityController::class, 'regenerateCodes'])->middleware('throttle:10,1')->name('account.security.recovery-codes');
+        Route::post('/account/security/two-factor', [AccountSecurityController::class, 'start'])->middleware('throttle:account-security')->name('account.security.two-factor.start');
+        Route::post('/account/security/two-factor/confirm', [AccountSecurityController::class, 'confirm'])->middleware('throttle:account-security')->name('account.security.two-factor.confirm');
+        Route::delete('/account/security/two-factor', [AccountSecurityController::class, 'disable'])->middleware('throttle:account-security')->name('account.security.two-factor.disable');
+        Route::post('/account/security/recovery-codes', [AccountSecurityController::class, 'regenerateCodes'])->middleware('throttle:account-security')->name('account.security.recovery-codes');
         Route::delete('/account/security/sessions', [AccountSecurityController::class, 'revokeOthers'])->name('account.security.sessions.others');
         Route::delete('/account/security/sessions/{session}', [AccountSecurityController::class, 'revokeSession'])->whereNumber('session')->name('account.security.sessions.destroy');
         Route::get('/settings/security', [InstanceSecurityController::class, 'show'])->name('settings.security');
