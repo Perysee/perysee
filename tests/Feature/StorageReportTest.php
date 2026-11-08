@@ -91,9 +91,25 @@ class StorageReportTest extends TestCase
         $admin = User::factory()->create(['is_admin' => true]);
         $expected = array_slice(app(StorageMeter::class)->tables() ?? [], 0, 8);
 
-        $this->actingAs($admin)->get('/health')->assertInertia(fn (Assert $page) => $page
-            ->where('health.largest_tables', $expected)
-            ->where('health.database_bytes', app(StorageMeter::class)->totalBytes()));
+        // SQLite measures the same bytes before and during the request; the InnoDB estimates move with the rows the
+        // request itself writes (a device row), so on MariaDB the page is checked for its shape and its order.
+        if (DB::getDriverName() === 'sqlite') {
+            $this->actingAs($admin)->get('/health')->assertInertia(fn (Assert $page) => $page
+                ->where('health.largest_tables', $expected)
+                ->where('health.database_bytes', app(StorageMeter::class)->totalBytes()));
+        } else {
+            $this->actingAs($admin)->get('/health')->assertInertia(fn (Assert $page) => $page
+                ->where('health.largest_tables', function ($tables): bool {
+                    $tables = array_values(collect($tables)->all());
+                    $sizes = array_map(fn ($table): int => $table['data_bytes'] + $table['index_bytes'], $tables);
+                    $sorted = $sizes;
+                    rsort($sorted);
+
+                    return $tables !== [] && count($tables) <= 8 && $sizes === $sorted
+                        && array_keys($tables[0]) === ['name', 'data_bytes', 'index_bytes', 'row_estimate', 'free_bytes'];
+                })
+                ->where('health.database_bytes', fn ($bytes): bool => is_int($bytes) && $bytes > 0));
+        }
         $this->assertLessThanOrEqual(8, count($expected));
     }
 }
