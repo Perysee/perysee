@@ -16,7 +16,7 @@ export function accentCss(accent) {
 
     return (
         `:root{--ui-primary:${accent};--brand-action:${accent};--brand-action-hover:${hover};--brand-subtle:color-mix(in srgb, ${accent} 8%, #FBFBFD);}` +
-        `.dark{--ui-primary:color-mix(in srgb, ${accent} 55%, #FFFFFF);--brand-action:${accent};--brand-action-hover:${hover};--brand-subtle:color-mix(in srgb, ${accent} 18%, #0E0E10);}`
+        `.dark{--ui-primary:color-mix(in srgb, ${accent} 55%, #FFFFFF);--brand-action:${accent};--brand-action-hover:${hover};--brand-subtle:#26262B;}`
     );
 }
 

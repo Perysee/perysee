@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "colors": {
     "primary": "brand",
     "secondary": "brand",
@@ -113,7 +113,7 @@
         "--ui-border": "#2E2E33",
         "--ui-border-muted": "#232327",
         "--ui-border-accented": "#818183",
-        "--brand-subtle": "#10253D",
+        "--brand-subtle": "#26262B",
         "--brand-action": "#0066CC",
         "--brand-action-hover": "#0058AF",
         "--ui-secondary": "#6CB4FF",

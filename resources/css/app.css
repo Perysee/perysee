@@ -785,6 +785,20 @@ summary {
     --ui-border: #36363C;
     --ui-border-muted: #26262B;
 }
+/* Dark fills are neutral greys: an accent tint looks muddy on near black and breaks with a white label accent. */
+:root {
+    --brand-chart-area: var(--ui-primary);
+}
+.dark {
+    --brand-chart-area: var(--ui-text-highlighted);
+}
 .dark .perysee-nav [aria-current="page"] {
-    background: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+    background: var(--ui-bg-accented);
+}
+.dark .breakdown-label::before {
+    background: color-mix(in srgb, var(--ui-text-highlighted) 9%, transparent);
+    border-right-color: color-mix(in srgb, var(--ui-text-highlighted) 28%, transparent);
+}
+.dark [role="dialog"] [role="option"][data-highlighted] {
+    background: var(--ui-bg-accented);
 }

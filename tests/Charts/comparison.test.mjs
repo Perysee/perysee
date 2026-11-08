@@ -91,6 +91,7 @@ test("the comparison line is dashed and aligned with the current period by index
     assert.equal(option.series[1].lineStyle.type, "dashed");
     assert.equal(option.series[1].name, "Previous period");
     assert.equal(option.series[1].areaStyle, undefined);
+    assert.equal(option.series[0].areaStyle.color, "#0066CC");
     assert.deepEqual(option.xAxis.data, ["10-18", "10-19", "10-20"]);
     const text = option.tooltip.formatter([
         { dataIndex: 1, seriesName: "Pageviews", value: 6 },
@@ -153,4 +154,10 @@ test("every echarts component used by the chart options is registered", async ()
     const needed = { legend: "LegendComponent", tooltip: "TooltipComponent", grid: "GridComponent", aria: "AriaComponent" };
     for (const [key, component] of Object.entries(needed))
         if (option[key]) assert.match(registered, new RegExp(`\\b${component}\\b`), `${key} needs ${component}`);
+});
+
+test("the area under the line takes its own color, so dark mode can keep it neutral", () => {
+    const option = lineOption([{ label: "a", pageviews: 1 }], "pageviews", { primary: "#6CB4FF", area: "#F5F5F7" });
+    assert.equal(option.series[0].lineStyle.color, "#6CB4FF");
+    assert.equal(option.series[0].areaStyle.color, "#F5F5F7");
 });
