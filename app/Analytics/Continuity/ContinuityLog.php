@@ -27,7 +27,7 @@ final class ContinuityLog
 
     public const SCOPES = ['all', 'sessions', 'pageviews', 'events', 'goals', 'segments'];
 
-    public const KINDS = ['tracking_mode', 'consent', 'allowed_domains', 'excluded_paths', 'currency', 'timezone', 'retention_change'];
+    public const KINDS = ['tracking_mode', 'consent', 'allowed_domains', 'excluded_paths', 'currency', 'timezone', 'retention_change', 'retention_purge'];
 
     /** Days an entry is kept (the statistics retention default), and the rows kept per site or for the instance. */
     public const RETENTION_DAYS = 1095;

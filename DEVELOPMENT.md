@@ -172,6 +172,16 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 | `perysee:prune-share-links --limit=1000` | toutes les heures, sans chevauchement | Supprime les liens de partage expirés ou révoqués depuis plus de 30 jours. À vide : une lecture. |
 | `perysee:prune-cache --limit=1000` | toutes les heures, sans chevauchement | Supprime les fichiers expirés du magasin de cache `file` (`storage/framework/cache/data`, celui que l'installateur configure) : les compteurs de limitation de débit créent un fichier par clé et un hébergement mutualisé compte les inodes. Lecture du seul préfixe d'expiration, 50 000 fichiers examinés au plus par passage, départ tournant selon l'heure. Aucune requête SQL. |
 
+### Purge manuelle (`perysee:purge`)
+
+Outil de l'opérateur pour purger plus tôt que la rétention quand la base est trop grosse. `php artisan perysee:purge <cible> --older-than=<durée>` avec la cible `events`, `stats`, `segments`, `sessions` ou `share-links`, et une durée `90d`, `12w`, `6m` ou `2y` (un mois = 30 jours, une année = 365 ; minimum 1 jour).
+
+- **Simulation par défaut** : décompte exact par table, sans aucun DELETE. `--dry-run` l'impose même avec `--force`.
+- **Exécution** : `--force`, puis confirmation interactive ; `--yes` la remplace dans un script, et sans terminal ni `--yes` rien n'est supprimé. `--yes` seul est refusé. `--limit` (1 à 10 000, 1 000 par défaut) borne chaque lot ; au plus 50 lots par table et par appel, la commande dit s'il faut la relancer.
+- **Mêmes règles que les purges horaires** (`App\Analytics\Maintenance\RetentionPurge`) : jamais d'événement non traité (`processed_at` nul), statistiques, compteurs de segments et registres de sessions conservés tant qu'un événement non traité plus ancien existe, verrou d'agrégation pris pendant la suppression.
+- **Journal de continuité** : une purge plus courte que la rétention en vigueur écrit une ligne `retention_purge` (instance, gravité `breaks`, `data_from` = date de coupe) ; une purge qui ne fait qu'avancer l'échéance normale n'écrit rien.
+- La sortie rappelle qu'une sauvegarde est conseillée et ce qui est perdu (rapports, comparaisons, filtres croisés, recalcul d'objectifs et de segments).
+
 ### Équipe et invitations
 
 - Écran `/sites/{website}/team` (`SiteMemberController`) : tout membre voit la liste ; seul un `owner` voit les invitations et les commandes (inviter, changer un rôle, retirer, renvoyer, révoquer). Un administrateur d'instance sans rôle sur le site n'a aucun accès implicite. Chacun peut quitter un site (`DELETE /sites/{website}/team/me`).
