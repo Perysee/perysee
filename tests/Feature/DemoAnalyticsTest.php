@@ -126,6 +126,6 @@ class DemoAnalyticsTest extends TestCase
         app(InstallationState::class)->exclusive(fn () => app(InstallationState::class)->complete());
         $response = $this->actingAs($admin)->get(route('sites.favicon', $site));
         $response->assertOk()->assertHeader('Content-Type', 'image/svg+xml');
-        $this->assertStringContainsString('#5B21FF', $response->getContent());
+        $this->assertStringContainsString('#0066CC', $response->getContent());
     }
 }

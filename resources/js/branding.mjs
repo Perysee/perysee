@@ -12,11 +12,11 @@ export function accentCss(accent) {
     if (typeof accent !== "string" || !ACCENT_PATTERN.test(accent)) {
         return "";
     }
-    const hover = `color-mix(in srgb, ${accent} 85%, #00020C)`;
+    const hover = `color-mix(in srgb, ${accent} 85%, #1D1D1F)`;
 
     return (
-        `:root{--ui-primary:${accent};--brand-action:${accent};--brand-action-hover:${hover};--brand-subtle:color-mix(in srgb, ${accent} 8%, #F8F8F8);}` +
-        `.dark{--ui-primary:color-mix(in srgb, ${accent} 55%, #FFFFFF);--brand-action:${accent};--brand-action-hover:${hover};--brand-subtle:color-mix(in srgb, ${accent} 18%, #00020C);}`
+        `:root{--ui-primary:${accent};--brand-action:${accent};--brand-action-hover:${hover};--brand-subtle:color-mix(in srgb, ${accent} 8%, #FBFBFD);}` +
+        `.dark{--ui-primary:color-mix(in srgb, ${accent} 55%, #FFFFFF);--brand-action:${accent};--brand-action-hover:${hover};--brand-subtle:color-mix(in srgb, ${accent} 18%, #0E0E10);}`
     );
 }
 

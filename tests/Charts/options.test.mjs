@@ -15,12 +15,12 @@ test('chart keeps integer metrics without smoothing or changing totals', () => {
     assert.equal(option.tooltip.renderMode,'richText');
 });
 
-for (const [mode, background, text] of [['light', '#F8F8F8', '#00020C'], ['dark', '#00020C', '#F8F8F8']]) {
+for (const [mode, background, text] of [['light', '#FBFBFD', '#1D1D1F'], ['dark', '#0E0E10', '#F5F5F7']]) {
     test(`chart tooltips and labels follow the ${mode} theme`, () => {
         const option = lineOption([{label:'Today',pageviews:8}], 'pageviews', {background, text});
         assert.equal(option.tooltip.backgroundColor, background);
         assert.equal(option.tooltip.textStyle.color, text);
         assert.equal(option.xAxis.axisLabel.color, text);
-        assert.equal(option.series[0].lineStyle.color, '#5516FF');
+        assert.equal(option.series[0].lineStyle.color, '#0066CC');
     });
 }

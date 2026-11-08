@@ -18,5 +18,5 @@ createInertiaApp({
         registerModuleComponents(app);
         app.mount(el);
     },
-    progress: { color: "#5B21FF", showSpinner: false },
+    progress: { color: "#0066CC", showSpinner: false },
 });
