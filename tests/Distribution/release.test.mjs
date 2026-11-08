@@ -18,7 +18,7 @@ function fixture(t) {
     const output = join(root, 'output');
     for (const path of ['app/Example.php', 'bootstrap/app.php', 'config/app.php', 'database/migrations/example.php',
         'resources/views/example.blade.php', 'routes/web.php', 'artisan', 'composer.json', 'composer.lock', 'README.md', 'LICENSE', 'LICENSING.md', 'MODULE-EXCEPTION.md',
-        'public/index.php', 'public/.htaccess', 'public/site-icon.svg', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/fonts/geist.woff2', 'public/tracker/lueur.v1.js',
+        'public/index.php', 'public/.htaccess', 'public/site-icon.svg', 'public/logo.svg', 'public/logo-dark.svg', 'public/favicon.svg', 'public/color-mode.js', 'public/fonts/aspekta.woff2', 'public/tracker/lueur.v1.js',
         'public/brands/chatgpt.svg', 'public/brands/LICENSE', 'public/maps/world.json', 'public/tracker/lueur.v1.js.gz', 'vendor/autoload.php', 'vendor/composer/platform_check.php']) {
         mkdirSync(join(source, path, '..'), { recursive: true });
         writeFileSync(join(source, path), '<?php // fixture');

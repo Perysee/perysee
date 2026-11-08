@@ -2,13 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mapOption } from "../../resources/js/map-options.mjs";
 const theme = {
-    primary: "#5516FF",
+    primary: "#0066CC",
     text: "#111",
     border: "#ddd",
     background: "#fff",
     muted: "#eee",
     subtle: "#eee",
-    font: "Geist",
+    font: "Aspekta",
 };
 const geo = {
     features: [
