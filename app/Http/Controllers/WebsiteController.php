@@ -7,6 +7,7 @@ use App\Analytics\Diagnostics\SiteActivity;
 use App\Analytics\Reporting\Reports;
 use App\Http\Requests\SaveWebsiteRequest;
 use App\Models\Website;
+use App\Modules\Events\DomainEvents;
 use App\Support\Currencies;
 use App\Support\Ui;
 use Illuminate\Http\RedirectResponse;
@@ -101,21 +102,27 @@ class WebsiteController extends Controller
 
     public function update(SaveWebsiteRequest $request, Website $website, ContinuityLog $continuity): RedirectResponse
     {
-        DB::transaction(function () use ($request, $website, $continuity): void {
+        $events = DB::transaction(function () use ($request, $website, $continuity): array {
             $locked = Website::whereKey($website->id)->lockForUpdate()->firstOrFail();
             $data = $request->siteAttributes();
             if (($locked->first_collected_at || DB::table('events')->where('website_id', $locked->id)->exists()) && $data['timezone'] !== $locked->timezone) {
                 throw ValidationException::withMessages(['timezone' => 'The reporting timezone is fixed after the first collected event.']);
             }
             abort_if($locked->deleting_at, 409);
-            $continuity->diffWebsite($locked, $data, $request->user()->id);
+            $changes = $continuity->diffWebsite($locked, $data, $request->user()->id);
             if (isset($data['tracking_mode']) && $data['tracking_mode'] !== $locked->tracking_mode) {
                 $changed = now('UTC')->format('Y-m-d H:i:s.v');
                 DB::table('site_measurement_periods')->where('website_id', $locked->id)->whereNull('ended_at')->update(['ended_at' => $changed]);
                 DB::table('site_measurement_periods')->insert(['website_id' => $locked->id, 'started_at' => $changed, 'mode' => $data['tracking_mode']]);
             }
             $locked->update($data);
+
+            return $changes;
         }, 3);
+        // After the commit, once the response is sent: a replayed transaction publishes nothing twice (ADR 005, 009).
+        foreach ($events as $event) {
+            app(DomainEvents::class)->publishAfterResponse($event);
+        }
 
         return redirect()->route('sites.show', $website)->with('status', __('Site updated.'));
     }

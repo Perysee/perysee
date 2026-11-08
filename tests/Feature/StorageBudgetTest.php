@@ -6,6 +6,7 @@ use App\Analytics\InstanceHealth;
 use App\Analytics\StorageBudget;
 use App\Analytics\StorageMeter;
 use App\Models\Website;
+use App\Modules\Events\ContinuityBreakRecorded;
 use App\Modules\Events\DomainEvents;
 use App\Modules\Events\StorageBudgetExceeded;
 use App\Modules\ModuleRegistry;
@@ -287,6 +288,21 @@ class StorageBudgetTest extends TestCase
         $this->assertSame([1, 2], array_column($received, 'tier'), 'Lifting a tier is not an exceeded budget.');
         $this->pass((int) (1.1 * self::BUDGET));
         $this->assertSame([1, 2, 1], array_column($received, 'tier'));
+    }
+
+    public function test_a_rising_tier_also_tells_the_continuity_event_but_a_lifted_one_does_not(): void
+    {
+        $this->configure('auto');
+        $received = [];
+        app(DomainEvents::class)->listen('watcher', ContinuityBreakRecorded::class, function (ContinuityBreakRecorded $event) use (&$received): void {
+            $received[] = $event->payload();
+        });
+        $this->withModuleEnabled();
+
+        $this->pass((int) (1.1 * self::BUDGET));
+        $this->pass((int) (0.5 * self::BUDGET));
+
+        $this->assertSame([['site_id' => null, 'kind' => 'storage_tier', 'scope' => 'all', 'data_from' => now('UTC')->toDateString()]], $received);
     }
 
     public function test_no_event_is_published_while_the_mode_is_not_applying_a_tier(): void

@@ -8,6 +8,7 @@ use App\Analytics\Continuity\ContinuityLog;
 use App\Analytics\InstanceHealth;
 use App\Analytics\Maintenance\AggregationLock;
 use App\Analytics\Maintenance\RetentionPurge;
+use App\Modules\Events\DomainEvents;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -134,7 +135,10 @@ class PurgeData extends Command
             if ($retention !== null && $days < $retention && $total > 0) {
                 // The history is shorter than the retention says: figures before and after are no longer comparable.
                 try {
-                    $continuity->record('retention_purge', null, ContinuityLog::BREAKS, self::SCOPES[$target], ['target' => $target, 'older_than_days' => $days, 'retention_days' => $retention, 'rows' => $total], $cutoff->toDateString());
+                    $event = $continuity->record('retention_purge', null, ContinuityLog::BREAKS, self::SCOPES[$target], ['target' => $target, 'older_than_days' => $days, 'retention_days' => $retention, 'rows' => $total], $cutoff->toDateString());
+                    if ($event) {
+                        app(DomainEvents::class)->publish($event);
+                    }
                 } catch (\Throwable) {
                     $this->warn('The rows are deleted but the continuity log entry could not be written.');
                 }

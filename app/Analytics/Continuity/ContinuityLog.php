@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Analytics\Continuity;
 
+use App\Analytics\Maintenance\RetentionPurge;
 use App\Models\Website;
+use App\Modules\Events\ContinuityBreakRecorded;
+use App\Modules\Events\DomainEvents;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +31,7 @@ final class ContinuityLog
 
     public const SCOPES = ['all', 'sessions', 'pageviews', 'events', 'goals', 'segments'];
 
-    public const KINDS = ['tracking_mode', 'consent', 'allowed_domains', 'excluded_paths', 'currency', 'timezone', 'retention_change', 'retention_purge', 'storage_tier'];
+    public const KINDS = ['tracking_mode', 'consent', 'allowed_domains', 'excluded_paths', 'currency', 'timezone', 'retention_change', 'retention_purge', 'storage_tier', 'core_version', 'tracker_version', 'rebuild'];
 
     /** Days an entry is kept (the statistics retention default), and the rows kept per site or for the instance. */
     public const RETENTION_DAYS = 1095;
@@ -55,8 +58,10 @@ final class ContinuityLog
     /**
      * @param  array<string, scalar|list<scalar>|null>  $payload  Old and new values; text is cut, lists are shortened with a count.
      * @param  string|null  $dataFrom  First report day (Y-m-d) the change applies to.
+     * @return ContinuityBreakRecorded|null The event to publish once the caller's transaction is committed: only for a
+     *                                      `breaks` entry, and only when a module listens (nothing is built for nobody).
      */
-    public function record(string $kind, ?int $siteId, string $severity, string $scope, array $payload, ?string $dataFrom = null, ?int $actorId = null): void
+    public function record(string $kind, ?int $siteId, string $severity, string $scope, array $payload, ?string $dataFrom = null, ?int $actorId = null): ?ContinuityBreakRecorded
     {
         if (! in_array($kind, self::KINDS, true) || ! in_array($severity, [self::BREAKS, self::NOTE], true) || ! in_array($scope, self::SCOPES, true)) {
             throw new \InvalidArgumentException("Unknown continuity log entry \"{$kind}\" / \"{$severity}\" / \"{$scope}\".");
@@ -71,6 +76,43 @@ final class ContinuityLog
             'payload' => $this->encode($payload),
             'actor_id' => $actorId,
         ]);
+
+        return $severity === self::BREAKS && app(DomainEvents::class)->listening(ContinuityBreakRecorded::class) ? new ContinuityBreakRecorded($siteId, $kind, $scope, $dataFrom) : null;
+    }
+
+    /**
+     * A note that is written once: the same kind, scope and first day for the same site (or the instance) leaves a
+     * single entry, however often the system comes back to it. Callers hold a lock or a transaction of their own.
+     *
+     * @param  array<string, scalar|list<scalar>|null>  $payload
+     * @return bool Whether an entry was written.
+     */
+    public function noteOnce(string $kind, ?int $siteId, string $scope, string $dataFrom, array $payload): bool
+    {
+        $exists = DB::table('continuity_log')->where('kind', $kind)->where('scope', $scope)->where('data_from', $dataFrom)
+            ->when($siteId === null, fn ($query) => $query->whereNull('website_id'), fn ($query) => $query->where('website_id', $siteId))->exists();
+        if ($exists) {
+            return false;
+        }
+        $this->record($kind, $siteId, self::NOTE, $scope, $payload, $dataFrom);
+
+        return true;
+    }
+
+    /**
+     * What an automatic retention purge removed (rows deleted by table, as RetentionPurge::purge returns them):
+     * one note per kind of data and cutoff day. Nothing deleted, nothing read, nothing written.
+     *
+     * @param  array<string, int>  $deleted
+     */
+    public function expired(array $deleted, Carbon $cutoff): void
+    {
+        $day = $cutoff->copy()->utc()->toDateString();
+        foreach (RetentionPurge::EXPIRY_SCOPES as $target => $scope) {
+            if (array_sum(array_intersect_key($deleted, array_flip(RetentionPurge::TARGETS[$target]))) > 0) {
+                $this->noteOnce('retention_purge', null, $scope, $day, ['target' => $target]);
+            }
+        }
     }
 
     /**
@@ -78,9 +120,11 @@ final class ContinuityLog
      * locked site as it still is, and inside the transaction of the update. A field absent from $after is untouched.
      *
      * @param  array<string, mixed>  $after  The validated attributes about to be saved.
+     * @return list<ContinuityBreakRecorded> Events to publish once the transaction is committed.
      */
-    public function diffWebsite(Website $before, array $after, ?int $actorId = null): void
+    public function diffWebsite(Website $before, array $after, ?int $actorId = null): array
     {
+        $events = [];
         $dataFrom = now((string) ($after['timezone'] ?? $before->timezone))->toDateString();
         foreach (self::TRACKED as $field => [$kind, $scope]) {
             if (! array_key_exists($field, $after)) {
@@ -97,8 +141,10 @@ final class ContinuityLog
                 'timezone' => false,
                 default => true,
             };
-            $this->record($kind, $before->id, $breaks ? self::BREAKS : self::NOTE, $scope, ['from' => $from, 'to' => $to], $dataFrom, $actorId);
+            $events[] = $this->record($kind, $before->id, $breaks ? self::BREAKS : self::NOTE, $scope, ['from' => $from, 'to' => $to], $dataFrom, $actorId);
         }
+
+        return array_values(array_filter($events));
     }
 
     /**

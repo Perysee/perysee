@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Analytics\Aggregation\Aggregator;
+use App\Analytics\Continuity\ContinuityLog;
 use App\Analytics\InstanceHealth;
 use App\Installation\InstallationState;
 use App\Models\User;
@@ -64,6 +65,25 @@ class DemoAnalyticsTest extends TestCase
         $this->seed(LocalDemoSeeder::class);
         Website::where('is_demo', true)->first()->forceFill(['is_demo' => false])->save();
         $this->artisan('perysee:demo-reset')->assertFailed();
+    }
+
+    public function test_demo_reset_empties_the_continuity_log_of_the_demo_sites_only(): void
+    {
+        $this->app->instance('env', 'local');
+        User::factory()->create(['is_admin' => true]);
+        $this->seed(LocalDemoSeeder::class);
+        $demo = Website::where('is_demo', true)->first();
+        $real = Website::factory()->create();
+        $log = app(ContinuityLog::class);
+        $log->record('consent', $demo->id, 'breaks', 'all', [], '2026-10-01');
+        $log->record('consent', $real->id, 'breaks', 'all', [], '2026-10-01');
+        $log->record('retention_change', null, 'note', 'all', []);
+
+        $this->artisan('perysee:demo-reset', ['--seed' => 73421])->assertSuccessful();
+
+        $this->assertSame(0, DB::table('continuity_log')->where('website_id', $demo->id)->count());
+        $this->assertSame(1, DB::table('continuity_log')->where('website_id', $real->id)->count());
+        $this->assertSame(1, DB::table('continuity_log')->whereNull('website_id')->count(), 'an instance entry is not the demo site\'s');
     }
 
     public function test_failed_demo_aggregation_rolls_back_the_reset(): void

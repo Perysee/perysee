@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Analytics\Maintenance;
 
 use App\Analytics\Aggregation\Segments;
+use App\Analytics\Continuity\ContinuityLog;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +31,12 @@ final class RetentionPurge
         'sessions' => ['measured_sessions', 'segment_sessions'],
         'share-links' => ['share_links'],
     ];
+
+    /**
+     * The scope of the note an automatic purge leaves in the continuity log, one per kind of data (the log keeps one
+     * note per scope and cutoff day, so the scopes differ). It is a note: the normal expiry is no change of setting.
+     */
+    public const EXPIRY_SCOPES = ['events' => 'events', 'stats' => 'all', 'segments' => 'segments', 'sessions' => 'sessions'];
 
     /** The hourly aggregates, which the storage tiers can keep for less time than the daily ones (ADR 011). */
     public const HOURLY = ['stats_hourly', 'stats_segment_hourly'];
@@ -100,9 +107,10 @@ final class RetentionPurge
      * Deletes what is older than the cutoff, at most $maxBatches batches of $limit rows per table.
      *
      * @param  string|list<string>  $target
+     * @param  bool  $noteExpiry  Leave a note in the continuity log when rows were deleted (the automatic purges; an operator's purge writes its own entry)
      * @return array<string, int> Rows deleted by table; empty when the guard holds the target back.
      */
-    public function purge(string|array $target, Carbon $cutoff, int $limit, int $maxBatches): array
+    public function purge(string|array $target, Carbon $cutoff, int $limit, int $maxBatches, bool $noteExpiry = false): array
     {
         if ($this->blocked($target, $cutoff)) {
             return [];
@@ -116,6 +124,14 @@ final class RetentionPurge
                 if ($removed === 0) {
                     break;
                 }
+            }
+        }
+        if ($noteExpiry && array_sum($deleted) > 0) {
+            try {
+                app(ContinuityLog::class)->expired($deleted, $cutoff);
+            } catch (\Throwable $exception) {
+                // The rows are gone for good: a missing note must not fail the pass.
+                report($exception);
             }
         }
 

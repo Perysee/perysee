@@ -2,6 +2,10 @@
 
 return [
     'version' => '0.4.0',
+    // Version of the tracker script (public/tracker/lueur.v1.js, built from resources/js/lueur.js), which has no version of
+    // its own: raise it when a change of the script can move the figures. 1.0.0 counted pageviews and events; 1.1.0 added
+    // the value, props and id of an event. FinalizeUpdate writes a continuity note when it changes (ADR 009).
+    'tracker_version' => '1.1.0',
     'modules_path' => env('PERYSEE_MODULES_PATH', storage_path('app/modules')),
     // "docker" when the instance runs from the image built by the Docker installer: code is replaced by rebuilding
     // the image, never in place, so the in-place updater refuses to run.

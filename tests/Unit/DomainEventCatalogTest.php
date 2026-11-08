@@ -25,6 +25,7 @@ class DomainEventCatalogTest extends TestCase
         'share.revoked' => ['schema' => 1, 'payload' => ['site_id' => 'int', 'link_id' => 'int']],
         'module.quarantined' => ['schema' => 1, 'payload' => ['module_id' => 'string', 'stability' => 'string', 'dependents' => 'list', 'at' => 'string']],
         'ingest.storage_budget_exceeded' => ['schema' => 1, 'payload' => ['tier' => 'int', 'ratio_percent' => 'int', 'days_left' => '?int']],
+        'continuity.break_recorded' => ['schema' => 1, 'payload' => ['site_id' => '?int', 'kind' => 'string', 'scope' => 'string', 'data_from' => '?string']],
     ];
 
     private const FORBIDDEN_WORDS = ['email', 'mail', 'ip', 'token', 'hint', 'secret', 'password', 'label', 'reason', 'message', 'path', 'name', 'session', 'key', 'url'];

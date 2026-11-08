@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Analytics;
 
 use App\Analytics\Continuity\ContinuityLog;
+use App\Modules\Events\ContinuityBreakRecorded;
 use App\Modules\Events\DomainEvents;
 use App\Modules\Events\EventState;
 use App\Modules\Events\StorageBudgetExceeded;
@@ -223,16 +224,21 @@ class StorageBudget
     private function move(array $settings, int $tier, int $ratio): void
     {
         $from = $settings['tier'];
-        DB::transaction(function () use ($settings, $tier, $from, $ratio): void {
+        $break = DB::transaction(function () use ($settings, $tier, $from, $ratio): ?ContinuityBreakRecorded {
             if ($tier === 0) {
                 DB::table('analytics_state')->whereIn('name', [self::TIER, self::SINCE, self::AGREED])->delete();
             } else {
                 $this->health->put(self::TIER, $tier);
                 $this->health->put(self::SINCE, now('UTC')->toIso8601String());
             }
+
             // Data goes earlier from now on when the tier rises; a lifted tier only gives the settings back.
-            app(ContinuityLog::class)->record('storage_tier', null, $tier > $from ? ContinuityLog::BREAKS : ContinuityLog::NOTE, 'all', ['from' => $from, 'to' => $tier, 'ratio_percent' => $ratio, 'mode' => $settings['mode']], now('UTC')->toDateString());
+            return app(ContinuityLog::class)->record('storage_tier', null, $tier > $from ? ContinuityLog::BREAKS : ContinuityLog::NOTE, 'all', ['from' => $from, 'to' => $tier, 'ratio_percent' => $ratio, 'mode' => $settings['mode']], now('UTC')->toDateString());
         });
+        // After the commit; delivery never changes the outcome of the pass.
+        if ($break) {
+            app(DomainEvents::class)->publish($break);
+        }
         if ($tier === 0) {
             DB::table('analytics_state')->where('name', 'like', self::EVENT_MARKER.'%')->delete();
 

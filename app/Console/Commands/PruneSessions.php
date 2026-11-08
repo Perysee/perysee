@@ -48,7 +48,7 @@ class PruneSessions extends Command
 
                 return self::SUCCESS;
             }
-            $deleted = $purge->purge('sessions', $cutoff, $limit, self::MAX_BATCHES);
+            $deleted = $purge->purge('sessions', $cutoff, $limit, self::MAX_BATCHES, noteExpiry: true);
             $this->info('Removed '.($deleted['measured_sessions'] ?? 0).' measured sessions and '.($deleted['segment_sessions'] ?? 0).' segment sessions.');
 
             return self::SUCCESS;

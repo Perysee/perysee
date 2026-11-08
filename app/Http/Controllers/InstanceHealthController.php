@@ -7,6 +7,7 @@ use App\Analytics\Ingestion\Geolocation;
 use App\Analytics\InstanceHealth;
 use App\Analytics\StorageBudget;
 use App\Analytics\StorageTiers;
+use App\Modules\Events\DomainEvents;
 use App\Modules\ModuleExtensions;
 use App\Modules\ModuleFailures;
 use App\Support\AccessLog;
@@ -103,16 +104,22 @@ class InstanceHealthController extends Controller
     {
         abort_unless($request->user()->is_admin, 403);
         $data = $request->validate(['raw_retention_days' => ['required', 'integer', 'between:1,3650'], 'stats_retention_days' => ['required', 'integer', 'between:1,3650']]);
-        DB::transaction(function () use ($data, $health, $continuity, $request): void {
+        $events = DB::transaction(function () use ($data, $health, $continuity, $request): array {
+            $events = [];
             foreach ($data as $name => $days) {
                 $before = $health->retentionDays($name);
                 $health->put($name, (int) $days);
                 if ($before !== (int) $days) {
                     // Keeping less history removes data for good, so figures before and after are no longer comparable.
-                    $continuity->record('retention_change', null, (int) $days < $before ? ContinuityLog::BREAKS : ContinuityLog::NOTE, 'all', ['setting' => $name, 'from' => $before, 'to' => (int) $days], now('UTC')->toDateString(), $request->user()->id);
+                    $events[] = $continuity->record('retention_change', null, (int) $days < $before ? ContinuityLog::BREAKS : ContinuityLog::NOTE, 'all', ['setting' => $name, 'from' => $before, 'to' => (int) $days], now('UTC')->toDateString(), $request->user()->id);
                 }
             }
+
+            return array_values(array_filter($events));
         });
+        foreach ($events as $event) {
+            app(DomainEvents::class)->publishAfterResponse($event);
+        }
 
         return back()->with('status', 'Retention updated. Expired data will be removed by scheduled maintenance.');
     }

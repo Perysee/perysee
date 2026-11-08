@@ -7,6 +7,7 @@ use App\Installation\InstallationState;
 use App\Models\Website;
 use App\Modules\Events\AggregationCompleted;
 use App\Modules\Events\BacklogExceeded;
+use App\Modules\Events\ContinuityBreakRecorded;
 use App\Modules\Events\DomainEvents;
 use App\Modules\Events\GoalConverted;
 use App\Modules\Events\HeartbeatMissed;
@@ -60,7 +61,7 @@ class DomainEventsCostTest extends TestCase
         $this->idlePass(); // warm-up: first runs write markers that later runs do not
 
         $alone = count($this->idlePass());
-        foreach ([AggregationCompleted::class, GoalConverted::class, HeartbeatMissed::class, BacklogExceeded::class] as $event) {
+        foreach ([AggregationCompleted::class, GoalConverted::class, HeartbeatMissed::class, BacklogExceeded::class, ContinuityBreakRecorded::class] as $event) {
             app(DomainEvents::class)->listen('watcher', $event, fn () => null);
         }
         $listened = $this->idlePass();

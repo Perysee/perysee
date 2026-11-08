@@ -29,7 +29,7 @@ class PruneTracking extends Command
         try {
             // One batch per pass: the rule is shared with the hourly purges and the operator's `perysee:purge`.
             // The goal ledger only deduplicates live sessions; the aggregated goal counters follow the statistics retention like the other aggregates.
-            $deleted = app(RetentionPurge::class)->purge('events', now('UTC')->subDays($days), $limit, 1)['events'] ?? 0;
+            $deleted = app(RetentionPurge::class)->purge('events', now('UTC')->subDays($days), $limit, 1, noteExpiry: true)['events'] ?? 0;
             $this->info("Deleted {$deleted} expired tracking events.");
 
             return self::SUCCESS;
