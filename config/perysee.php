@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '0.5.1',
+    'version' => '0.6.0',
     // Version of the tracker script (public/tracker/lueur.v1.js, built from resources/js/lueur.js), which has no version of
     // its own: raise it when a change of the script can move the figures. 1.0.0 counted pageviews and events; 1.1.0 added
     // the value, props and id of an event. FinalizeUpdate writes a continuity note when it changes (ADR 009).
