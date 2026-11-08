@@ -780,10 +780,10 @@ summary {
 
 /* Dark mode refinements: three readable levels (sidebar and top bar, page, cards) and borders that stay visible. */
 .dark {
-    --ui-bg-workspace: #04060f;
-    --ui-bg-panel: #0b0e1a;
-    --ui-border: #323750;
-    --ui-border-muted: #232738;
+    --ui-bg-workspace: #08080A;
+    --ui-bg-panel: #141416;
+    --ui-border: #36363C;
+    --ui-border-muted: #26262B;
 }
 .dark .perysee-nav [aria-current="page"] {
     background: color-mix(in srgb, var(--ui-primary) 12%, transparent);
