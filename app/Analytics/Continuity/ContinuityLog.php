@@ -29,6 +29,11 @@ final class ContinuityLog
 
     public const KINDS = ['tracking_mode', 'consent', 'allowed_domains', 'excluded_paths', 'currency', 'timezone', 'retention_change'];
 
+    /** Days an entry is kept (the statistics retention default), and the rows kept per site or for the instance. */
+    public const RETENTION_DAYS = 1095;
+
+    public const MAX_PER_SITE = 500;
+
     private const MAX_PAYLOAD_BYTES = 1024;
 
     private const MAX_TEXT_LENGTH = 64;

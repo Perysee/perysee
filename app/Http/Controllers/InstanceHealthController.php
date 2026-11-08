@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\Continuity\ContinuityLog;
 use App\Analytics\Ingestion\Geolocation;
 use App\Analytics\InstanceHealth;
 use App\Modules\ModuleExtensions;
@@ -12,6 +13,7 @@ use App\Updates\UpdateStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Response;
 
 class InstanceHealthController extends Controller
@@ -54,13 +56,20 @@ class InstanceHealthController extends Controller
         return back()->with('status', 'Storage quota saved.');
     }
 
-    public function update(Request $request, InstanceHealth $health): RedirectResponse
+    public function update(Request $request, InstanceHealth $health, ContinuityLog $continuity): RedirectResponse
     {
         abort_unless($request->user()->is_admin, 403);
         $data = $request->validate(['raw_retention_days' => ['required', 'integer', 'between:1,3650'], 'stats_retention_days' => ['required', 'integer', 'between:1,3650']]);
-        foreach ($data as $name => $days) {
-            $health->put($name, (int) $days);
-        }
+        DB::transaction(function () use ($data, $health, $continuity, $request): void {
+            foreach ($data as $name => $days) {
+                $before = $health->retentionDays($name);
+                $health->put($name, (int) $days);
+                if ($before !== (int) $days) {
+                    // Keeping less history removes data for good, so figures before and after are no longer comparable.
+                    $continuity->record('retention_change', null, (int) $days < $before ? ContinuityLog::BREAKS : ContinuityLog::NOTE, 'all', ['setting' => $name, 'from' => $before, 'to' => (int) $days], now('UTC')->toDateString(), $request->user()->id);
+                }
+            }
+        });
 
         return back()->with('status', 'Retention updated. Expired data will be removed by scheduled maintenance.');
     }
