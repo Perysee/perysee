@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountSecurityController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ConfigurationAuditController;
 use App\Http\Controllers\DemoController;
 use App\Http\Controllers\EventPropertyController;
 use App\Http\Controllers\FunnelController;
@@ -53,6 +54,7 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/pixels', [WorkspaceController::class, 'pixels'])->name('pixels');
         Route::get('/modules/{module}/assets/{file}', ModuleAssetController::class)->where('file', '[A-Za-z0-9_.-]+')->name('modules.assets');
         Route::get('/health', [InstanceHealthController::class, 'show'])->name('health');
+        Route::get('/health/audit', [ConfigurationAuditController::class, 'show'])->name('health.audit');
         Route::put('/health', [InstanceHealthController::class, 'update'])->name('health.update');
         Route::put('/health/storage', [InstanceHealthController::class, 'storage'])->name('health.storage');
         Route::put('/health/storage/budget', [InstanceHealthController::class, 'budget'])->name('health.storage.budget');

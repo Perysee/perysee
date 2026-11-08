@@ -100,17 +100,20 @@ const processing = computed(() =>
                 Collection, consolidation and data retention.
             </p>
         </div>
-        <UBadge
-            :color="cronLate || backlogLate ? 'warning' : 'success'"
-            variant="subtle"
-            >{{
-                cronLate
-                    ? "Check your scheduler"
-                    : backlogLate
-                      ? "Consolidation delayed"
-                      : "Scheduler active"
-            }}</UBadge
-        >
+        <div class="flex flex-wrap items-center gap-3">
+            <UButton :to="page.props.links['health.audit']" label="Configuration audit" icon="i-tabler-checklist" color="neutral" variant="outline" size="sm" />
+            <UBadge
+                :color="cronLate || backlogLate ? 'warning' : 'success'"
+                variant="subtle"
+                >{{
+                    cronLate
+                        ? "Check your scheduler"
+                        : backlogLate
+                          ? "Consolidation delayed"
+                          : "Scheduler active"
+                }}</UBadge
+            >
+        </div>
     </div>
     <UAlert
         v-if="cronLate"

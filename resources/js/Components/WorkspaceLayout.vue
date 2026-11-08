@@ -46,6 +46,7 @@ const title = computed(
             journeys: "Journeys",
             dashboard: "Home",
             health: "Instance health",
+            "health.audit": "Configuration audit",
             settings: "Instance settings",
             "settings.mail": "Mail",
             modules: "Modules",
@@ -200,6 +201,12 @@ const configNav = computed(() =>
                             icon: "i-tabler-activity",
                             to: p.value.links.health,
                             active: p.value.screen === "health",
+                        },
+                        {
+                            label: "Configuration audit",
+                            icon: "i-tabler-checklist",
+                            to: p.value.links["health.audit"],
+                            active: p.value.screen === "health.audit",
                         },
                         {
                             label: "Instance settings",

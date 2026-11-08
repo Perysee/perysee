@@ -35,7 +35,18 @@ class InstanceHealth
     /** The retention the administrator chose for `raw_retention_days` or `stats_retention_days`, its default when nobody set it. */
     public function retentionDays(string $name): int
     {
-        return (int) $this->get($name, $name === 'raw_retention_days' ? config('perysee.raw_retention_days', 90) : 1095);
+        return (int) $this->get($name, $this->defaultRetentionDays($name));
+    }
+
+    /**
+     * The retention of an instance whose administrator never saved one, from the configuration. A missing or
+     * absurd default stops the caller instead of becoming "keep nothing" in a purge.
+     */
+    public function defaultRetentionDays(string $name): int
+    {
+        $days = (int) ($name === 'raw_retention_days' ? config('perysee.raw_retention_days', 90) : config('perysee.stats_retention_days'));
+
+        return $days >= 1 ? $days : throw new \LogicException("The default of {$name} in config/perysee.php must be a number of days.");
     }
 
     /**
@@ -47,8 +58,8 @@ class InstanceHealth
     public function effectiveRetention(): array
     {
         $state = $this->many(['raw_retention_days', 'stats_retention_days', 'storage_tier']);
-        $raw = (int) ($state['raw_retention_days'] ?? config('perysee.raw_retention_days', 90));
-        $stats = (int) ($state['stats_retention_days'] ?? 1095);
+        $raw = (int) ($state['raw_retention_days'] ?? $this->defaultRetentionDays('raw_retention_days'));
+        $stats = (int) ($state['stats_retention_days'] ?? $this->defaultRetentionDays('stats_retention_days'));
         $tier = max(0, min(StorageTiers::MAX, (int) ($state['storage_tier'] ?? 0)));
 
         return ['raw' => StorageTiers::rawDays($raw, $tier), 'stats' => $stats, 'hourly' => StorageTiers::hourlyDays($stats, $tier), 'tier' => $tier];
