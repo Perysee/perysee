@@ -18,6 +18,9 @@ class UpsertIncrementTest extends TestCase
 
     public function test_sqlite_adds_the_excluded_row(): void
     {
+        config(['database.connections.upsert-increment' => ['driver' => 'sqlite', 'database' => ':memory:']]);
+        DB::setDefaultConnection('upsert-increment');
+
         $columns = UpsertIncrement::columns(['pageviews', 'sessions']);
 
         $this->assertSame(['pageviews', 'sessions'], array_keys($columns));
