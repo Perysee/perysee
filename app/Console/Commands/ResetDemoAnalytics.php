@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Analytics\Aggregation\Aggregator;
 use App\Analytics\DemoTraffic;
 use App\Analytics\InstanceHealth;
+use App\Analytics\Maintenance\SiteTables;
 use App\Analytics\Reporting\JourneyReports;
 use App\Analytics\Reporting\Reports;
 use App\Models\Website;
@@ -57,7 +58,7 @@ class ResetDemoAnalytics extends Command
                 }
                 $manifests = [];
                 foreach ($sites as $site) {
-                    foreach (['events', 'stats_daily', 'stats_hourly', 'stats_dimension_daily', 'measured_sessions', 'site_measurement_periods', 'stats_segment_daily', 'stats_segment_hourly', 'segment_events', 'segment_sessions', 'journey_report_sessions', 'journey_reports'] as $table) {
+                    foreach (SiteTables::DEMO as $table) {
                         DB::table($table)->where('website_id', $site->id)->delete();
                     }
                     $generated = app(DemoTraffic::class)->generate($site, $seed);
