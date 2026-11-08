@@ -183,7 +183,8 @@ class ConfigurationAuditTest extends TestCase
         $this->actingAs($admin)->get('/health/audit')->assertOk();
 
         // Any signed-in request records its device in `user_sessions`: that is the shell of every page, not the audit.
-        $this->assertSame([], array_values(array_filter($writes, fn (string $sql): bool => ! str_contains($sql, '"user_sessions"'))), 'Only the device list may be written.');
+        // MariaDB quotes names with backticks, SQLite with double quotes: compare them in one form.
+        $this->assertSame([], array_values(array_filter($writes, fn (string $sql): bool => ! str_contains(str_replace('`', '"', $sql), '"user_sessions"'))), 'Only the device list may be written.');
         $this->assertSame(array_diff_key($before, ['user_sessions' => 1]), array_diff_key($this->dump(), ['user_sessions' => 1]));
     }
 
@@ -200,7 +201,8 @@ class ConfigurationAuditTest extends TestCase
 
         $statements = [];
         DB::listen(function ($query) use (&$statements): void {
-            $statements[] = $query->sql;
+            // MariaDB quotes names with backticks, SQLite with double quotes: keep one form to search in.
+            $statements[] = str_replace('`', '"', $query->sql);
         });
         $this->actingAs($admin)->get('/health/audit')->assertOk();
 

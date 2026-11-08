@@ -133,7 +133,9 @@ class AggregationQueryBudgetTest extends TestCase
 
         // The Health page shows this figure: it stays a count, not a yes or no.
         $this->assertSame(3, app(InstanceHealth::class)->get('segments_rebuild')['pending']);
-        $this->assertLessThanOrEqual(15, count($queries), implode(' | ', $queries));
+        // MariaDB adds the GET_LOCK and the RELEASE_LOCK of the aggregation lock.
+        $budget = in_array(DB::getDriverName(), ['mariadb', 'mysql'], true) ? 17 : 15;
+        $this->assertLessThanOrEqual($budget, count($queries), implode(' | ', $queries));
         $this->assertSame(3, app(Segments::class)->rebuild(5));
         $this->assertSame(0, app(InstanceHealth::class)->get('segments_rebuild')['pending']);
     }
