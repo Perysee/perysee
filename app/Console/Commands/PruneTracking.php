@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Analytics\Aggregation\Segments;
 use App\Analytics\InstanceHealth;
+use App\Analytics\Maintenance\KeyedDelete;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -46,8 +47,9 @@ class PruneTracking extends Command
             });
             // The goal ledger only deduplicates live sessions; the aggregated goal counters follow the statistics retention like the other aggregates.
             $keys = ['website_id', 'goal_id', 'version', 'session_key'];
-            foreach (DB::table('goal_sessions')->where('last_hit_at', '<', now('UTC')->subDays($days))->orderBy('last_hit_at')->limit($limit)->get($keys) as $row) {
-                DB::table('goal_sessions')->where((array) $row)->delete();
+            $expired = DB::table('goal_sessions')->where('last_hit_at', '<', now('UTC')->subDays($days))->orderBy('last_hit_at')->limit($limit)->get($keys);
+            if ($expired->isNotEmpty()) {
+                KeyedDelete::rows('goal_sessions', $keys, $expired);
             }
             $this->info("Deleted {$deleted} expired tracking events.");
 

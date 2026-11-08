@@ -1,0 +1,448 @@
+{
+    "source": {
+        "map": [],
+        "total": 31,
+        "distinct_values": 5,
+        "granularity": "day",
+        "series": [
+            {
+                "date": "2026-10-23",
+                "label": "2026-10-23",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-24",
+                "label": "2026-10-24",
+                "pageviews": 21,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-25",
+                "label": "2026-10-25",
+                "pageviews": 10,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-26",
+                "label": "2026-10-26",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            }
+        ],
+        "data": [
+            {
+                "value": "chatgpt.com",
+                "count": 12,
+                "label": "ChatGPT",
+                "provider": "chatgpt",
+                "category": "ai",
+                "icon": "chatgpt"
+            },
+            {
+                "value": "google",
+                "count": 7,
+                "label": "google",
+                "provider": null,
+                "category": "other",
+                "icon": null
+            },
+            {
+                "value": "Direct",
+                "count": 6,
+                "label": "Direct \/ unidentified origin",
+                "provider": null,
+                "category": "direct",
+                "icon": null
+            },
+            {
+                "value": "claude.ai",
+                "count": 5,
+                "label": "Claude",
+                "provider": "claude",
+                "category": "ai",
+                "icon": "claude"
+            },
+            {
+                "value": "news.example",
+                "count": 1,
+                "label": "news.example",
+                "provider": null,
+                "category": "other",
+                "icon": null
+            }
+        ]
+    },
+    "ai": {
+        "map": [],
+        "total": 17,
+        "distinct_values": 2,
+        "granularity": "day",
+        "series": [
+            {
+                "date": "2026-10-23",
+                "label": "2026-10-23",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-24",
+                "label": "2026-10-24",
+                "pageviews": 14,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-25",
+                "label": "2026-10-25",
+                "pageviews": 3,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-26",
+                "label": "2026-10-26",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            }
+        ],
+        "data": [
+            {
+                "value": "chatgpt.com",
+                "count": 12,
+                "label": "ChatGPT",
+                "provider": "chatgpt",
+                "category": "ai",
+                "icon": "chatgpt"
+            },
+            {
+                "value": "claude.ai",
+                "count": 5,
+                "label": "Claude",
+                "provider": "claude",
+                "category": "ai",
+                "icon": "claude"
+            }
+        ]
+    },
+    "provider": {
+        "map": [],
+        "total": 5,
+        "distinct_values": 1,
+        "granularity": "day",
+        "series": [
+            {
+                "date": "2026-10-23",
+                "label": "2026-10-23",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-24",
+                "label": "2026-10-24",
+                "pageviews": 4,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-25",
+                "label": "2026-10-25",
+                "pageviews": 1,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-26",
+                "label": "2026-10-26",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            }
+        ],
+        "data": [
+            {
+                "value": "claude.ai",
+                "count": 5,
+                "label": "Claude",
+                "provider": "claude",
+                "category": "ai",
+                "icon": "claude"
+            }
+        ]
+    },
+    "mixed case value": {
+        "map": [],
+        "total": 12,
+        "distinct_values": 1,
+        "granularity": "day",
+        "series": [
+            {
+                "date": "2026-10-23",
+                "label": "2026-10-23",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-24",
+                "label": "2026-10-24",
+                "pageviews": 10,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-25",
+                "label": "2026-10-25",
+                "pageviews": 2,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-26",
+                "label": "2026-10-26",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            }
+        ],
+        "data": [
+            {
+                "value": "chatgpt.com",
+                "count": 12,
+                "label": "ChatGPT",
+                "provider": "chatgpt",
+                "category": "ai",
+                "icon": "chatgpt"
+            }
+        ]
+    },
+    "path": {
+        "map": [],
+        "total": 9,
+        "distinct_values": 2,
+        "granularity": "day",
+        "series": [
+            {
+                "date": "2026-10-23",
+                "label": "2026-10-23",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-24",
+                "label": "2026-10-24",
+                "pageviews": 3,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-25",
+                "label": "2026-10-25",
+                "pageviews": 6,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-26",
+                "label": "2026-10-26",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            }
+        ],
+        "data": [
+            {
+                "value": "\/a",
+                "count": 5
+            },
+            {
+                "value": "\/b",
+                "count": 4
+            }
+        ]
+    },
+    "path value": {
+        "map": [],
+        "total": 5,
+        "distinct_values": 1,
+        "granularity": "day",
+        "series": [
+            {
+                "date": "2026-10-23",
+                "label": "2026-10-23",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-24",
+                "label": "2026-10-24",
+                "pageviews": 3,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-25",
+                "label": "2026-10-25",
+                "pageviews": 2,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-26",
+                "label": "2026-10-26",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            }
+        ],
+        "data": [
+            {
+                "value": "\/a",
+                "count": 5
+            }
+        ]
+    },
+    "country": {
+        "map": [
+            {
+                "value": "FR",
+                "count": 6
+            },
+            {
+                "value": "US",
+                "count": 3
+            }
+        ],
+        "total": 9,
+        "distinct_values": 2,
+        "granularity": "day",
+        "series": [
+            {
+                "date": "2026-10-23",
+                "label": "2026-10-23",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-24",
+                "label": "2026-10-24",
+                "pageviews": 5,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-25",
+                "label": "2026-10-25",
+                "pageviews": 4,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-26",
+                "label": "2026-10-26",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            }
+        ],
+        "data": [
+            {
+                "value": "FR",
+                "count": 6
+            },
+            {
+                "value": "US",
+                "count": 3
+            }
+        ]
+    },
+    "event": {
+        "map": [],
+        "total": 2,
+        "distinct_values": 1,
+        "granularity": "day",
+        "series": [
+            {
+                "date": "2026-10-23",
+                "label": "2026-10-23",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-24",
+                "label": "2026-10-24",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-25",
+                "label": "2026-10-25",
+                "pageviews": 0,
+                "custom_events": 2,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-26",
+                "label": "2026-10-26",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            }
+        ],
+        "data": [
+            {
+                "value": "signup",
+                "count": 2
+            }
+        ]
+    },
+    "none": {
+        "map": [],
+        "total": 0,
+        "distinct_values": 0,
+        "granularity": "day",
+        "series": [
+            {
+                "date": "2026-10-23",
+                "label": "2026-10-23",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-24",
+                "label": "2026-10-24",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-25",
+                "label": "2026-10-25",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            },
+            {
+                "date": "2026-10-26",
+                "label": "2026-10-26",
+                "pageviews": 0,
+                "custom_events": 0,
+                "sessions": null
+            }
+        ],
+        "data": []
+    }
+}

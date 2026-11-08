@@ -94,6 +94,19 @@ class CoordinationTest extends TestCase
         $this->assertDatabaseCount('events', 0);
     }
 
+    public function test_the_collection_limit_is_a_setting_that_defaults_to_120_a_minute(): void
+    {
+        $this->assertSame(['max_attempts' => 120, 'decay_seconds' => 60], config('perysee.collect.rate_limit'));
+        config(['perysee.collect.rate_limit' => ['max_attempts' => 5, 'decay_seconds' => 30]]);
+        $site = Website::factory()->create();
+        $recorder = $this->recorder();
+        $this->app->instance(Coordination::class, $recorder);
+
+        $this->collect($site)->assertNoContent();
+
+        $this->assertSame([5, 30], [$recorder->calls[0][2], $recorder->calls[0][3]]);
+    }
+
     public function test_collection_failures_are_counted_through_the_bound_service(): void
     {
         $site = Website::factory()->create();

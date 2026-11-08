@@ -28,10 +28,33 @@ class Geolocation
                 throw new \RuntimeException('A country database is required.');
             }
 
-            return ['available' => true, 'provider' => 'DB-IP Lite', 'built_at' => gmdate('Y-m-d', $metadata->buildEpoch), 'sha256' => hash_file('sha256', $this->path())];
+            return ['available' => true, 'provider' => 'DB-IP Lite', 'built_at' => gmdate('Y-m-d', $metadata->buildEpoch), 'sha256' => $this->sha256()];
         } catch (Throwable) {
             return ['available' => false, 'provider' => 'DB-IP Lite', 'built_at' => null, 'sha256' => null];
         }
+    }
+
+    /**
+     * The checksum is read from the cache while the file keeps its path, size and modification time: hashing the whole
+     * database on every status (the Health page asks twice) is wasted work.
+     */
+    private function sha256(): string
+    {
+        $path = $this->path();
+        $stamp = $path.'|'.filemtime($path).'|'.filesize($path);
+        $known = Cache::store('file')->get('geoip:sha256');
+        if (($known['stamp'] ?? null) === $stamp) {
+            return $known['sha256'];
+        }
+        $sha256 = $this->digest($path);
+        Cache::store('file')->forever('geoip:sha256', ['stamp' => $stamp, 'sha256' => $sha256]);
+
+        return $sha256;
+    }
+
+    protected function digest(string $path): string
+    {
+        return hash_file('sha256', $path);
     }
 
     public function lookup(string $ip): array
@@ -82,6 +105,7 @@ class Geolocation
                     throw new \RuntimeException('Cannot replace country database.');
                 }
                 $this->reader = null;
+                Cache::store('file')->forget('geoip:sha256');
             } finally {
                 if (is_file($temporary)) {
                     unlink($temporary);

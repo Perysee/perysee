@@ -41,6 +41,10 @@ return [
     'order_dedup_days' => (int) env('PERYSEE_ORDER_DEDUP_DAYS', 30),
     // A site that has received events but none for this many days is flagged as silent.
     'silent_site_days' => (int) env('PERYSEE_SILENT_SITE_DAYS', 3),
+    // The collector (/api/collect) accepts this many events from one address for one site in `decay_seconds`.
+    'collect' => [
+        'rate_limit' => ['max_attempts' => 120, 'decay_seconds' => 60],
+    ],
     'redis_enabled' => (bool) env('PERYSEE_REDIS_ENABLED', false),
     'landing_url' => env('PERYSEE_LANDING_URL', 'https://perysee.com'),
     'docs_url' => env('PERYSEE_DOCS_URL', 'https://docs.perysee.com'),

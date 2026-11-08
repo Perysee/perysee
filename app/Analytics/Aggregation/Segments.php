@@ -217,10 +217,7 @@ class Segments
             DB::table($table)->insertOrIgnore($row['insert']);
             DB::table($table)->where($row['identity'])->incrementEach(array_filter($row['metrics']));
         }
-        $expressions = [];
-        foreach (self::METRICS as $metric) {
-            $expressions[$metric] = DB::raw($metric.' + '.(DB::getDriverName() === 'sqlite' ? 'excluded.'.$metric : 'VALUES('.$metric.')'));
-        }
+        $expressions = UpsertIncrement::columns(self::METRICS);
         foreach (array_chunk($additions, 200) as $chunk) {
             DB::table($table)->upsert($chunk, ['website_id', 'bucket_start', 'segment_hash'], $expressions);
         }

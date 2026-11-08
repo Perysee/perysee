@@ -236,9 +236,8 @@ class Aggregator
                 throw new RuntimeException('Dimension identity collision.');
             }
         }
-        $incoming = DB::getDriverName() === 'sqlite' ? 'excluded.metric_count' : 'VALUES(metric_count)';
         foreach (array_chunk(array_values($dimensions), 200) as $chunk) {
-            DB::table('stats_dimension_daily')->upsert($chunk, ['website_id', 'stat_date', 'dimension_type', 'dimension_hash'], ['metric_count' => DB::raw('metric_count + '.$incoming)]);
+            DB::table('stats_dimension_daily')->upsert($chunk, ['website_id', 'stat_date', 'dimension_type', 'dimension_hash'], UpsertIncrement::columns(['metric_count']));
         }
     }
 
@@ -265,12 +264,7 @@ class Aggregator
         if ($groups === []) {
             return;
         }
-        $expressions = [];
-        foreach (['pageviews', 'custom_events', 'sessions', 'session_pageviews', 'unknown_pageviews', 'dimension_pageviews', 'country_pageviews'] as $metric) {
-            $incoming = DB::getDriverName() === 'sqlite' ? 'excluded.'.$metric : 'VALUES('.$metric.')';
-            $expressions[$metric] = DB::raw($metric.' + '.$incoming);
-        }
-        DB::table($table)->upsert(array_values($groups), $keys, $expressions);
+        DB::table($table)->upsert(array_values($groups), $keys, UpsertIncrement::columns(['pageviews', 'custom_events', 'sessions', 'session_pageviews', 'unknown_pageviews', 'dimension_pageviews', 'country_pageviews']));
     }
 
     private function sessionDelta(array &$deltas, int $site, string $date, string $hour, int $count): void

@@ -81,4 +81,35 @@ class GeolocationTest extends TestCase
         $site = Website::factory()->create();
         $this->withHeaders(['Origin' => 'https://'.$site->domain, 'X-Forwarded-For' => '8.8.8.8'])->postJson('/api/collect', ['v' => 1, 'site' => $site->public_id, 'type' => 'pageview', 'mode' => 'pageviews', 'host' => $site->domain, 'path' => '/', 'consent' => true, 'ref' => null])->assertNoContent();
     }
+
+    public function test_the_database_is_hashed_once_per_version_of_the_file_whatever_the_number_of_calls(): void
+    {
+        config(['cache.stores.file.path' => $this->installationDirectory.'/cache', 'cache.stores.file.lock_path' => $this->installationDirectory.'/locks', 'perysee.geoip_directory' => $this->installationDirectory.'/geoip']);
+        $counting = fn (): Geolocation => new class extends Geolocation
+        {
+            public static int $hashes = 0;
+
+            protected function digest(string $path): string
+            {
+                self::$hashes++;
+
+                return parent::digest($path);
+            }
+        };
+        $counting()::$hashes = 0;
+        $first = $counting()->status();
+
+        $this->assertSame(hash_file('sha256', resource_path('geoip/country.mmdb')), $first['sha256']);
+        $this->assertSame($first, $counting()->status());
+        $geo = $counting();
+        $this->assertSame($first, $geo->status());
+        $this->assertSame(1, $geo::$hashes);
+
+        // An import replaces the file: the next status reads the new one, every time.
+        $file = UploadedFile::fake()->createWithContent('country.mmdb', file_get_contents(resource_path('geoip/country.mmdb')));
+        $geo->import($file);
+        $geo->import($file);
+        $this->assertSame($first['sha256'], $geo->status()['sha256']);
+        $this->assertSame(2, $geo::$hashes);
+    }
 }
