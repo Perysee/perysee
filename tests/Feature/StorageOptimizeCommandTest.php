@@ -72,6 +72,10 @@ class StorageOptimizeCommandTest extends TestCase
 
     public function test_on_sqlite_it_says_it_is_not_applicable_and_succeeds(): void
     {
+        if (DB::getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('The command does nothing on SQLite only; this run uses '.DB::getDriverName().'.');
+        }
+
         $this->artisan('perysee:storage-optimize', ['table' => 'events', '--force' => true])->expectsOutputToContain('Not applicable')->assertSuccessful();
         $this->artisan('perysee:storage-optimize', ['table' => 'no_such_table'])->expectsOutputToContain('Not applicable')->assertSuccessful();
         $this->assertSame('sqlite', DB::getDriverName());
