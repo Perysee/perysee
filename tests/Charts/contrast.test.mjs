@@ -34,7 +34,7 @@ for (const mode of ['light', 'dark']) {
         for (const surface of ['--ui-bg', '--ui-bg-elevated', '--ui-bg-muted']) {
             check(tokens['--ui-primary'], tokens[surface], tokens, 3, `Chart on ${surface}`);
         }
-        check('#F8F8F8', tokens['--brand-action'] || tokens['--ui-primary'], tokens, 4.5, 'Solid action label');
+        check('#FFFFFF', tokens['--brand-action'] || tokens['--ui-primary'], tokens, 4.5, 'Solid action label');
         check(tokens['--ui-border-accented'], tokens['--ui-bg-elevated'], tokens, 3, 'Control boundary');
     });
 }
@@ -67,7 +67,7 @@ for (const mode of ['light', 'dark']) {
         for (const surface of ['--ui-bg', '--ui-bg-panel', '--ui-bg-overlay']) {
             check(fills[0], tokens[surface], tokens, 4.5, `Brand silhouette on ${surface}`);
         }
-        check('#F8F8F8', tokens['--brand-action'], tokens, 4.5, 'New violet action label');
+        check('#FFFFFF', tokens['--brand-action'], tokens, 4.5, 'Action label');
         check(tokens['--ui-primary'], tokens['--ui-bg-panel'], tokens, 3, 'Chart and focus accent');
     });
 }

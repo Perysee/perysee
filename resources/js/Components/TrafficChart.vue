@@ -60,7 +60,7 @@ const options = () => {
         background: color("--ui-bg"),
         muted: color("--ui-bg-accented"),
         subtle: color("--brand-subtle"),
-        font: "Geist, sans-serif",
+        font: "Aspekta, sans-serif",
         compact: props.compact,
         reduced: matchMedia("(prefers-reduced-motion: reduce)").matches,
     };
