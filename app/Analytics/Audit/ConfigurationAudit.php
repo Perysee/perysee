@@ -10,6 +10,7 @@ use App\Analytics\Audit\Checks\AllowedDomainsCheck;
 use App\Analytics\Audit\Checks\BackupCheck;
 use App\Analytics\Audit\Checks\ContinuityBreaksCheck;
 use App\Analytics\Audit\Checks\CookieCheck;
+use App\Analytics\Audit\Checks\CookieScopeCheck;
 use App\Analytics\Audit\Checks\HttpsCheck;
 use App\Analytics\Audit\Checks\MeasurementModeCheck;
 use App\Analytics\Audit\Checks\RawRetentionCheck;
@@ -33,7 +34,7 @@ final class ConfigurationAudit
     {
         return $this->checks ?? [
             new RawRetentionCheck, new StatsRetentionCheck,
-            new MeasurementModeCheck, new CookieCheck, new AddressStorageCheck,
+            new MeasurementModeCheck, new CookieCheck, ...($profile->cnil === null ? [] : [new CookieScopeCheck]), new AddressStorageCheck,
             new AllowedDomainsCheck,
             new HttpsCheck, new SchedulerCheck, new BackupCheck, new VersionCheck, new StorageBudgetCheck,
             new TwoFactorCheck, new AdministratorCountCheck,

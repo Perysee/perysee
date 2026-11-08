@@ -29,7 +29,7 @@ final class StatsRetentionCheck extends AbstractCheck
                 ? __('The daily statistics are kept longer than this profile expects. The retention form of the Instance health page changes it; shortening it deletes history for good.')
                 : __('The daily statistics are deleted after this delay by the scheduled maintenance.'),
             __('at most :days days', ['days' => $max]),
-            route('health', [], false),
+            route('health', [], false).'#data-retention',
         );
     }
 }

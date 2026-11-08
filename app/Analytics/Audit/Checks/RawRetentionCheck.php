@@ -29,7 +29,7 @@ final class RawRetentionCheck extends AbstractCheck
                 ? __('Processed raw events are kept longer than this profile expects. They are the most detailed data the instance holds.')
                 : __('Processed raw events are deleted after this delay by the scheduled maintenance.'),
             __('at most :days days', ['days' => $max]),
-            route('health', [], false),
+            route('health', [], false).'#data-retention',
         );
     }
 }

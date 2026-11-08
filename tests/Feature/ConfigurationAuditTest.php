@@ -227,7 +227,7 @@ class ConfigurationAuditTest extends TestCase
             ->component('Workspace')
             ->where('screen', 'health.audit')
             ->where('profile.id', 'generic')
-            ->has('profiles', 1)
+            ->has('profiles', 2)
             ->where('profiles.0.active', true)
             ->has('categories', 6)
             ->has('findings', 14)

@@ -519,7 +519,7 @@ const processing = computed(() =>
             </dl>
         </UCard>
     </div>
-    <UCard class="mb-6"
+    <UCard id="data-retention" class="mb-6"
         ><template #header
             ><h2 class="text-sm font-medium">Data retention</h2></template
         ><UForm
