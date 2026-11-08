@@ -54,6 +54,7 @@ Route::middleware(EnsureInstalled::class)->group(function (): void {
         Route::get('/modules/{module}/assets/{file}', ModuleAssetController::class)->where('file', '[A-Za-z0-9_.-]+')->name('modules.assets');
         Route::get('/health', [InstanceHealthController::class, 'show'])->name('health');
         Route::put('/health', [InstanceHealthController::class, 'update'])->name('health.update');
+        Route::put('/health/storage', [InstanceHealthController::class, 'storage'])->name('health.storage');
         Route::get('/api/instance/health', [InstanceHealthController::class, 'api'])->name('health.api');
         Route::post('/health/geolocation', [InstanceHealthController::class, 'importGeolocation'])->name('health.geolocation');
         Route::post('/health/updates/check', [InstanceUpdateController::class, 'check'])->middleware('throttle:instance-updates')->name('health.updates.check');
