@@ -83,3 +83,11 @@ test("every kind the server can write has a label, and an unknown one stays read
     }
     assert.equal(markerText("something_new"), "something new");
 });
+
+test("the echarts component that draws a marker is registered, or the line is silently dropped", async () => {
+    const { readFileSync } = await import("node:fs");
+    const registered = readFileSync(new URL("../../resources/js/vue-charts.js", import.meta.url), "utf8");
+    const option = lineOption(series, "pageviews", { markers: chartMarkers(series, [entry("2026-10-19", "consent")], "pageviews") });
+    assert.ok(option.series[0].markLine, "the option carries a markLine");
+    assert.match(registered, /\bMarkLineComponent\b/);
+});
