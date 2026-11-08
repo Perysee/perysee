@@ -192,6 +192,16 @@ Page Santé, carte « Storage budget » : un budget en Mio (`storage_budget_byte
 - Événement de domaine `ingest.storage_budget_exceeded` (`tier`, `ratio_percent`, `days_left`), à partir de la version 0.5.0 : un module qui l'écoute le déclare dans `core` de `module.json` (`ModuleProvider::listen()` le vérifie). Publié par `perysee:storage-budget` à chaque montée de palier, une seule fois par palier et par incident, jamais par la collecte.
 - Les purges restent des lots bornés : après une montée de palier, la suppression suit le rythme des passes (1 000 lignes par table et par passe de cinq minutes). Pour aller plus vite : `perysee:purge`.
 
+### Récupérer l'espace (`perysee:storage-optimize`)
+
+Supprimer des lignes ne rend pas l'espace au disque : il reste libre dans la table. `php artisan perysee:storage-optimize <table> [--dry-run] [--force]` reconstruit une table (`OPTIMIZE TABLE`) pour le rendre. Jamais planifiée, une table à la fois.
+
+- **Simulation par défaut** : taille de la table, espace récupérable estimé (`data_free`), `innodb_file_per_table` (une requête `SHOW VARIABLES`), espace libre nécessaire (environ la taille de la table, plus la croissance d'un jour d'après la projection) et espace libre du quota saisi. `--force` lance la reconstruction.
+- **Liste blanche** : le nom doit être un identifiant simple ET une table que la base elle-même liste (`StorageMeter`) ; il est quoté, jamais injecté tel quel.
+- **Gardes** : refus, même avec `--force`, si le quota saisi laisse moins que l'espace nécessaire, ou si `innodb_file_per_table` est `OFF` (l'espace partagé ne rétrécit jamais). Sans quota saisi, la simulation dit pourquoi l'espace libre est inconnu ; `--force` passe outre, aux risques de l'opérateur.
+- Sur hébergement mutualisé, le quota peut être dépassé pendant la reconstruction. Une attente de verrou de plus de 15 s abandonne l'opération (les requêtes s'empilent derrière un `OPTIMIZE` en attente). Une sauvegarde est conseillée.
+- SQLite : message « Not applicable », code de sortie 0.
+
 ### Purge manuelle (`perysee:purge`)
 
 Outil de l'opérateur pour purger plus tôt que la rétention quand la base est trop grosse. `php artisan perysee:purge <cible> --older-than=<durée>` avec la cible `events`, `stats`, `segments`, `sessions` ou `share-links`, et une durée `90d`, `12w`, `6m` ou `2y` (un mois = 30 jours, une année = 365 ; minimum 1 jour).
