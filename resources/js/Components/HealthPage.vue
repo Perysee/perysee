@@ -39,6 +39,14 @@ const backlogLate = computed(
         Date.now() - new Date(props.health.oldest_pending + "Z").getTime() >
             900000,
 );
+const mebibytes = (bytes) => (bytes / 1048576).toFixed(1);
+const largestTables = computed(() =>
+    props.health.largest_tables.map((table) => ({
+        name: table.name,
+        size: mebibytes(table.data_bytes + table.index_bytes),
+        rows: table.row_estimate === null ? "—" : table.row_estimate.toLocaleString(),
+    })),
+);
 const processing = computed(() =>
     Object.entries({
         heartbeat: "Last scheduler heartbeat",
@@ -108,7 +116,7 @@ const processing = computed(() =>
                     value:
                         health.database_bytes === null
                             ? '—'
-                            : (health.database_bytes / 1048576).toFixed(1),
+                            : mebibytes(health.database_bytes),
                     unit: 'MiB · database and indexes',
                 },
                 {
@@ -128,6 +136,17 @@ const processing = computed(() =>
             <p class="text-[11px] text-muted mt-2">{{ item.unit }}</p></UCard
         >
     </div>
+    <UCard v-if="largestTables.length" class="mb-6" :ui="{ body: 'p-0 sm:p-0' }"
+        ><template #header
+            ><h2 class="text-sm font-medium">Largest tables</h2></template
+        ><UTable
+            :data="largestTables"
+            :columns="[
+                { accessorKey: 'name', header: 'Table' },
+                { accessorKey: 'size', header: 'MiB · data and indexes' },
+                { accessorKey: 'rows', header: 'Rows (estimate)' },
+            ]"
+    /></UCard>
     <div class="grid lg:grid-cols-2 gap-6 mb-6">
         <UCard :ui="{ body: 'p-0 sm:p-0' }"
             ><template #header

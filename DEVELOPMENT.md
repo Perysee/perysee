@@ -167,6 +167,7 @@ Le cron appelle `php artisan schedule:run` chaque minute. `routes/console.php` d
 | `perysee:prune-access-log --limit=1000` | toutes les heures, sans chevauchement | Supprime les entrées du journal d'accès de plus de 90 jours. |
 | `perysee:prune-diagnostics` | toutes les heures, sans chevauchement | Supprime les diagnostics de collecte de plus de 7 jours. |
 | `perysee:prune-event-values --limit=1000` | toutes les heures, sans chevauchement | Supprime les identifiants de commande hors fenêtre et les propriétés d'événements hors rétention. |
+| `perysee:storage-snapshot` | toutes les heures, sans chevauchement | Enregistre une fois par jour la taille de chaque table (`table_size_snapshots`, estimation du moteur, sans `COUNT(*)`) et supprime les instantanés de plus de 400 jours. Une fois l'instantané du jour pris, le coût est une lecture. `perysee:storage-report [--json]` affiche les tailles en lecture seule. |
 
 ### Équipe et invitations
 

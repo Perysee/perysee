@@ -24,5 +24,8 @@ Schedule::command('perysee:prune-api-tokens')->hourly()->withoutOverlapping();
 // Installation check: collector diagnostics expire after seven days.
 Schedule::command('perysee:prune-diagnostics')->hourly()->withoutOverlapping();
 
+// Storage: one size snapshot per table and day (400 days kept); once recorded, an hourly pass costs one read.
+Schedule::command('perysee:storage-snapshot')->hourly()->withoutOverlapping();
+
 // Event values and properties: retention of the order identifiers and of the property statistics (ADR 008).
 Schedule::command('perysee:prune-event-values --limit=1000')->hourly()->withoutOverlapping();

@@ -62,10 +62,7 @@ class InstanceHealth
     public function snapshot(): array
     {
         $pending = DB::table('events')->whereNull('processed_at');
-        $size = null;
-        if (DB::getDriverName() === 'mariadb' || DB::getDriverName() === 'mysql') {
-            $size = (int) DB::selectOne('SELECT SUM(data_length + index_length) AS bytes FROM information_schema.tables WHERE table_schema = DATABASE()')->bytes;
-        }
+        $tables = app(StorageMeter::class)->tables();
 
         return [
             'journey_reports_pending' => DB::table('journey_reports')->whereIn('status', ['scanning', 'reducing'])->count(),
@@ -74,7 +71,8 @@ class InstanceHealth
             'geolocation' => app(Geolocation::class)->status(),
             'heartbeat' => $this->get('heartbeat'), 'aggregate_success' => $this->get('aggregate_success'),
             'aggregate_error' => $this->get('aggregate_error'), 'backlog' => (clone $pending)->count(),
-            'oldest_pending' => (clone $pending)->min('received_at'), 'database_bytes' => $size,
+            'oldest_pending' => (clone $pending)->min('received_at'), 'database_bytes' => $tables === null ? null : StorageMeter::total($tables),
+            'largest_tables' => array_slice($tables ?? [], 0, 8),
             'collection_failures' => app(Coordination::class)->failures('collection_failures'),
             'collection_rejections' => app(Coordination::class)->failures('collection_rejections'),
             'property_truncations' => app(Coordination::class)->failures('property_truncations'),
