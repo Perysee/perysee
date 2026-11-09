@@ -80,8 +80,9 @@ const share = (row) =>
         :data="visible"
         :columns="columns"
         :ui="{
-            th: 'text-xs text-muted font-medium',
-            td: 'text-sm py-3 tabular-nums',
+            thead: 'border-b border-default [&>tr]:after:hidden',
+            th: 'h-9 py-0 text-xs text-dimmed font-medium',
+            td: 'text-sm py-1.5 tabular-nums',
             root: 'w-full',
         }"
     >
@@ -147,20 +148,19 @@ const share = (row) =>
         /></template>
     </UTable>
     <div
-        class="flex justify-between items-center px-5 py-3 border-t border-default text-xs text-muted"
+        class="flex justify-between items-center gap-4 px-4 py-2 border-t border-default text-xs text-dimmed"
     >
         <span>{{
             compact
                 ? `${visible.length} values`
-                : `${visible.length} values shown · share of matching ${type === "event" ? "events" : "pageviews"}`
+                : `${visible.length} values shown, as a share of matching ${type === "event" ? "events" : "pageviews"}`
         }}</span
         ><UButton
             v-if="compact && reportUrl"
             :to="queryUrl(reportUrl, query)"
             label="View report"
-            trailing-icon="i-tabler-arrow-up-right"
             size="xs"
-            color="neutral"
+            color="primary"
             variant="link"
         />
     </div>

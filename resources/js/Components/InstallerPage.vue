@@ -41,7 +41,6 @@ onMounted(() => {
 </script>
 <template>
     <div class="text-center mb-8">
-        <p class="eyebrow">Welcome to your instance</p>
         <h1 class="text-3xl tracking-tight font-medium text-highlighted mt-2">
             Install Perysee
         </h1>

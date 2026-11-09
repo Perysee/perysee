@@ -93,7 +93,6 @@ async function runTest() {
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">{{ website.domain }}</p>
             <h1>Verify the installation</h1>
             <p class="text-sm text-muted">Find out why events do or do not arrive.</p>
         </div>

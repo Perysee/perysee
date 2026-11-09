@@ -24,3 +24,11 @@ for (const [mode, background, text] of [['light', '#FBFBFD', '#1D1D1F'], ['dark'
         assert.equal(option.series[0].lineStyle.color, '#0066CC');
     });
 }
+
+test("daily labels read as short dates on the axis and stay complete in the tooltip", () => {
+    const option = lineOption([{label:'2026-11-03',pageviews:2},{label:'2026-11-04',pageviews:8}], 'pageviews');
+
+    assert.equal(option.xAxis.axisLabel.formatter('2026-11-03'), 'Nov 3');
+    assert.equal(option.xAxis.axisLabel.formatter('00:00 CET'), '00:00 CET', 'hour labels are left alone');
+    assert.deepEqual(option.xAxis.data, ['2026-11-03', '2026-11-04'], 'the data keeps the full date for the tooltip');
+});

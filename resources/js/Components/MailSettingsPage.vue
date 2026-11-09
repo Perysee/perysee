@@ -87,7 +87,6 @@ function reset() {
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">Administration</p>
             <h1>Mail</h1>
             <p class="text-sm text-muted">The mail server of this instance, used for team invitations and for future reports and alerts.</p>
         </div>

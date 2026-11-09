@@ -52,13 +52,12 @@ async function copy() {
 const day = (iso) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
 </script>
 <template>
+    <div class="settings-page">
     <div class="page-heading">
         <div>
-            <p class="eyebrow">{{ website.domain }}</p>
             <h1>Team</h1>
-            <p class="text-sm text-muted">Who can see the reports of this site.</p>
+            <p class="text-sm text-muted">Who can see the reports of {{ website.domain }}.</p>
         </div>
-        <UButton label="Leave site" icon="i-tabler-door-exit" color="neutral" variant="outline" @click="leave" />
     </div>
     <UAlert v-if="errors?.member" color="error" variant="soft" :description="errors.member" class="mb-5" role="alert" />
     <UAlert
@@ -79,13 +78,19 @@ const day = (iso) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "m
             <code class="block break-all select-all text-xs" tabindex="0">{{ invitationLink }}</code>
         </template>
     </UAlert>
-    <UCard>
-        <template #header><h2 class="text-sm font-medium">Members</h2></template>
-        <ul class="divide-y divide-default">
-            <li v-for="member in members" :key="member.id" class="py-3 flex flex-wrap items-center justify-between gap-3">
-                <div class="min-w-0">
-                    <p class="text-sm font-medium truncate">{{ member.name }}<span v-if="member.you" class="text-muted font-normal"> (you)</span></p>
-                    <p class="text-xs text-muted truncate">{{ member.email }}</p>
+    <section class="settings-section" aria-labelledby="team-members">
+        <div class="settings-section-head">
+            <h2 id="team-members">Members</h2>
+            <span class="tabular-nums">{{ members.length }} {{ members.length === 1 ? "person" : "people" }}</span>
+        </div>
+        <ul class="settings-rows">
+            <li v-for="member in members" :key="member.id">
+                <div class="flex min-w-0 items-center gap-3">
+                    <UAvatar :alt="member.name" size="md" />
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium truncate">{{ member.name }}<span v-if="member.you" class="text-muted font-normal"> (you)</span></p>
+                        <p class="text-xs text-muted truncate">{{ member.email }}</p>
+                    </div>
                 </div>
                 <div v-if="canManage" class="flex items-center gap-2">
                     <USelect
@@ -93,44 +98,53 @@ const day = (iso) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "m
                         :items="roles"
                         :aria-label="'Role of ' + member.name"
                         :disabled="member.role === 'owner' && owners < 2"
+                        size="sm"
                         @update:model-value="(role) => changeRole(member, role)"
                     />
-                    <UButton icon="i-tabler-user-minus" :aria-label="'Remove ' + member.name" color="neutral" variant="ghost" :disabled="member.role === 'owner' && owners < 2" @click="remove(member)" />
+                    <UButton label="Remove" :aria-label="'Remove ' + member.name" color="neutral" variant="ghost" size="sm" :disabled="member.role === 'owner' && owners < 2" @click="remove(member)" />
                 </div>
                 <UBadge v-else :label="member.role" variant="subtle" color="neutral" class="capitalize" />
             </li>
         </ul>
-    </UCard>
+    </section>
     <template v-if="canManage">
-        <UCard class="mt-6">
-            <template #header><h2 class="text-sm font-medium">Invite someone</h2></template>
-            <UForm :state="invite" class="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end" @submit="sendInvite">
+        <section class="settings-section" aria-labelledby="team-invite">
+            <div class="settings-section-head"><h2 id="team-invite">Invite someone</h2></div>
+            <UForm :state="invite" class="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end mt-4" @submit="sendInvite">
                 <UFormField label="Email" name="email" :error="invite.errors.email" required>
                     <UInput v-model="invite.email" type="email" autocomplete="off" class="w-full" />
                 </UFormField>
                 <UFormField label="Role" name="role" :error="invite.errors.role">
                     <USelect v-model="invite.role" :items="roles" />
                 </UFormField>
-                <UButton type="submit" label="Invite" :loading="invite.processing" />
+                <UButton type="submit" label="Send invitation" :loading="invite.processing" />
             </UForm>
-            <p class="data-note mt-4">Invitations are e-mailed through the server set up by an administrator under Administration, Mail (or in .env). Without one, you get a link to send yourself. Viewers read the reports; owners also manage the site and its team.</p>
-        </UCard>
-        <UCard v-if="invitations.length" class="mt-6">
-            <template #header><h2 class="text-sm font-medium">Pending invitations</h2></template>
-            <ul class="divide-y divide-default">
-                <li v-for="invitation in invitations" :key="invitation.id" class="py-3 flex flex-wrap items-center justify-between gap-3">
+            <p class="data-note mt-3">Viewers read the reports; owners also manage the site and its team. Invitations are e-mailed through the server set up under Administration, Mail (or in .env). Without one, you get a link to send yourself.</p>
+        </section>
+        <section v-if="invitations.length" class="settings-section" aria-labelledby="team-pending">
+            <div class="settings-section-head">
+                <h2 id="team-pending">Pending invitations</h2>
+                <span class="tabular-nums">{{ invitations.length }}</span>
+            </div>
+            <ul class="settings-rows">
+                <li v-for="invitation in invitations" :key="invitation.id">
                     <div class="min-w-0">
                         <p class="text-sm font-medium truncate">{{ invitation.email }}</p>
                         <p class="text-xs text-muted">
-                            <span class="capitalize">{{ invitation.role }}</span> · expires {{ day(invitation.expires_at) }}<span v-if="invitation.sent"> · e-mailed</span>
+                            <span class="capitalize">{{ invitation.role }}</span>, expires {{ day(invitation.expires_at) }}<span v-if="invitation.sent">, e-mailed</span>
                         </p>
                     </div>
                     <div class="flex gap-2">
-                        <UButton label="Resend" icon="i-tabler-send" color="neutral" variant="outline" size="sm" @click="resend(invitation)" />
-                        <UButton label="Revoke" icon="i-tabler-x" color="neutral" variant="ghost" size="sm" @click="revoke(invitation)" />
+                        <UButton label="Resend" color="neutral" variant="outline" size="sm" @click="resend(invitation)" />
+                        <UButton label="Revoke" color="neutral" variant="ghost" size="sm" @click="revoke(invitation)" />
                     </div>
                 </li>
             </ul>
-        </UCard>
+        </section>
     </template>
+    <div class="settings-danger">
+        <p>Leaving removes your access to {{ website.domain }}. An owner can invite you again.</p>
+        <UButton label="Leave site" color="error" variant="outline" size="sm" @click="leave" />
+    </div>
+    </div>
 </template>

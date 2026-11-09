@@ -85,7 +85,6 @@ const enabledCount = computed(() => props.installed.filter((module) => module.en
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">Administration</p>
             <h1>Modules</h1>
             <p class="text-sm text-muted">
                 {{ enabledCount }} of {{ installed.length }} installed modules enabled

@@ -23,7 +23,6 @@ const docsUrl = (finding) => page.props.docsUrl + props.docsPath + "#" + finding
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">Administration</p>
             <h1>Configuration audit</h1>
             <p class="text-sm text-muted">What the current settings imply, read when this page opens. Nothing here changes a setting.</p>
         </div>

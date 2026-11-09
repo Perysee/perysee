@@ -8,7 +8,6 @@ const save = () => form.put(props.securityUpdateUrl, { preserveScroll: true });
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">Administration</p>
             <h1>Security</h1>
             <p class="text-sm text-muted">Two-factor policy and the access log of this instance.</p>
         </div>

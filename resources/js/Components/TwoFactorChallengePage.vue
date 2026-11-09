@@ -18,7 +18,6 @@ const submit = () => form.post(props.challengeUrl, { onFinish: () => form.reset(
 </script>
 <template>
     <div class="mb-7 text-center">
-        <p class="eyebrow">Two-step verification</p>
         <h1 class="text-3xl tracking-tight text-highlighted font-medium mt-2">Enter your code</h1>
         <p class="text-sm text-muted mt-2">
             {{ recovery ? "Use one of the recovery codes you saved. Each works once." : "Open your authenticator app and type the 6-digit code." }}

@@ -34,7 +34,6 @@ const columns = [
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">Your workspace</p>
             <h1>Your sites</h1>
             <p class="text-sm text-muted">
                 One place for every website you measure.

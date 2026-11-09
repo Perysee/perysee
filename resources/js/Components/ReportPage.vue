@@ -88,14 +88,6 @@ const headings = {
     event: "Custom events",
     country: "Countries",
 };
-const icons = {
-    path: "i-tabler-file-text",
-    source: "i-tabler-arrow-up-right",
-    campaign: "i-tabler-speakerphone",
-    device: "i-tabler-device-desktop",
-    event: "i-tabler-bolt",
-    country: "i-tabler-world",
-};
 const format = (value) =>
     value === null ? "—" : new Intl.NumberFormat("en").format(value);
 const variationIcons = {
@@ -153,6 +145,39 @@ const recentColumns = [
 ];
 const notesOpen = ref(false),
     dataOpen = ref(false);
+// The facts under the title: when the figures were last consolidated, or that they are still waiting.
+const freshnessText = computed(() =>
+    isRecent.value
+        ? "Last 15 minutes, before consolidation"
+        : props.report.freshness.pending
+          ? "Consolidation pending"
+          : props.report.freshness.aggregated_at
+            ? `Consolidated ${lastConsolidation.value}`
+            : "Not yet consolidated",
+);
+// Export and site settings share one menu, so the header keeps a single row of controls.
+const moreItems = computed(() => [
+    [
+        {
+            label: isDimension.value ? "Export table CSV" : "Export daily CSV",
+            icon: "i-tabler-download",
+            to: exportUrl.value,
+            external: true,
+        },
+        ...(current.value === "events"
+            ? [
+                  {
+                      label: "Event properties",
+                      icon: "i-tabler-list-details",
+                      to: queryUrl(props.siteLinks.events + "/properties", { from: props.period.from, to: props.period.to }),
+                  },
+              ]
+            : []),
+    ],
+    ...(props.canUpdate
+        ? [[{ label: "Site settings", icon: "i-tabler-settings", to: props.siteLinks.edit }]]
+        : []),
+]);
 const lastConsolidation = computed(() =>
     props.report.freshness.aggregated_at
         ? new Intl.DateTimeFormat("en", {
@@ -169,7 +194,7 @@ const lastConsolidation = computed(() =>
     <ReportHeader
         :title="
             overview
-                ? website.name
+                ? 'Overview'
                 : isRecent
                   ? 'Recent activity'
                   : isSessions
@@ -178,43 +203,22 @@ const lastConsolidation = computed(() =>
                       ? 'Devices & browsers'
                       : headings[dimension]
         "
+        :demo="website.is_demo"
+        :meta="[website.timezone, freshnessText]"
     >
-        <template #meta>
-            <span>{{ website.domain }}</span
-            ><span class="text-dimmed"> · </span
-            ><span>{{ website.timezone }}</span
-            ><template v-if="website.is_demo"
-                ><span class="text-dimmed"> · </span
-                ><span
-                    class="report-demo"
-                    title="Demonstration data · synthetic events"
-                    >Demonstration data</span
-                ></template
-            ><template v-if="!isRecent"
-                ><span class="text-dimmed"> · </span
-                ><span
-                    class="report-status"
-                    :class="
-                        report.freshness.pending
-                            ? 'is-pending'
-                            : 'is-consolidated'
-                    "
-                    >{{
-                        report.freshness.pending
-                            ? "Consolidation pending"
-                            : "Consolidated"
-                    }}</span
-                ><span class="hidden xl:inline text-dimmed"
-                    > · {{ lastConsolidation }}</span
-                ></template
-            >
-        </template>
         <DateRange
             v-if="!isRecent"
             :period="period"
             :today="today"
             :timezone="website.timezone"
             :comparable="overview"
+        />
+        <FilterBar
+            v-if="!isRecent"
+            part="button"
+            :period="period"
+            :site-links="siteLinks"
+            :active-dimension="dimension"
         />
         <UButton
             v-if="isRecent"
@@ -224,38 +228,29 @@ const lastConsolidation = computed(() =>
             size="sm"
             label="Refresh"
             @click="router.reload({ preserveScroll: true })"
-        /><UButton
-            v-else
-            :href="exportUrl"
-            external
-            icon="i-tabler-download"
-            color="neutral"
-            variant="outline"
-            size="sm"
-            :aria-label="isDimension ? 'Export table CSV' : 'Export daily CSV'"
-            :title="isDimension ? 'Export table CSV' : 'Export daily CSV'"
-            ><span class="hidden 2xl:inline">Export CSV</span></UButton
-        ><UButton
-            v-if="current === 'events'"
-            :to="queryUrl(siteLinks.events + '/properties', { from: period.from, to: period.to })"
-            icon="i-tabler-list-details"
-            color="neutral"
-            variant="outline"
-            size="sm"
-            aria-label="Event properties"
-            title="Event properties"
-            ><span class="hidden 2xl:inline">Properties</span></UButton
-        ><UButton
-            v-if="canUpdate"
-            :to="siteLinks.edit"
-            icon="i-tabler-settings"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            aria-label="Edit site"
         />
+        <UDropdownMenu
+            v-else
+            :items="moreItems"
+            :content="{ align: 'end' }"
+        >
+            <UButton
+                icon="i-tabler-dots"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                aria-label="More actions: export and settings"
+            />
+        </UDropdownMenu>
+        <template v-if="!isRecent" #below>
+            <FilterBar
+                part="chips"
+                :period="period"
+                :site-links="siteLinks"
+                :active-dimension="dimension"
+            />
+        </template>
     </ReportHeader>
-    <FilterBar v-if="!isRecent" :period="period" :site-links="siteLinks" :active-dimension="dimension" />
     <UAlert v-if="report.segment_coverage && report.segment_coverage.status !== 'available'" color="warning" :description="report.segment_coverage.message" class="mb-5" />
     <UAlert
         v-if="!isRecent && report.freshness.pending"
@@ -536,12 +531,7 @@ const lastConsolidation = computed(() =>
             >
                 <div class="report-panel">
                     <header class="panel-heading">
-                        <h2>
-                            <UIcon
-                                :name="icons[dimension]"
-                                class="size-4 text-muted"
-                            />{{ headings[dimension] }}
-                        </h2>
+                        <h2>{{ headings[dimension] }}</h2>
                     </header>
                     <CampaignTable
                         v-if="dimension === 'campaign' && !overview"
@@ -610,12 +600,7 @@ const lastConsolidation = computed(() =>
                 </div>
                 <div v-if="overview" class="report-panel">
                     <header class="panel-heading">
-                        <h2>
-                            <UIcon
-                                name="i-tabler-arrow-up-right"
-                                class="size-4 text-muted"
-                            />Sources
-                        </h2>
+                        <h2>Sources</h2>
                     </header>
                     <BreakdownTable
                         :rows="breakdowns.source"
