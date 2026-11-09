@@ -42,7 +42,6 @@ async function copy() {
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">{{ website.domain }}</p>
             <h1>API access</h1>
             <p class="text-sm text-muted">Read-only tokens for this site. Use them from a server, never from a web page.</p>
         </div>

@@ -26,7 +26,6 @@ const update = () =>
 <template>
     <template v-if="screen === 'auth.login'"
         ><div class="mb-7 text-center">
-            <p class="eyebrow">Welcome back</p>
             <h1
                 class="text-3xl tracking-tight text-highlighted font-medium mt-2"
             >
@@ -71,13 +70,12 @@ const update = () =>
     <template v-else
         ><div class="page-heading">
             <div>
-                <p class="eyebrow">Account</p>
                 <h1>Change password</h1>
                 <p class="text-sm text-muted">Keep your account secure.</p>
             </div>
         </div>
-        <UCard class="max-w-xl"
-            ><UForm :state="password" class="space-y-5" @submit="update"
+        <UCard
+            ><UForm :state="password" class="grid gap-5 lg:grid-cols-3 items-start" @submit="update"
                 ><UFormField
                     label="Current password"
                     name="current_password"
@@ -92,7 +90,7 @@ const update = () =>
                     label="New password"
                     name="password"
                     :error="password.errors.password"
-                    description="At least 12 characters."
+                    help="At least 12 characters."
                     required
                     ><UInput
                         v-model="password.password"
@@ -113,6 +111,7 @@ const update = () =>
                 ><UButton
                     type="submit"
                     label="Update password"
+                    class="justify-self-start lg:col-span-3"
                     :loading="password.processing" /></UForm></UCard
     ></template>
 </template>

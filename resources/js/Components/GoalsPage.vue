@@ -10,7 +10,7 @@ const creating=ref(false);
 const active=()=>props.goals.filter(goal=>!goal.archived_at).length;
 </script>
 <template>
-<ReportHeader title="Goals"><template #meta>{{website.domain}}<template v-if="website.is_demo"><span class="text-dimmed"> · </span><span class="report-demo" title="Demonstration data · synthetic events">Demonstration data</span></template><span class="text-dimmed"> · </span>Sessions that reach a page or an event</template><UButton v-if="canUpdate" label="Create goal" icon="i-tabler-plus" size="sm" :disabled="active()>=limit" @click="creating=!creating"/></ReportHeader>
+<ReportHeader title="Goals" :demo="website.is_demo" :meta="[website.domain,'Sessions that reach a page or an event']"><UButton v-if="canUpdate" label="Create goal" icon="i-tabler-plus" size="sm" :disabled="active()>=limit" @click="creating=!creating"/></ReportHeader>
 <UAlert v-if="website.tracking_mode!=='sessions'" color="warning" title="Session measurement required" description="Without sessions only the hits on a goal are counted. Conversions and the conversion rate need session measurement, subject to your consent configuration." class="mb-5"/>
 <p v-if="canUpdate" class="text-xs text-muted mb-4">{{active()}} of {{limit}} active goals.</p>
 <UCard v-if="creating && canUpdate" class="mb-6"><GoalEditor :url="createUrl" @saved="creating=false"/></UCard>

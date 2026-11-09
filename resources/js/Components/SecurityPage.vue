@@ -45,7 +45,6 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">Account</p>
             <h1>Security</h1>
             <p class="text-sm text-muted">Two-factor authentication, connected devices and recent activity.</p>
         </div>

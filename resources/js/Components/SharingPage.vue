@@ -56,7 +56,6 @@ async function copy() {
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">{{ website.domain }}</p>
             <h1>Sharing</h1>
             <p class="text-sm text-muted">Read-only links to chosen reports, usable without an account.</p>
         </div>

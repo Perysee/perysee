@@ -26,7 +26,6 @@ const submit = () =>
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">Configuration</p>
             <h1>{{ editing ? "Site settings" : "Add site" }}</h1>
             <p class="text-sm text-muted">
                 Your website, measurement and privacy settings.
@@ -40,7 +39,7 @@ const submit = () =>
             label="Back"
         />
     </div>
-    <UCard class="max-w-4xl"
+    <UCard
         ><UForm :state="form" class="space-y-6" @submit="submit"
             ><div class="form-grid">
                 <UFormField
@@ -171,7 +170,7 @@ const submit = () =>
                     color="neutral"
                 /></div></UForm
     ></UCard>
-    <UCard v-if="editing && canUpdate" class="max-w-4xl mt-6"
+    <UCard v-if="editing && canUpdate" class="mt-6"
         ><div class="flex flex-wrap justify-between gap-4 items-center">
             <div>
                 <h2 class="text-sm font-medium">Delete site and data</h2>

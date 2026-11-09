@@ -4,7 +4,9 @@ import {router,usePage} from '@inertiajs/vue3';
 import {queryUrl,reportFilters} from '../interface-query.mjs';
 import {filterLogo} from '../client-labels.mjs';
 import {defineShortcuts} from '@nuxt/ui/composables';
-const props=defineProps(['period','siteLinks','journey','activeDimension']);
+// part: 'button' (the Filter control, for a toolbar), 'chips' (the active filters) or both when left out.
+const props=defineProps(['period','siteLinks','journey','activeDimension','part']);
+const showButton=computed(()=>props.part!=='chips'), showChips=computed(()=>props.part!=='button');
 const page=usePage(), open=ref(false), dimension=ref('country'), search=ref(''), options=ref([]), selected=ref([]), loading=ref(false), error=ref('');
 const labels={path:'Page',country:'Country',source:'Source',provider:'AI provider',campaign:'Campaign',device:'Device',device_brand:'Brand',browser:'Browser',event:'Event'};
 const dimensions=computed(()=>Object.entries(labels).filter(([key])=>!props.journey || !['path','event'].includes(key)).map(([value,label])=>({value,label})));
@@ -21,9 +23,9 @@ const chips=computed(()=>Object.entries(active.value).flatMap(([key,values])=>va
 const navigate=filters=>router.get(queryUrl(page.props.currentUrl,{...reportFilters(page.url),from:props.period.from,to:props.period.to,filters,value:null,source_group:null,provider:null}),{}, {preserveScroll:true});
 const remove=(key,value)=>navigate({...active.value,[key]:active.value[key].filter(item=>item!==value)});
 const apply=()=>{navigate({...active.value,[dimension.value]:[...new Set(selected.value)]});open.value=false;};
-defineShortcuts({'/':()=>{open.value=true;}});
+defineShortcuts({'/':()=>{if(showButton.value)open.value=true;}});
 const openFromPalette=()=>{open.value=true;};
-onMounted(()=>window.addEventListener('perysee:open-filter',openFromPalette));
+onMounted(()=>{if(showButton.value)window.addEventListener('perysee:open-filter',openFromPalette);});
 let controller, timer;
 async function load(){
  controller?.abort();controller=new AbortController();loading.value=true;error.value='';
@@ -36,10 +38,10 @@ watch(search,()=>{clearTimeout(timer);timer=setTimeout(load,250);});
 onBeforeUnmount(()=>{clearTimeout(timer);controller?.abort();window.removeEventListener('perysee:open-filter',openFromPalette);});
 </script>
 <template>
-<section aria-label="Report filters" class="flex flex-wrap items-center gap-2 mb-4">
- <UPopover v-model:open="open" :content="{align:'start'}"><UButton icon="i-tabler-filter-plus" label="Add filter" color="neutral" variant="outline" size="sm" />
+<section v-if="showButton || (showChips && chips.length)" :aria-label="part==='button'?'Add a filter':'Report filters'" :class="part==='button'?'contents':'report-filters'">
+ <UPopover v-if="showButton" v-model:open="open" :content="{align:part==='button'?'end':'start'}"><UButton icon="i-tabler-filter" label="Filter" color="neutral" variant="outline" size="sm" />
  <template #content><div class="p-4 w-80 max-w-[90vw] space-y-3"><p class="font-medium text-sm">Filter measured data</p><USelect v-model="dimension" :items="dimensions" aria-label="Filter dimension" class="w-full"/><UInput v-model="search" placeholder="Find or enter an exact value" aria-label="Find filter values" class="w-full"/><p v-if="error" role="alert" class="text-xs text-warning">{{error}}</p><p v-if="loading" role="status" class="text-xs text-muted">Loading values…</p><div class="max-h-56 overflow-auto space-y-2"><label v-for="value in [...new Set([...selected,...options])]" :key="value" class="flex items-start gap-2 text-sm break-all"><input v-model="selected" type="checkbox" :value="value" class="mt-1"/><img v-if="logoUrl(dimension,value)" :src="logoUrl(dimension,value)" alt="" class="size-4 mt-0.5 shrink-0"/>{{display(dimension,value)}}</label></div><UButton v-if="search && !selected.includes(search)" :label="'Use exact value: '+search" color="neutral" variant="ghost" size="xs" @click="selected.push(search)"/><p class="text-xs text-muted">Any selected value · all different filters must match.</p><UButton label="Apply filter" :disabled="!selected.length" @click="apply"/></div></template></UPopover>
- <UButton v-for="chip in chips" :key="chip.key+chip.value" :label="chip.label" trailing-icon="i-tabler-x" color="neutral" variant="soft" size="sm" class="max-w-full [&>span]:truncate" :title="chip.label" :aria-label="'Remove '+chip.label" :avatar="chip.logo?{src:chip.logo,alt:''}:undefined" @click="remove(chip.key,chip.value)"/>
- <UButton v-if="chips.length" label="Clear filters" color="neutral" variant="ghost" size="xs" @click="navigate({})"/>
+ <template v-if="showChips"><UButton v-for="chip in chips" :key="chip.key+chip.value" :label="chip.label" trailing-icon="i-tabler-x" color="neutral" variant="soft" size="sm" class="max-w-full [&>span]:truncate" :title="chip.label" :aria-label="'Remove '+chip.label" :avatar="chip.logo?{src:chip.logo,alt:''}:undefined" @click="remove(chip.key,chip.value)"/>
+ <UButton v-if="chips.length" label="Clear filters" color="neutral" variant="ghost" size="xs" @click="navigate({})"/></template>
 </section>
 </template>

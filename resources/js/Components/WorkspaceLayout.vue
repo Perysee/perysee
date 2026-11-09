@@ -287,6 +287,12 @@ const accountMenu = computed(() => [
     ],
     [
         {
+            label: "Source code",
+            icon: "i-tabler-brand-github",
+            to: p.value.repositoryUrl,
+            target: "_blank",
+        },
+        {
             label: "Sign out",
             icon: "i-tabler-logout",
             onSelect: () => router.post(p.value.links.logout),
@@ -472,6 +478,33 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
             >
                 <template #header><BrandLogo /></template>
                 <div class="perysee-nav">
+                    <UDropdownMenu
+                        v-if="hasSite"
+                        :items="siteMenu"
+                        :content="{ align: 'start' }"
+                        :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width) min-w-56' }"
+                    >
+                        <button
+                            type="button"
+                            class="site-switch"
+                            :aria-label="`Switch site, current: ${p.website.name}`"
+                        >
+                            <UAvatar
+                                v-bind="siteAvatar(p.siteLinks.favicon, p.website.name)"
+                                size="xs"
+                                class="shrink-0"
+                            />
+                            <span class="site-switch-text"
+                                ><strong>{{ p.website.name }}</strong
+                                ><small>{{ p.website.domain }}</small></span
+                            >
+                            <UIcon
+                                name="i-tabler-selector"
+                                class="size-4 shrink-0 text-dimmed"
+                                aria-hidden="true"
+                            />
+                        </button>
+                    </UDropdownMenu>
                     <button
                         type="button"
                         class="sidebar-search"
@@ -566,22 +599,33 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                     />
                 </div>
                 <template #footer>
+                    <div class="sidebar-footer">
                     <UDropdownMenu
                         :items="accountMenu"
                         :content="{ side: 'top', align: 'start' }"
-                        class="w-full"
+                        class="min-w-0 flex-1"
                     >
                         <UButton
                             color="neutral"
                             variant="ghost"
                             icon="i-tabler-user"
-                            trailing-icon="i-tabler-selector"
                             :label="p.auth.name"
                             aria-label="Account menu"
                             class="w-full"
-                            :ui="{ label: 'truncate', trailingIcon: 'ms-auto' }"
+                            :ui="{ label: 'truncate' }"
                         />
                     </UDropdownMenu>
+                    <ColorModeButton />
+                    <UButton
+                        color="neutral"
+                        variant="ghost"
+                        icon="i-tabler-book-2"
+                        :to="p.docsUrl"
+                        target="_blank"
+                        rel="noopener"
+                        aria-label="Documentation"
+                    />
+                    </div>
                 </template>
             </UDashboardSidebar>
             <UDashboardPanel
@@ -589,54 +633,6 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                 class="perysee-workspace"
                 :ui="{ root: 'min-h-0 h-full lg:not-last:border-e-0' }"
             >
-                <UDashboardNavbar
-                        class="perysee-topbar"
-                        :toggle="{ color: 'neutral', variant: 'ghost', 'aria-label': 'Open navigation' }"
-                    >
-                        <template #left
-                            ><div class="flex min-w-0 items-center gap-3">
-                                <span class="hidden sm:block text-xs text-muted"
-                            >{{ p.branding.name }}</span
-                        ><span class="hidden sm:block text-dimmed text-xs"
-                            >/</span
-                        ><UDropdownMenu v-if="hasSite" :items="siteMenu"
-                            ><UButton
-                                color="neutral"
-                                variant="ghost"
-                                :avatar="siteAvatar(p.siteLinks.favicon, p.website.name)"
-                                trailing-icon="i-tabler-chevron-down"
-                                :label="p.website.domain"
-                                class="max-w-52 sm:max-w-sm truncate" /></UDropdownMenu
-                        ><span v-else class="text-sm text-muted">{{
-                            title
-                        }}</span>
-
-                            </div></template
-                        >
-                        <template #right
-                            ><div class="flex items-center gap-2">
-                        <ColorModeButton />
-                        <UButton
-                            color="neutral"
-                            variant="ghost"
-                            icon="i-tabler-brand-github"
-                            :to="p.repositoryUrl"
-                            target="_blank"
-                            rel="noopener"
-                            aria-label="GitHub repository"
-                        />
-                        <UButton
-                            color="neutral"
-                            variant="ghost"
-                            icon="i-tabler-book-2"
-                            :to="p.docsUrl"
-                            target="_blank"
-                            rel="noopener"
-                            aria-label="Documentation"
-                        />
-                            </div></template
-                        >
-                    </UDashboardNavbar>
                 <main
                     id="main"
                     scroll-region
@@ -644,7 +640,15 @@ onBeforeUnmount(() => stops.forEach((stop) => stop()));
                     :class="{ 'is-navigating': busy }"
                     :aria-busy="busy"
                 >
-                    <div class="perysee-content"><slot /></div>
+                    <div class="perysee-content">
+                        <UDashboardSidebarToggle
+                            color="neutral"
+                            variant="ghost"
+                            aria-label="Open navigation"
+                            class="mobile-nav-toggle"
+                        />
+                        <slot />
+                    </div>
                 </main>
             </UDashboardPanel>
         </UDashboardGroup>

@@ -114,7 +114,7 @@ onBeforeUnmount(() => media?.removeEventListener("change", adapt));
                 :key="preset.key"
                 :label="preset.label"
                 color="neutral"
-                :variant="activePreset === preset.key ? 'soft' : 'ghost'"
+                :variant="activePreset === preset.key ? 'solid' : 'outline'"
                 size="sm"
                 @click="navigate({ period: preset.key })"
         /></UButtonGroup>
@@ -124,7 +124,7 @@ onBeforeUnmount(() => media?.removeEventListener("change", adapt));
             :label="small ? undefined : 'Compare'"
             aria-label="Compare with the previous period"
             color="neutral"
-            :variant="comparing ? 'soft' : 'ghost'"
+            :variant="comparing ? 'subtle' : 'outline'"
             size="sm"
             :aria-pressed="comparing"
             title="Compare with the previous period of the same length"

@@ -126,7 +126,6 @@ const moduleScreen = computed(() => moduleHost.screens[p.value.screen]);
         <template v-else-if="p.screen === 'settings'"
             ><div class="page-heading">
                 <div>
-                    <p class="eyebrow">Administration</p>
                     <h1>Instance settings</h1>
                     <p class="text-sm text-muted">Current configuration</p>
                 </div>
