@@ -131,7 +131,7 @@ summary {
     justify-content: space-between;
     gap: 12px;
     min-height: 48px;
-    padding: 8px 16px 8px 20px;
+    padding: 8px 20px;
     border-bottom: 1px solid var(--ui-border);
 }
 .panel-heading h2 {
@@ -220,18 +220,19 @@ button.metric-cell:hover {
     align-items: center;
     gap: 10px;
     min-width: 0;
-    padding: 5px 10px;
+    padding: 11px 0;
     isolation: isolate;
     color: var(--ui-text-highlighted);
 }
+/* The share is a solid bar in the chart blue, under the label, so the text never sits on colour. */
 .breakdown-label::before {
     content: "";
     position: absolute;
-    inset: 0 auto 0 0;
-    width: var(--bar-width, 0%);
-    /* The brand color, dimmed so the label stays readable on top of it; no edge, the length is the figure. */
-    background: color-mix(in srgb, var(--ui-primary) 14%, transparent);
-    z-index: -1;
+    left: 0;
+    bottom: 0;
+    width: calc(100% * var(--bar-width-ratio, 0));
+    height: 6px;
+    background: var(--ui-primary);
     pointer-events: none;
 }
 .breakdown-label:hover,
@@ -907,9 +908,6 @@ button.metric-cell:hover {
 }
 .dark .perysee-nav [aria-current="page"] {
     background: var(--ui-bg-accented);
-}
-.dark .breakdown-label::before {
-    background: color-mix(in srgb, var(--ui-text-highlighted) 9%, transparent);
 }
 .dark [role="dialog"] [role="option"][data-highlighted] {
     background: var(--ui-bg-accented);

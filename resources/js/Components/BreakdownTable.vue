@@ -81,8 +81,8 @@ const share = (row) =>
         :columns="columns"
         :ui="{
             thead: 'border-b border-default [&>tr]:after:hidden',
-            th: 'h-9 py-0 text-xs text-dimmed font-medium',
-            td: 'text-sm py-1.5 tabular-nums',
+            th: 'h-9 py-0 px-5 text-xs text-dimmed font-medium',
+            td: 'text-sm py-1 px-5 tabular-nums',
             root: 'w-full',
         }"
     >
@@ -101,8 +101,7 @@ const share = (row) =>
                 "
                 class="breakdown-label"
                 :style="{
-                    '--bar-width':
-                        (row.original.count / leadingCount) * 100 + '%',
+                    '--bar-width-ratio': row.original.count / leadingCount,
                 }"
                 :title="reportUrl ? 'Filter: ' + name(row.original) : undefined"
                 @click="
@@ -148,7 +147,7 @@ const share = (row) =>
         /></template>
     </UTable>
     <div
-        class="flex justify-between items-center gap-4 px-4 py-2 border-t border-default text-xs text-dimmed"
+        class="flex justify-between items-center gap-4 px-5 py-2 border-t border-default text-xs text-dimmed"
     >
         <span>{{
             compact

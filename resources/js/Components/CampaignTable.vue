@@ -44,8 +44,9 @@ const columns = [
         :data="campaigns"
         :columns="columns"
         :ui="{
-            th: 'text-xs text-muted font-normal',
-            td: 'text-sm py-4 tabular-nums',
+            thead: 'border-b border-default [&>tr]:after:hidden',
+            th: 'h-9 py-0 px-5 text-xs text-dimmed font-medium',
+            td: 'text-sm py-1 px-5 tabular-nums',
         }"
         ><template #empty
             ><EmptyState
@@ -63,8 +64,7 @@ const columns = [
                 color="neutral"
                 class="breakdown-label w-full justify-start text-sm text-left"
                 :style="{
-                    '--bar-width':
-                        (row.original.count / leadingCount) * 100 + '%',
+                    '--bar-width-ratio': row.original.count / leadingCount,
                 }" /></template
         ><template #count-cell="{ row }">{{
             new Intl.NumberFormat("en").format(row.original.count)
