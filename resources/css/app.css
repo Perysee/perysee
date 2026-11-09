@@ -214,42 +214,67 @@ button.metric-cell:hover {
 .source-logo-mono {
     background: #fff;
 }
+/* Share bars: a 20 px rectangle in the chart blue behind the label. The label is drawn twice: the copy in the
+   bar's ink is clipped to the bar, so the words stay readable on the blue and off it. */
 .breakdown-label {
+    --bar-ink: var(--ui-text-inverted);
+    --bar-edge: calc(100% * var(--bar-width-ratio, 0));
     position: relative;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    display: block;
     min-width: 0;
-    padding: 11px 0;
     isolation: isolate;
     color: var(--ui-text-highlighted);
 }
-/* The share is a solid bar in the chart blue, under the label, so the text never sits on colour. */
 .breakdown-label::before {
     content: "";
     position: absolute;
+    top: 7px;
+    bottom: 7px;
     left: 0;
-    bottom: 0;
-    width: calc(100% * var(--bar-width-ratio, 0));
-    height: 6px;
+    width: var(--bar-edge);
     background: var(--ui-primary);
+    z-index: -1;
     pointer-events: none;
 }
-.breakdown-label:hover,
+.bar-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 7px 8px;
+    line-height: 20px;
+}
+.bar-content > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bar-content.is-ink {
+    position: absolute;
+    inset: 0;
+    color: var(--bar-ink);
+    clip-path: inset(0 calc(100% - var(--bar-edge)) 0 0);
+    pointer-events: none;
+}
+.bar-content.is-ink svg {
+    color: inherit;
+}
+.breakdown-label:hover .bar-content > span,
+.breakdown-label:focus-visible .bar-content > span {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
 .breakdown-label:focus-visible {
+    outline: 2px solid var(--ui-primary);
+    outline-offset: 2px;
+}
+.report-panel tbody tr:hover {
     background: var(--ui-bg-muted);
-    color: var(--ui-text-highlighted);
 }
 .share-value {
     display: block;
     font-variant-numeric: tabular-nums;
     color: var(--ui-text-highlighted);
-}
-.breakdown-label span {
-    color: var(--ui-text-highlighted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 .chart-element {
     width: 100%;

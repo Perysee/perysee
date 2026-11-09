@@ -117,6 +117,7 @@ const share = (row) =>
                         );
                     }
                 "
+                ><span class="bar-content"
                 ><img
                     v-if="type === 'source' && row.original.icon"
                     :src="logoUrl(row.original.icon)"
@@ -136,7 +137,29 @@ const share = (row) =>
                     v-else-if="['browser', 'device_brand'].includes(type)"
                     :name="row.original.icon"
                     class="size-5 text-muted shrink-0"
-                /><span>{{ name(row.original) }}</span></component
+                /><span>{{ name(row.original) }}</span></span
+                ><span class="bar-content is-ink" aria-hidden="true"
+                ><img
+                    v-if="type === 'source' && row.original.icon"
+                    :src="logoUrl(row.original.icon)"
+                    alt=""
+                    class="source-logo"
+                    :class="{ 'source-logo-mono': monoLogos.includes(row.original.icon) }"
+                /><UIcon
+                    v-else-if="type === 'source'"
+                    name="i-tabler-world"
+                    class="size-4 text-muted"
+                /><img
+                    v-else-if="['browser', 'device_brand'].includes(type) && row.original.logo"
+                    :src="logoUrl(row.original.logo)"
+                    alt=""
+                    class="source-logo"
+                /><UIcon
+                    v-else-if="['browser', 'device_brand'].includes(type)"
+                    :name="row.original.icon"
+                    class="size-5 text-muted shrink-0"
+                /><span>{{ name(row.original) }}</span></span
+                ></component
             ></template
         >
         <template #count-cell="{ row }">{{
