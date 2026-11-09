@@ -16,6 +16,13 @@ test("an accent overrides the primary and action colors in both color modes", ()
     assert.match(css, /\.dark\{[^}]*--brand-action:#12ab34;/);
 });
 
+test("dark surfaces stay neutral whatever the accent, so a white label never tints the backgrounds", () => {
+    const dark = accentCss("#12ab34").match(/\.dark\{[^}]*\}/)[0];
+
+    assert.match(dark, /--brand-subtle:#26262B;/);
+    assert.doesNotMatch(dark, /--brand-subtle:[^;]*#12ab34/);
+});
+
 test("anything that is not a six digit hex color is ignored, so a value can never inject styles", () => {
     for (const value of ["red", "#fff", "#12ab34; background:url(x)", "#12ab34}", "url(x)", 12, {}]) {
         assert.equal(accentCss(value), "", String(value));

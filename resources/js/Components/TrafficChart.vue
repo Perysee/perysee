@@ -55,6 +55,7 @@ const options = () => {
     };
     return {
         primary: color("--ui-primary"),
+        area: color("--brand-chart-area"),
         text: color("--ui-text"),
         border: color("--ui-border"),
         background: color("--ui-bg"),
