@@ -55,14 +55,14 @@ async function render(props) {
     return renderToString(app);
 }
 
-test("the page sits in the Nuxt UI dashboard shell: sidebar, top bar, and a scroll region for the content", async () => {
+test("the page sits in the Nuxt UI dashboard shell: a sidebar and a scroll region, without a top bar", async () => {
     const html = await render(signedIn());
 
     assert.match(html, /perysee-sidebar/);
-    assert.match(html, /perysee-topbar/);
+    assert.doesNotMatch(html, /perysee-topbar/, "the top bar is gone: its content lives in the sidebar");
     assert.match(html, /<main[^>]*id="main"[^>]*scroll-region|<main[^>]*scroll-region[^>]*id="main"/, "Inertia restores the scroll of an element marked scroll-region");
     assert.match(html, /<main[^>]*>.*<p id="page-content">Page body<\/p>/s, "the page is the content of the scrolling element");
-    assert.match(html, /aria-label="Open navigation"/, "the top bar carries the button that opens the menu on a phone");
+    assert.match(html, /aria-label="Open navigation"/, "the content keeps the button that opens the menu on a phone");
     assert.doesNotMatch(html, /perysee-shell"[^>]*>\s*<aside/, "the hand-made aside is gone");
 });
 
@@ -74,8 +74,8 @@ test("no link of the application carries a protocol, so every click stays an Ine
     const external = hrefs.filter((href) => /^[a-z][a-z0-9+.-]*:/i.test(href));
     assert.deepEqual(
         [...new Set(external)].sort(),
-        ["https://docs.example.test", "https://github.example.test/perysee"],
-        "only the documentation and the repository, which live on other sites, may be absolute",
+        ["https://docs.example.test"],
+        "only the documentation, which lives on another site, may be absolute (the repository sits in the closed account menu)",
     );
 });
 
@@ -87,7 +87,7 @@ test("module entries appear in the menu and the active page is marked", async ()
     assert.match(html, /aria-current="page"[^>]*href="\/dashboard"|href="\/dashboard"[^>]*aria-current="page"/);
 });
 
-test("the top bar shows the white label name and members do not get the administration entries", async () => {
+test("the sidebar shows the white label name and members do not get the administration entries", async () => {
     const html = await render(signedIn({ auth: { id: 2, name: "Bo", email: "bo@example.test", is_admin: false }, branding: { name: "Acme Analytics", logo: null, accent: null } }));
 
     assert.match(html, />Acme Analytics</);
@@ -140,4 +140,22 @@ test("the command palette has a single entry point, the search field of the side
 
     assert.equal((html.match(/aria-keyshortcuts="Meta\+K Control\+K"/g) ?? []).length, 1);
     assert.doesNotMatch(html, /Open the command palette/);
+});
+
+test("inside a site, the site switcher heads the sidebar and lists every site", async () => {
+    const html = await render(inSite());
+    const sidebar = html.slice(html.indexOf("perysee-sidebar"));
+
+    assert.match(sidebar, /aria-label="Switch site, current: Acme"/, "the switcher names the current site");
+    assert.match(sidebar, /acme\.test/, "the switcher shows the domain under the name");
+    assert.ok(sidebar.indexOf("Switch site") < sidebar.indexOf("Search"), "the switcher comes before the search field");
+});
+
+test("the sidebar footer carries the account, the colour mode and the documentation", async () => {
+    const html = await render(signedIn());
+    const footer = html.slice(html.lastIndexOf("Account menu") - 2000);
+
+    assert.match(footer, /aria-label="Account menu"/);
+    assert.match(footer, /aria-label="Switch (to (dark|light)|color) mode"/, "the colour mode button (stubbed in this fixture)");
+    assert.match(footer, /aria-label="Documentation"[^>]*href="https:\/\/docs\.example\.test"|href="https:\/\/docs\.example\.test"[^>]*aria-label="Documentation"/);
 });

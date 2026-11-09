@@ -48,8 +48,8 @@ const freshness = computed(() =>
             <main class="mx-auto max-w-5xl space-y-6 px-4 py-6">
                 <header class="flex flex-wrap items-end justify-between gap-4">
                     <div class="min-w-0">
-                        <p class="eyebrow break-all">{{ site.domain }}</p>
                         <h1 class="break-words">{{ site.name }}</h1>
+                        <p class="text-sm text-muted break-all">{{ site.domain }}</p>
                         <p v-if="freshness" class="text-sm text-muted">Last consolidated {{ freshness }} ({{ site.timezone }})</p>
                     </div>
                     <DateRange :period="period" :today="today" :timezone="site.timezone" />

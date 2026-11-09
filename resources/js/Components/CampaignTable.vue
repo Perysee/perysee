@@ -3,7 +3,7 @@ import ShareValue from "./ShareValue.vue";
 import EmptyState from "./EmptyState.vue";
 import { computed } from "vue";
 import { queryUrl, selectFilter } from "../interface-query.mjs";
-import {usePage} from "@inertiajs/vue3";
+import { Link, usePage } from "@inertiajs/vue3";
 const page=usePage();
 const props = defineProps(["rows", "total", "reportUrl", "query"]);
 const campaigns = computed(() =>
@@ -44,8 +44,9 @@ const columns = [
         :data="campaigns"
         :columns="columns"
         :ui="{
-            th: 'text-xs text-muted font-normal',
-            td: 'text-sm py-4 tabular-nums',
+            thead: 'border-b border-default [&>tr]:after:hidden',
+            th: 'h-9 py-0 px-5 text-xs text-dimmed font-medium',
+            td: 'text-sm py-1 px-5 tabular-nums',
         }"
         ><template #empty
             ><EmptyState
@@ -53,19 +54,16 @@ const columns = [
                 description="UTM-tagged pageviews will appear here."
                 icon="i-tabler-speakerphone" /></template
         ><template #name-cell="{ row }"
-            ><UButton
-                :to="
-                    queryUrl(reportUrl, { ...query, ...selectFilter(page.url, 'campaign', row.original.value) })
-                "
-                :label="row.original.name"
-                icon="i-tabler-speakerphone"
-                variant="link"
-                color="neutral"
-                class="breakdown-label w-full justify-start text-sm text-left"
-                :style="{
-                    '--bar-width':
-                        (row.original.count / leadingCount) * 100 + '%',
-                }" /></template
+            ><Link
+                :href="queryUrl(reportUrl, { ...query, ...selectFilter(page.url, 'campaign', row.original.value) })"
+                class="breakdown-label text-sm"
+                :style="{ '--bar-width-ratio': row.original.count / leadingCount }"
+                ><span class="bar-content"
+                    ><UIcon name="i-tabler-speakerphone" class="size-4 shrink-0" /><span>{{ row.original.name }}</span></span
+                ><span class="bar-content is-ink" aria-hidden="true"
+                    ><UIcon name="i-tabler-speakerphone" class="size-4 shrink-0" /><span>{{ row.original.name }}</span></span
+                ></Link
+            ></template
         ><template #count-cell="{ row }">{{
             new Intl.NumberFormat("en").format(row.original.count)
         }}</template

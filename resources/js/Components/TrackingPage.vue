@@ -18,7 +18,6 @@ async function copy() {
 <template>
     <div class="page-heading">
         <div>
-            <p class="eyebrow">{{ website.domain }}</p>
             <h1>Tracking setup</h1>
             <p class="text-sm text-muted">Connect Lueur to your website.</p>
         </div>

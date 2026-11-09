@@ -80,8 +80,9 @@ const share = (row) =>
         :data="visible"
         :columns="columns"
         :ui="{
-            th: 'text-xs text-muted font-medium',
-            td: 'text-sm py-3 tabular-nums',
+            thead: 'border-b border-default [&>tr]:after:hidden',
+            th: 'h-9 py-0 px-5 text-xs text-dimmed font-medium',
+            td: 'text-sm py-1 px-5 tabular-nums',
             root: 'w-full',
         }"
     >
@@ -100,8 +101,7 @@ const share = (row) =>
                 "
                 class="breakdown-label"
                 :style="{
-                    '--bar-width':
-                        (row.original.count / leadingCount) * 100 + '%',
+                    '--bar-width-ratio': row.original.count / leadingCount,
                 }"
                 :title="reportUrl ? 'Filter: ' + name(row.original) : undefined"
                 @click="
@@ -117,6 +117,7 @@ const share = (row) =>
                         );
                     }
                 "
+                ><span class="bar-content"
                 ><img
                     v-if="type === 'source' && row.original.icon"
                     :src="logoUrl(row.original.icon)"
@@ -136,7 +137,29 @@ const share = (row) =>
                     v-else-if="['browser', 'device_brand'].includes(type)"
                     :name="row.original.icon"
                     class="size-5 text-muted shrink-0"
-                /><span>{{ name(row.original) }}</span></component
+                /><span>{{ name(row.original) }}</span></span
+                ><span class="bar-content is-ink" aria-hidden="true"
+                ><img
+                    v-if="type === 'source' && row.original.icon"
+                    :src="logoUrl(row.original.icon)"
+                    alt=""
+                    class="source-logo"
+                    :class="{ 'source-logo-mono': monoLogos.includes(row.original.icon) }"
+                /><UIcon
+                    v-else-if="type === 'source'"
+                    name="i-tabler-world"
+                    class="size-4 text-muted"
+                /><img
+                    v-else-if="['browser', 'device_brand'].includes(type) && row.original.logo"
+                    :src="logoUrl(row.original.logo)"
+                    alt=""
+                    class="source-logo"
+                /><UIcon
+                    v-else-if="['browser', 'device_brand'].includes(type)"
+                    :name="row.original.icon"
+                    class="size-5 text-muted shrink-0"
+                /><span>{{ name(row.original) }}</span></span
+                ></component
             ></template
         >
         <template #count-cell="{ row }">{{
@@ -147,20 +170,19 @@ const share = (row) =>
         /></template>
     </UTable>
     <div
-        class="flex justify-between items-center px-5 py-3 border-t border-default text-xs text-muted"
+        class="flex justify-between items-center gap-4 px-5 py-2 border-t border-default text-xs text-dimmed"
     >
         <span>{{
             compact
                 ? `${visible.length} values`
-                : `${visible.length} values shown · share of matching ${type === "event" ? "events" : "pageviews"}`
+                : `${visible.length} values shown, as a share of matching ${type === "event" ? "events" : "pageviews"}`
         }}</span
         ><UButton
             v-if="compact && reportUrl"
             :to="queryUrl(reportUrl, query)"
             label="View report"
-            trailing-icon="i-tabler-arrow-up-right"
             size="xs"
-            color="neutral"
+            color="primary"
             variant="link"
         />
     </div>

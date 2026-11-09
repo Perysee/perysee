@@ -6,6 +6,13 @@ export const metricLabels = {
     conversions: "Goal conversions",
     hits: "Goal hits",
 };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// The axis shows "Nov 3" for a daily label; the tooltip keeps the full date of the data.
+export function shortDate(label) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(label));
+    return match ? `${MONTHS[Number(match[2]) - 1]} ${Number(match[3])}` : label;
+}
+
 export function lineOption(
     series,
     metric,
@@ -58,6 +65,7 @@ export function lineOption(
                 fontSize: 12,
                 hideOverlap: true,
                 margin: 14,
+                formatter: shortDate,
             },
         },
         yAxis: {

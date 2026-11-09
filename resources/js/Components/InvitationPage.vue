@@ -8,7 +8,6 @@ const accept = () => form.post(props.invitation.accept_url, { onFinish: () => fo
 </script>
 <template>
     <div class="mb-7 text-center">
-        <p class="eyebrow">Invitation</p>
         <h1 class="text-3xl tracking-tight text-highlighted font-medium mt-2">Join {{ invitation.site }}</h1>
         <p class="text-sm text-muted mt-2">
             You were invited as {{ invitation.role === "owner" ? "an owner" : "a viewer" }} of {{ invitation.domain }}.
